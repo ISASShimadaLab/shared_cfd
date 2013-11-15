@@ -1,0 +1,9 @@
+##### SELECT ARCHITECTURE#######################
+#SUPER COMPUTER
+arc=mod_mpi.o
+compiler=f90jxflat -Umpi -Uomp
+#compiler=f90jx -Umpi -Uomp
+#compiler=f90jx -Umpi
+#compiler=f90jx -Umpi -Uomp -xert,cvr
+##### END SELECT ARCHITECTURE###################
+

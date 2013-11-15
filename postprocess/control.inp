@@ -1,0 +1,10 @@
+#Input File for PostProcessing
+File Read Freq.         : 100
+From Where              : -1
+Database Place          : ../checkout/
+OverWrite? Yes(1)/No(0) : 0
+i-direction start index : 1
+i-direction end   index : -1
+j-direction start index : 1
+j-direction end   index : -1
+

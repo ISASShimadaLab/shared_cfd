@@ -1,0 +1,5 @@
+
+#Viscosity
+sch_viscous.o: sch_viscous.f90 variable.o $(arc)
+	$(compiler) -c $<
+

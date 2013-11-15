@@ -1,0 +1,5 @@
+
+#Time Scheme
+time_euler_viscous.o:   time_euler_viscous.f90  variable.o $(arc)
+	$(compiler) -c $<
+

@@ -1,0 +1,17 @@
+
+#user definition
+condition.o: condition.f90 $(core) $(arc) $(time_scheme) $(viscous) $(thermalmodel) $(highorder)
+	$(compiler) -c $<
+
+main : main.f90 $(core) $(arc) $(time_scheme) $(viscous) $(thermalmodel) $(highorder) condition.o
+	$(compiler) -o $@ $^
+
+clean: remove
+	rm -rf main *.mod *.o *.dat *.eps *.vtk *.bin temp.* result/*.* 
+remove:
+	rm -rf *.o* *.e* result/* result.tar.gz
+
+tar:
+	tar cvf  result.tar result/*.bin geometry.bin RMS.dat
+	gzip result.tar
+

@@ -1,0 +1,11 @@
+
+#thermal model
+dvode.o: dvode.f
+	$(compiler) -c $<
+mod_chem.o:  mod_chem.f90
+	$(compiler) -c $<
+sub_chem.o:  sub_chem.f90 mod_chem.o
+	$(compiler) -c $<
+thermal_model.o:  thermal_model.f90 sub_chem.o prmtr.o variable.o $(arc)
+	$(compiler) -c $<
+

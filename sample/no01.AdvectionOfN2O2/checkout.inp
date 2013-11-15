@@ -1,0 +1,9 @@
+grid file name    : debug0.x #Grid file name (*.x)
+nY                : 3  #The number of gas types
+NumOfProcessors   : 30  #The Maximum Number of Processors @ M-System[Super Computer] / 0 @ Personal Computer
+time step         : 1  #global(0)/local(1)
+time scheme       : 1  #Euler(0)/Runge-Kutta two-step(1)/LU-SGS(2)/Newton-Raphson(3)/Pre-Conditioner(4)
+high order scheme : 1  #Up Wind(0)/MUSCL(1)
+viscosity         : 1  #non-viscous flow(0)/viscous flow(1)
+thermal model     : 0  #Ideal Gas(0)/Cold Flow using chemical kinetics database(1) / Chemical Kinetics Model(2)
+ParametersForAbove: 4 1 #depends on the model. see text.

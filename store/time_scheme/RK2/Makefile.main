@@ -1,0 +1,5 @@
+
+#Time Scheme
+time_RK2_viscous.o:   time_RK2_viscous.f90  variable.o $(arc)
+	$(compiler) -c $<
+

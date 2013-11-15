@@ -1,0 +1,1 @@
+core =  n_grid.o read_control.o scheme.o variable.o prmtr.o geometry.o set_dt.o check_convergence.o inout.o 

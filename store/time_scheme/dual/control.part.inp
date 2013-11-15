@@ -1,0 +1,9 @@
+#For Internal Loop Control
+InternalLoop CFL tau    : 1.e-2
+InternalLoop Omega Max  : 1.e-1
+InternalLoop Omega Min  : 1.e-3
+InternalLoop Dqrate Max : 1.e-2
+InternalLoop ResRateWarn: 1.e-5
+InternalLoop ResRateErr : 1.e-3
+InternalLoop OutOmega   : true
+InternalLoop Max Number : 60

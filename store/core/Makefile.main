@@ -1,0 +1,30 @@
+
+all: main
+
+#Core
+n_grid.o:n_grid.f90
+	$(compiler) -c $<
+prmtr.o: prmtr.f90
+	$(compiler) -c $<
+
+variable.o:variable.f90 n_grid.o
+	$(compiler) -c $<
+mod_mpi.o:mod_mpi.f90 n_grid.o
+	$(compiler) -c $<
+mod_mpi_dummy.o:mod_mpi_dummy.f90 n_grid.o
+	$(compiler) -c $<
+
+geometry.o: geometry.f90 variable.o $(arc)
+	$(compiler) -c $<
+
+scheme.o: scheme.f90     variable.o $(arc)
+	$(compiler) -c $<
+inout.o:  inout.f90                        variable.o $(arc)
+	$(compiler) -c $<
+read_control.o:read_control.f90            variable.o $(arc)
+	$(compiler) -c $<
+check_convergence.o: check_convergence.f90 variable.o $(arc)
+	$(compiler) -c $<
+set_dt.o: set_dt.f90                       variable.o $(arc)
+	$(compiler) -c $<
+
