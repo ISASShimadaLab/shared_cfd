@@ -33,8 +33,8 @@ subroutine calc_next_step_implicit(step_internal)
       do i=max(nxs,sm-nye),min(sm-nys,nxe)
          j=sm-i
          Dq(:,i,j)=alpha(i,j)*(Dq(:,i,j)&
-                              +dsci(i,j)*matmul(Ap(:,:,i,j),Dq(:,i-1,j  ))&
-                              +dscj(i,j)*matmul(Bp(:,:,i,j),Dq(:,i  ,j-1)))
+                              +dsci(i-1,j  )*matmul(Ap(:,:,i-1,j  ),Dq(:,i-1,j  ))&
+                              +dscj(i  ,j-1)*matmul(Bp(:,:,i  ,j-1),Dq(:,i  ,j-1)))
       end do
       !$omp end parallel do
    end do
@@ -51,8 +51,8 @@ subroutine calc_next_step_implicit(step_internal)
       do i=max(nxs,sm-nye),min(sm-nys,nxe)
          j=sm-i
          Dq(:,i,j)=Dq(:,i,j)&
-                  -alpha(i,j)*(dsci(i,j)*matmul(Am(:,:,i,j),Dq(:,i+1,j  ))&
-                              +dscj(i,j)*matmul(Bm(:,:,i,j),Dq(:,i  ,j+1)))
+                  -alpha(i,j)*(dsci(i+1,j  )*matmul(Am(:,:,i+1,j  ),Dq(:,i+1,j  ))&
+                              +dscj(i  ,j+1)*matmul(Bm(:,:,i  ,j+1),Dq(:,i  ,j+1)))
 
          res =res +Dq(nY+3,i,j)**2
          !do k=1,dimq

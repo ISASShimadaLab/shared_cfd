@@ -1,6 +1,6 @@
 #origin=`pwd`
 #cd ../../
-origin="sample/no03.n0012"
+origin="sample/no05.boundary_layer_ideal"
 
 # move input file and checkout
 cp $origin/checkout.inp .

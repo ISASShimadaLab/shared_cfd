@@ -6,20 +6,23 @@ subroutine set_IC
    use gas
    implicit none
    double precision rho,u,v,T
+   double precision q_temp(dimq)
    integer i,j
 
-   T   = 225.31883809d0
-   rho = 1.54148755777d5/(R_gas*T)
-   u   = 121.347809114d0
+   T   = 300d0
+   rho = 1d5/(R_gas*T)
+   u   = 100d0
    v   = 0d0
+
+   q_temp(1:nY)=rho
+   q_temp(nY+1)=rho*u
+   q_temp(nY+2)=rho*v
+   q_temp(nY+3)=rho*(1d0/(kappa_gas-1d0)*R_gas*T +0.5d0*(u**2+v**2))
 
    do i=nxs,nxe
      do j=nys,nye
-        q(1,    i,j)=rho
-        q(2,    i,j)=rho*u
-        q(3,    i,j)=rho*v
-        q(4,    i,j)=rho*(1d0/(kappa_gas-1d0)*R_gas*T+0.5d0*(u**2+v**2))
-        w(4,    i,j)=1.54148755777d5
+        q(:,    i,j)=q_temp
+        w(4,    i,j)=1d5
         w(indxg,i,j)=kappa_gas
         w(indxR,i,j)=R_gas
      end do
@@ -34,8 +37,7 @@ subroutine set_BC(step)
    use gas
    implicit none
    integer,intent(in)::step
-   double precision T
-   double precision dp
+   double precision rho,T
    integer i,j
 
    integer,parameter::DLength=dimw+nY !for MPI Communication
@@ -44,11 +46,22 @@ subroutine set_BC(step)
    !boundary right and left
    if(gx .eq. 1) then
       !i=1/2
-      !mirror wall
+      !subsonic inflow
       do j=nys,nye
-         w(:,   0,j) = w(:,  1,j)
-         w(3,   0,j) =-w(3,  1,j)
-         vhi(:, 0,j) = vhi(:,1,j)
+         T   = 300d0
+         rho = w(4,1,j)/(R_gas*T)
+         w(     1,0,j)= rho
+         w(     2,0,j)= 100d0
+         w(     3,0,j)= 0d0
+         w(     4,0,j)= w(4,1,j)
+
+         w(4+1:4+nY,0,j)= 1d0
+
+         w(indxg, 0,j)=kappa_gas
+         w(indxht,0,j)=kappa_gas/(kappa_gas-1d0)*R_gas*T +0.5d0*(w(2,0,j)**2+w(3,0,j)**2)
+         w(indxR, 0,j)=R_gas
+         w(indxMu,0,j)=nu_gas*rho
+         vhi(:,   0,j)=kappa_gas/(kappa_gas-1d0)*R_gas*T
 
          w(:,  -1,j) = w(:,  0,j)
          vhi(:,-1,j) = vhi(:,0,j)
@@ -60,7 +73,7 @@ subroutine set_BC(step)
       !subsonic outflow
       do j=nys,nye
          w(:,  ni+1,j) = w(:,  ni,j)
-         w(4,  ni+1,j) = 1.54148755777d5
+         w(4,  ni+1,j) = 1d5
          vhi(:,ni+1,j) = vhi(:,ni,j)
 
          w(:,  ni+2,j) = w(:,  ni+1,j)
@@ -73,22 +86,21 @@ subroutine set_BC(step)
    !boundary upper and lower
    if(gy .eq. 1) then
       !j=1/2 lower wall
+
       !slip wall
-      do i=nxs-1,min(nxe+1,200)
+      do i=nxs-1,min(nxe+1,54)
          w(:,  i, 0) =  w(:,  i,1)
-         dp = vnj(1,i,0)*w(2,i,1)+vnj(2,i,0)*w(3,i,1)
-         w(2,  i, 0) =  w(2,  i,1)-2d0*dp*vnj(1,i,0)
-         w(3,  i, 0) =  w(3,  i,1)-2d0*dp*vnj(2,i,0)
+         w(3,  i, 0) = -w(3,  i,1)
          vhi(:,i, 0) =  vhi(:,i,1)
 
          w(:,  i,-1) =  w(:,  i,0)
          vhi(:,i,-1) =  vhi(:,i,0)
       end do
 
-      !mirror wall
-      do i=max(nxs-1,201),nxe+1
+      !non-slip wall
+      do i=max(nxs-1,55),nxe+1
          w(:,  i, 0) =  w(:,  i,1)
-         w(2,  i, 0) =  w(2,  i,1)
+         w(2,  i, 0) = -w(2,  i,1)
          w(3,  i, 0) = -w(3,  i,1)
          vhi(:,i, 0) =  vhi(:,i,1)
 
@@ -99,21 +111,11 @@ subroutine set_BC(step)
 
    if(gy .eq.  ngy) then
       !j=nj+1/2 upper wall
-      !subsonic inflow
+      !subsonic outflow
       do i=nxs-1,nxe+1
-         T = 225.31883809d0
-         w(     1,i,nj+1)=w(4,i,nj)/(R_gas*T)
-         w(     2,i,nj+1)=121.347809114d0
-         w(     3,i,nj+1)=0d0
-         w(     4,i,nj+1)=w(4,i,nj)
-
-         w(4+1:4+nY,i,nj+1)=1d0
-
-         w(indxg, i,nj+1)=kappa_gas
-         w(indxht,i,nj+1)=kappa_gas/(kappa_gas-1d0)*R_gas*T+0.5d0*(w(2,i,nj+1)**2+w(3,i,nj+1)**2)
-         w(indxR, i,nj+1)=R_gas
-         w(indxMu,i,nj+1)=nu_gas*w(1,i,nj+1)
-         vhi(:,   i,nj+1)=kappa_gas/(kappa_gas-1d0)*R_gas*T
+         w(:,  i,nj+1) = w(:,  i,nj)
+         w(4,  i,nj+1) = 1d5
+         vhi(:,i,nj+1) = vhi(:,i,nj)
 
          w(:,  i,nj+2) = w(:,  i,nj+1)
          vhi(:,i,nj+2) = vhi(:,i,nj+1)

@@ -18,11 +18,13 @@ subroutine calc_next_step_implicit(step_internal)
                    +dsj(  i,j-1)*(TGj(1:dimq,i  ,j-1)-TGvj(1:dimq,i  ,j-1))&
                    -dsj(  i,  j)*(TGj(1:dimq,i  ,j  )-TGvj(1:dimq,i  ,j  ))
          Dq(:,i,j)= Dq(:,i,j)-Vol(i,j)*dqdt(:,i,j)
-         Dq(:,i,j)=(Dq(:,i,j)+pre1(:,i,j)*dot_product(pre2(:,i,j),Dq(:,i,j)))/(1d0+beta(i,j))
+
+         Dq(:,i,j)=Dq(:,i,j)+pre_sca(2,i,j)*dot_product(pre2(:,i,j),Dq(:,i,j))*pre1(:,i,j)
       end do
    end do
    !$omp end parallel do
 
+   !!!!!!!!!!!!! FIRST STEP !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
    !set BC Delta q
    Dq(:,nxs-1,:)=0d0
    Dq(:,:,nys-1)=0d0
@@ -33,12 +35,26 @@ subroutine calc_next_step_implicit(step_internal)
       do i=max(nxs,sm-nye),min(sm-nys,nxe)
          j=sm-i
          Dq(:,i,j)=alpha(i,j)*(Dq(:,i,j)&
-                              +dsci(i,j)*matmul(Ap(:,:,i,j),Dq(:,i-1,j  ))&
-                              +dscj(i,j)*matmul(Bp(:,:,i,j),Dq(:,i  ,j-1)))
+                              +dsci(i-1,j  )*matmul(Ap(:,:,i-1,j  ),Dq(:,i-1,j  ))&
+                              +dscj(i  ,j-1)*matmul(Bp(:,:,i  ,j-1),Dq(:,i  ,j-1)))
+
+         Dq(:,i,j)=Dq(:,i,j)+pre_sca(4,i,j) *dot_product(pre2(:,i,j),Dq(:,i,j)) *pre1(:,i,j)
+         Dq(:,i,j)=1d0/pre_sca(1,i,j)*Dq(:,i,j)
       end do
       !$omp end parallel do
    end do
 
+   !!!!!!!!!!!!! SECOND STEP !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+   !$omp parallel do private(i)
+   do j=nys,nye
+      do i=nxs,nxe
+         Dq(:,i,j)=Dq(:,i,j)+pre_sca(3,i,j) *dot_product(pre2(:,i,j),Dq(:,i,j)) *pre1(:,i,j)
+         Dq(:,i,j)=pre_sca(1,i,j)*Dq(:,i,j)
+      end do
+   end do
+   !$omp end parallel do
+
+   !!!!!!!!!!!!! THIRD STEP !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
    !set BC Delta q
    Dq(:,nxe+1,:)=0d0
    Dq(:,:,nye+1)=0d0
@@ -51,8 +67,11 @@ subroutine calc_next_step_implicit(step_internal)
       do i=max(nxs,sm-nye),min(sm-nys,nxe)
          j=sm-i
          Dq(:,i,j)=Dq(:,i,j)&
-                  -alpha(i,j)*(dsci(i,j)*matmul(Am(:,:,i,j),Dq(:,i+1,j  ))&
-                              +dscj(i,j)*matmul(Bm(:,:,i,j),Dq(:,i  ,j+1)))
+                  -alpha(i,j)*(dsci(i+1,j  )*matmul(Am(:,:,i+1,j  ),Dq(:,i+1,j  ))&
+                              +dscj(i  ,j+1)*matmul(Bm(:,:,i  ,j+1),Dq(:,i  ,j+1)))
+
+         Dq(:,i,j)=Dq(:,i,j)+pre_sca(4,i,j) *dot_product(pre2(:,i,j),Dq(:,i,j)) *pre1(:,i,j)
+         Dq(:,i,j)=1d0/pre_sca(1,i,j)*Dq(:,i,j)
 
          res =res +Dq(nY+3,i,j)**2
          !do k=1,dimq
@@ -78,8 +97,12 @@ subroutine calc_next_step_implicit(step_internal)
    tmp = res
    call MPI_Reduce(tmp,  res,1, MPI_DOUBLE_PRECISION, MPI_SUM, 0, MPI_COMM_WORLD, ierr)
    if(myid .eq. 0) then
+      if(res .ne. res) then
+         print *,"res is NaN at internal step=",step_internal
+         call exit(1)
+      end if
       if(step_internal .eq. 1) res1 = res
-      write(66,'(i3,100e9.1)') step_internal,omega,res/res1,dt_grbl
+      write(66,'(i3,100e12.3)') step_internal,omega,res/res1,dt_grbl
    end if
    !!!!!!!!! END OF FOR PARAMETERS ADJUSTMENTS !!!!!!!!!
 

@@ -2,12 +2,12 @@
 NumToCalcAtFlameSheet   : -1
 Oxygen Pressure(Pa)     : 1.e5
 Oxygen Temperature(K)   : 300.
-Oxygen Composition(mole ratio):
+Oxygen Composition(mass ratio):
 O2 1
 N2 1
 end
 Fuel Pressure(Pa)       : 1.e5
 Fuel Temperature(K)     : 300.
-Fuel Composition(mole ratio):
+Fuel Composition(mass ratio):
 O2 1
 end

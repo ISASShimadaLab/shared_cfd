@@ -1,0 +1,354 @@
+\documentclass{jsarticle}
+\usepackage{shotayam}
+\newcommand{\bQ}{\huto Q}
+\newcommand{\bhQ}{\huto{\hat Q}}
+\newcommand{\bI}{\huto I}
+\newcommand{\bE}{\huto E}
+\newcommand{\bF}{\huto F}
+\newcommand{\bA}{\huto A}
+\newcommand{\bB}{\huto B}
+\newcommand{\bS}{\huto S}
+\newcommand{\bG}{\huto \Gamma}
+\newcommand{\bp}{\huto \phi}
+\newcommand{\Vol}{\mr{Vol}}
+\begin{document}
+
+\paragraph{pre-conditioner}
+
+\hspace{1em}
+
+\textbf{Note:} The equation of this paragraph is based on the concept of Weiss et al.(Preconditioning Applied to Variable and Constant Density Flows,1995)
+
+\hspace{1em}
+
+Governing equation is 
+\begin{equation}
+\bG \frac{\pa \bQ}{\pa t} + \frac{\pa \bE}{\pa x} + \frac{\pa \bF}{\pa y} = 0
+\end{equation}
+while
+\begin{equation}
+\bQ=\begin{pmatrix}
+\rho _1 \\
+\rho _2 \\
+\vdots\\
+\rho _n \\
+\rho u\\
+\rho v\\
+\rho E
+\end{pmatrix},
+\hspace{2em}
+\bE=\begin{pmatrix}
+\rho _1 u\\
+\rho _2 u\\
+\vdots\\
+\rho _n u\\
+\rho u^2 + p\\
+\rho vu\\
+\rho u H
+\end{pmatrix},
+\hspace{2em}
+\bF=\begin{pmatrix}
+\rho _1 v\\
+\rho _2 v\\
+\vdots\\
+\rho _n v\\
+\rho uv\\
+\rho v^2 + p\\
+\rho v H
+\end{pmatrix}
+\end{equation}
+and the Preconditioner matrix is 
+\begin{equation}
+\bG = \bI + \Phi \bp \frac{\pa p}{\pa \bQ}.
+\end{equation}
+$\bI$ is identity matrix and 
+\begin{equation}
+\bp = \begin{pmatrix}
+\rho _1 /\rho\\
+\rho _2 /\rho\\
+\vdots\\
+\rho _n /\rho\\
+u\\
+v\\
+H
+\end{pmatrix}
+\end{equation}
+and $\frac{\pa p}{\pa \bQ}$ is raw vector.
+
+$\Phi$ is calculated from the equations below.
+\begin{gather}
+\Phi = \frac{1}{U_r^2}-\frac 1 {c^2}\\
+U_r = \mr{min}(\mr{max}(V_v,|V|),c), \hspace{2em}V_v = \frac{\mu}{\rho \Delta s}
+\end{gather}
+$|V|$ is the absolute value of local velocity. $\Delta s$ is the shorter one of lengths of cell. $V_v$ represents reference velocity of viscosity.
+
+The governing equation is deformated as below.
+\begin{gather}
+\bG \frac{\pa \bQ^{n+1}}{\pa t} + \frac{\pa \bE^{n+1}}{\pa x} + \frac{\pa \bF^{n+1}}{\pa y} = 0\\
+\frac{\pa \bQ^{n+1}}{\pa t} + \bG ^{-1} \frac{\pa \bE^{n+1}}{\pa x} + \bG ^{-1} \frac{\pa \bF^{n+1}}{\pa y} = 0\\
+\int \frac{\pa \bQ^{n+1}}{\pa t} dV + \int \bG ^{-1} \frac{\pa \bE^{n+1}}{\pa x} dV + \int \bG ^{-1} \frac{\pa \bF^{n+1}}{\pa y} dV = 0\\
+\begin{split}
+\frac{\Delta \bQ _{i,j}}{\Delta t} \Vol _{i,j}
+&+ (\bG ^{-1} \bE^{n+1})_{i+1/2,j}\Delta si_{i+1/2,j} - (\bG ^{-1} \bE^{n+1})_{i-1/2,j}\Delta si_{i-1/2,j}\\
+&+ (\bG ^{-1} \bF^{n+1})_{i,j+1/2}\Delta sj_{i,j+1/2} - (\bG ^{-1} \bF^{n+1})_{i,j-1/2}\Delta sj_{i,j-1/2}=0\\
+\end{split}\\
+\begin{split}
+\frac{\Delta \bQ _{i,j}}{\Delta t} \Vol _{i,j}
+&+ (\bG ^{-1} \bE^n)_{i+1/2,j}\Delta si_{i+1/2,j} - (\bG ^{-1} \bE^n)_{i-1/2,j}\Delta si_{i-1/2,j}\\
+&+ (\bA\Delta \bQ)_{i+1/2,j}\Delta si_{i+1/2,j} - (\bA\Delta \bQ)_{i-1/2,j}\Delta si_{i-1/2,j}\\
+&+ (\bG ^{-1} \bF^n)_{i,j+1/2}\Delta sj_{i,j+1/2} - (\bG ^{-1} \bF^n)_{i,j-1/2}\Delta sj_{i,j-1/2}\\
+&+ (\bB\Delta \bQ)_{i,j+1/2}\Delta sj_{i,j+1/2} - (\bB\Delta \bQ)_{i,j-1/2}\Delta sj_{i,j-1/2}=0\\
+\end{split} \label{before_pm}
+\end{gather}
+while
+\begin{equation}
+\bA = \frac{\pa (\bG ^{-1}\bE)}{\pa \bQ},\hspace{2em}\bB = \frac{\pa (\bG ^{-1}\bF)}{\pa \bQ}
+\end{equation}
+and the spectral radius $\nu _A$ for $A$ and $\nu _B$ for $B$ will be
+\begin{gather}
+\begin{cases}
+\nu _A = |u'_A|+c'_A\\
+u'_A = u (1-\alpha)\\
+c'_A = \sqrt{\alpha^2 u^2+U_r^2}
+\end{cases}\\
+\begin{cases}
+\nu _B = |u'_B|+c'_B\\
+u'_B = v (1-\alpha)\\
+c'_B = \sqrt{\alpha^2 v^2+U_r^2}
+\end{cases}\\
+\alpha = \frac 1 2 \left( 1-\left( \frac{U_r}{c} \right) ^2\right)
+\end{gather}
+The time step have to be calculated from these spectral radiuses.
+
+When LU-SGS is used, $A$ and $B$ is approximated as below.
+\begin{gather}
+A_{i+1/2,j}=A^+_{i,j}+A^-_{i+1,j}\\
+A^\pm_{i,j}=\frac 1 2 \left( A \pm \nu_A \bI\right)
+\end{gather}
+
+Therefore, \eqref{before_pm} becomes
+\begin{gather}
+\begin{split}
+\frac{\Delta \bQ _{i,j}}{\Delta t} \Vol _{i,j}
+&+ (\bG ^{-1} \bE^n)_{i+1/2,j}\Delta si_{i+1/2,j} - (\bG ^{-1} \bE^n)_{i-1/2,j}\Delta si_{i-1/2,j}\\
+&+ (\bA^+\Delta \bQ)_{i,  j}\Delta si_{i,  j} - (\bA^+\Delta \bQ)_{i-1,j}\Delta si_{i-1,j}\\
+&+ (\bA^-\Delta \bQ)_{i+1,j}\Delta si_{i+1,j} - (\bA^-\Delta \bQ)_{i,  j}\Delta si_{i,  j}\\
+&+ (\bG ^{-1} \bF^n)_{i,j+1/2}\Delta sj_{i,j+1/2} - (\bG ^{-1} \bF^n)_{i,j-1/2}\Delta sj_{i,j-1/2}\\
+&+ (\bB^+\Delta \bQ)_{i,j  }\Delta sj_{i,j  } - (\bB^+\Delta \bQ)_{i,j-1}\Delta sj_{i,j-1}\\
+&+ (\bB^-\Delta \bQ)_{i,j+1}\Delta sj_{i,j+1} - (\bB^-\Delta \bQ)_{i,j  }\Delta sj_{i,j  }=0\\
+\end{split}\\
+\begin{split}
+\frac{\Delta \bQ _{i,j}}{\Delta t} \Vol _{i,j}
+&+ (\bG ^{-1} \bE^n)_{i+1/2,j}\Delta si_{i+1/2,j} - (\bG ^{-1} \bE^n)_{i-1/2,j}\Delta si_{i-1/2,j}\\
+&+ (\nu _A\Delta \bQ)_{i,  j}\Delta si_{i,  j} + (\bA^-\Delta \bQ)_{i+1,j}\Delta si_{i+1,j} - (\bA^+\Delta \bQ)_{i-1,j}\Delta si_{i-1,j}\\
+&+ (\bG ^{-1} \bF^n)_{i,j+1/2}\Delta sj_{i,j+1/2} - (\bG ^{-1} \bF^n)_{i,j-1/2}\Delta sj_{i,j-1/2}\\
+&+ (\nu _B\Delta \bQ)_{i,j  }\Delta sj_{i,j  } + (\bB^-\Delta \bQ)_{i,j+1}\Delta sj_{i,j+1} - (\bB^+\Delta \bQ)_{i,j-1}\Delta sj_{i,j-1}=0
+\end{split}\\
+\begin{split}
+&\left( \frac{\Vol _{i,j}}{\Delta t} + \nu _{A_{i,j}}\Delta si_{i,j} + \nu _{B_{i,j  }}\Delta sj_{i,j  }\right) \Delta \bQ _{i,j}\\
+&+ (\bA^-\Delta \bQ)_{i+1,j}\Delta si_{i+1,j} - (\bA^+\Delta \bQ)_{i-1,j}\Delta si_{i-1,j}\\
+&+ (\bB^-\Delta \bQ)_{i,j+1}\Delta sj_{i,j+1} - (\bB^+\Delta \bQ)_{i,j-1}\Delta sj_{i,j-1}\\
+&+ (\bG ^{-1} \bE^n)_{i+1/2,j}\Delta si_{i+1/2,j} - (\bG ^{-1} \bE^n)_{i-1/2,j}\Delta si_{i-1/2,j}\\
+&+ (\bG ^{-1} \bF^n)_{i,j+1/2}\Delta sj_{i,j+1/2} - (\bG ^{-1} \bF^n)_{i,j-1/2}\Delta sj_{i,j-1/2}=0
+\end{split}
+\end{gather}
+and for convinience, this equation is approximated as follows:
+\begin{gather}
+\begin{split}
+&\left( \frac{\Vol _{i,j}}{\Delta t} + \nu _{A_{i,j}}\Delta si_{i,j} + \nu _{B_{i,j  }}\Delta sj_{i,j  }\right) \Delta \bQ _{i,j}\\
+&+ (\bA^-\Delta \bQ)_{i+1,j}\Delta si_{i+1,j} - (\bA^+\Delta \bQ)_{i-1,j}\Delta si_{i-1,j}\\
+&+ (\bB^-\Delta \bQ)_{i,j+1}\Delta sj_{i,j+1} - (\bB^+\Delta \bQ)_{i,j-1}\Delta sj_{i,j-1}\\
+&+ \bG ^{-1} _{i,j} \left( (\bE \Delta si)_{i+1/2,j} - (\bE \Delta si)_{i-1/2,j}+  (\bF \Delta sj)_{i,j+1/2} - (\bF \Delta sj)_{i,j-1/2} \right) =0.
+\end{split} \label{eq_beforeD}
+\end{gather}
+Still more, the expressions below are used.
+\begin{gather}
+1/\alpha _{i,j}=\frac{\Vol _{i,j}}{\Delta t} + \nu _{A_{i,j}}\Delta si_{i,j} + \nu _{B_{i,j  }}\Delta sj_{i,j  }\\
+D_i^+ \Delta \bQ_{i,j} = \Delta \bQ_{i+1,j}\\
+D_i^- \Delta \bQ_{i,j} = \Delta \bQ_{i-1,j}\\
+D_j^+ \Delta \bQ_{i,j} = \Delta \bQ_{i,j+1}\\
+D_j^- \Delta \bQ_{i,j} = \Delta \bQ_{i,j-1}
+\end{gather}
+Then \eqref{eq_beforeD} becomes
+\begin{gather}
+\begin{split}
+(\bI
+&+ \alpha_{i,j}(\bA^-\Delta si)_{i+1,j}D_i^+ - \alpha_{i,j}(\bA^+\Delta si)_{i-1,j}D_i^-\\
+&+ \alpha_{i,j}(\bB^-\Delta sj)_{i,j+1}D_j^+ - \alpha_{i,j}(\bB^+\Delta sj)_{i,j-1}D_j^-)\Delta Q_{i,j}\\
+&+ \alpha_{i,j}\bG ^{-1} _{i,j} \left( (\bE \Delta si)_{i+1/2,j} - (\bE \Delta si)_{i-1/2,j}+  (\bF \Delta sj)_{i,j+1/2} - (\bF \Delta sj)_{i,j-1/2} \right) =0
+\end{split} \label{eq_beforeD}
+\end{gather}
+and moreover because $\alpha _{i,j}$ becomes small generally, the deformation below is used.
+\begin{gather}
+\begin{split}
+&(\bI -\alpha_{i,j}(\bA^+\Delta si)_{i-1,j}D_i^- -\alpha_{i,j}(\bB^+\Delta sj)_{i,j-1}D_j^-)(\bI+\alpha_{i,j}(\bA^-\Delta si)_{i+1,j}D_i^+ +\alpha_{i,j}(\bB^-\Delta sj)_{i,j+1}D_j^+)\Delta Q_{i,j}\\
+&+ \alpha_{i,j}\bG ^{-1} _{i,j} \left( (\bE \Delta si)_{i+1/2,j} - (\bE \Delta si)_{i-1/2,j}+  (\bF \Delta sj)_{i,j+1/2} - (\bF \Delta sj)_{i,j-1/2} \right) =0.
+\end{split} 
+\end{gather}
+This equation is solved in two steps. First step is
+\begin{gather}
+\begin{split}
+&(\bI -\alpha_{i,j}(\bA^+\Delta si)_{i-1,j}D_i^- -\alpha_{i,j}(\bB^+\Delta sj)_{i,j-1}D_j^-)\Delta Q^*_{i,j}\\
+&+ \alpha_{i,j}\bG ^{-1} _{i,j} \left( (\bE \Delta si)_{i+1/2,j} - (\bE \Delta si)_{i-1/2,j}+  (\bF \Delta sj)_{i,j+1/2} - (\bF \Delta sj)_{i,j-1/2} \right) =0
+\end{split} 
+\end{gather}
+i.e.
+\begin{gather}
+\begin{split}
+&\Delta Q^*_{i,j} -\alpha_{i,j}(\bA^+\Delta si)_{i-1,j}\Delta Q^*_{i-1,j}-\alpha_{i,j}(\bB^+\Delta sj)_{i,j-1}\Delta Q^*_{i,j-1}\\
+&+ \alpha_{i,j}\bG ^{-1} _{i,j} \left( (\bE \Delta si)_{i+1/2,j} - (\bE \Delta si)_{i-1/2,j}+  (\bF \Delta sj)_{i,j+1/2} - (\bF \Delta sj)_{i,j-1/2} \right) =0
+\end{split}\\
+\therefore
+\begin{split}
+\Delta Q^*_{i,j}&= \alpha_{i,j}((\bA^+\Delta si)_{i-1,j}\Delta Q^*_{i-1,j}+(\bB^+\Delta sj)_{i,j-1}\Delta Q^*_{i,j-1}\\
+&- \bG ^{-1} _{i,j} \left( (\bE \Delta si)_{i+1/2,j} - (\bE \Delta si)_{i-1/2,j}+  (\bF \Delta sj)_{i,j+1/2} - (\bF \Delta sj)_{i,j-1/2} \right) ).
+\end{split}
+\end{gather}
+The second one is
+\begin{gather}
+(\bI+\alpha_{i,j}(\bA^-\Delta si)_{i+1,j}D_i^+ +\alpha_{i,j}(\bB^-\Delta sj)_{i,j+1}D_j^+)\Delta Q_{i,j} = \Delta Q^*_{i,j}
+\end{gather}
+i.e.
+\begin{gather}
+\Delta Q_{i,j}+\alpha_{i,j}(\bA^-\Delta si)_{i+1,j}\Delta Q_{i+1,j} +\alpha_{i,j}(\bB^-\Delta sj)_{i,j+1}\Delta Q_{i,j+1} = \Delta Q^*_{i,j}\\
+\therefore \Delta Q_{i,j}=\Delta Q^*_{i,j}-\alpha_{i,j}((\bA^-\Delta si)_{i+1,j}\Delta Q_{i+1,j} +(\bB^-\Delta sj)_{i,j+1}\Delta Q_{i,j+1}).
+\end{gather}
+
+When calculating this equation, you have to calculate $\bG ^{-1}$. But this can be calculated easily. For general expression, considering the matrix next.
+\begin{equation}
+H=I+ab
+\end{equation}
+while $I$ is identity matrix, a is row vector and b is column vector. The inverse matrix is
+\begin{equation}
+H^{-1}=I-\frac{1}{1+(b\cdot a)}ab
+\end{equation}
+because
+\begin{equation}
+\begin{split}
+(I+ab)(I-\frac{1}{1+(b\cdot a)}ab)
+&=I+ab-\frac{1}{1+(b\cdot a)}ab-\frac{1}{1+(b\cdot a)}abab\\
+&=I+ab-\frac{1}{1+(b\cdot a)}ab-\frac{1}{1+(b\cdot a)}a(b\cdot a)b\\
+&=I+ab-\frac{1}{1+(b\cdot a)}ab-\frac{(b\cdot a)}{1+(b\cdot a)}ab\\
+&=I+(1-\frac{1}{1+(b\cdot a)}-\frac{(b\cdot a)}{1+(b\cdot a)})ab\\
+&=I+\frac{1+(b\cdot a)-1-(b\cdot a)}{1+(b\cdot a)}ab\\
+&=I
+\end{split}
+\end{equation}
+and the mathematical commutative law can be applied to this calculation. Therefore, if $a = \Phi \bp$ and $b= \frac{\pa p}{\pa \bQ}$, by using $(\bp \cdot \frac{\pa p}{\pa \bQ}) = c^2$ (I cannnot explain theoretically this relation, but when calculating it, this relation is correct.)
+\begin{equation}
+\begin{split}
+\bG ^{-1} &= \bI -\frac{1}{1+(\Phi \bp \cdot \frac{\pa p}{\pa \bQ})}\Phi \bp \frac{\pa p}{\pa \bQ}\\
+&=\bI -\frac{\Phi}{1+\Phi c^2}\bp \frac{\pa p}{\pa \bQ}\\
+&=\bI -\frac{1}{\frac 1 \Phi+c^2}\bp \frac{\pa p}{\pa \bQ}.
+\end{split}
+\end{equation}
+In my program, $-\frac{1}{\frac 1 \Phi+c^2}$ is named as "phh".
+
+
+
+
+
+
+
+\paragraph{Dual Time Step method with pre-conditioner}
+The governing equation is
+\begin{equation}
+\bG \frac{\pa \bQ}{\pa \tau} + \frac{\pa \bQ}{\pa t} + \frac{\pa \bE}{\pa x} + \frac{\pa \bF}{\pa y} = 0
+\end{equation}
+The concept of the dual time step is when the equation is converged for $\tau$, i.e. $\bG \frac{\pa \bQ}{\pa \tau}=0$, this equation becomes
+\begin{equation}
+\frac{\pa \bQ}{\pa t} + \frac{\pa \bE}{\pa x} + \frac{\pa \bF}{\pa y} = 0
+\end{equation}
+Therefore unsteady phenomena can be solved with pre-conditioner.
+
+In this calculation, outer time step is counted by $n$, and the inner time step is counted by $m$. For the calculation for $n+1$ outer step, the equation at $m+1$ inner step becomes
+\begin{equation}
+\frac{\Delta \bhQ}{\Delta \tau} + \bG ^{-1}\frac{3\bQ^{m+1}-4\bQ^{n}+\bQ^{n-1}}{2\Delta t} + \bG ^{-1}\frac{\pa \bE^{m+1}}{\pa x} + \bG ^{-1}\frac{\pa \bF^{m+1}}{\pa y} = 0
+\end{equation}
+while $\Delta \bhQ = \bhQ^{m+1}-\bhQ^m$. When the inner loop is converged, that is, $\Delta \bhQ$ becomes nearly zero, $\bQ^{n+1}$ is set to $\bQ^{m+1}$ and next $n$ is calculated.
+
+This equation is deformated like the section before, and finally it becomes
+\begin{gather}
+\begin{split}
+&\left( \Vol _{i,j}(\frac{1}{\Delta \tau} +\frac{3}{2\Delta t}\bG ^{-1})+ \nu _{A_{i,j}}\Delta si_{i,j} + \nu _{B_{i,j  }}\Delta sj_{i,j  }\right) \Delta \bhQ _{i,j}\\
+&+ (\bA^-\Delta \bhQ)_{i+1,j}\Delta si_{i+1,j} - (\bA^+\Delta \bhQ)_{i-1,j}\Delta si_{i-1,j}\\
+&+ (\bB^-\Delta \bhQ)_{i,j+1}\Delta sj_{i,j+1} - (\bB^+\Delta \bhQ)_{i,j-1}\Delta sj_{i,j-1}\\
+&+ \bG ^{-1} _{i,j} \left( (\bE \Delta si)_{i+1/2,j} - (\bE \Delta si)_{i-1/2,j}+  (\bF \Delta sj)_{i,j+1/2} - (\bF \Delta sj)_{i,j-1/2}+ \frac{3\bQ^m-4\bQ^n+\bQ^{n-1}}{2\Delta t}\right) =0
+\end{split}\\
+\begin{split}
+&\left( (\frac{\Vol _{i,j}}{\Delta \tau}+ \nu _{A_{i,j}}\Delta si_{i,j} + \nu _{B_{i,j}}\Delta sj_{i,j}) +\frac{3\Vol _{i,j}}{2\Delta t}\bG ^{-1}\right) \Delta \bhQ _{i,j}\\
+&+ (\bA^-\Delta \bhQ)_{i+1,j}\Delta si_{i+1,j} - (\bA^+\Delta \bhQ)_{i-1,j}\Delta si_{i-1,j}\\
+&+ (\bB^-\Delta \bhQ)_{i,j+1}\Delta sj_{i,j+1} - (\bB^+\Delta \bhQ)_{i,j-1}\Delta sj_{i,j-1}\\
+&+ \bG ^{-1} _{i,j} \left( (\bE \Delta si)_{i+1/2,j} - (\bE \Delta si)_{i-1/2,j}+  (\bF \Delta sj)_{i,j+1/2} - (\bF \Delta sj)_{i,j-1/2}+\frac{3\bQ^m-4\bQ^n+\bQ^{n-1}}{2\Delta t}\right) =0
+\end{split}
+\end{gather}
+So if the expressions below are used,
+\begin{gather}
+1/\alpha _{i,j}=\frac{\Vol _{i,j}}{\Delta \tau} + \nu _{A_{i,j}}\Delta si_{i,j} + \nu _{B_{i,j  }}\Delta sj_{i,j  }\\
+\beta _{i,j} = \frac{3\Vol _{i,j}}{2\Delta t}\alpha_{i,j}\\
+\bS_{i,j} = \bI +\beta _ {i,j}\bG ^{-1}\\
+RHS_{i,j} = -\bG ^{-1} _{i,j} \left( (\bE \Delta si)_{i+1/2,j} - (\bE \Delta si)_{i-1/2,j}+  (\bF \Delta sj)_{i,j+1/2} - (\bF \Delta sj)_{i,j-1/2}+\frac{3\bQ^m-4\bQ^n+\bQ^{n-1}}{2\Delta t}\right) \\
+D_i^+ \Delta \bhQ_{i,j} = \Delta \bhQ_{i+1,j}\\
+D_i^- \Delta \bhQ_{i,j} = \Delta \bhQ_{i-1,j}\\
+D_j^+ \Delta \bhQ_{i,j} = \Delta \bhQ_{i,j+1}\\
+D_j^- \Delta \bhQ_{i,j} = \Delta \bhQ_{i,j-1}
+\end{gather}
+it becomes
+\begin{gather}
+\begin{split}
+&\left( \bI +\beta _ {i,j}\bG ^{-1}+ \alpha_{i,j}(\bA^-\Delta si)_{i+1,j}D_i^+ - \alpha_{i,j}(\bA^+\Delta si)_{i-1,j}D_i^-+ \alpha_{i,j}(\bB^-\Delta sj)_{i,j+1}D_j^+ - \alpha_{i,j}(\bB^+\Delta sj)_{i,j-1}D_j^- \right) \bhQ _{i,j}\\
+&=\alpha_{i,j}RHS_{i,j}
+\end{split}\\
+\begin{split}
+&\left( \bS_ {i,j}+ \alpha_{i,j}(\bA^-\Delta si)_{i+1,j}D_i^+ - \alpha_{i,j}(\bA^+\Delta si)_{i-1,j}D_i^-+ \alpha_{i,j}(\bB^-\Delta sj)_{i,j+1}D_j^+ - \alpha_{i,j}(\bB^+\Delta sj)_{i,j-1}D_j^- \right) \bhQ _{i,j}\\
+&=\alpha_{i,j}RHS_{i,j}
+\end{split}
+\end{gather}
+Here we use LDU decomposition approximation such as
+\begin{equation}
+L+D+U \sim (D+U)D^{-1}(D+L).
+\end{equation}
+So it becomes
+\begin{gather}
+\begin{split}
+&\left( \bS_{i,j} -\alpha_{i,j}(\bA^+\Delta si)_{i-1,j}D_i^- -\alpha_{i,j}(\bB^+\Delta sj)_{i,j-1}D_j^-\right)\bS_{i,j}^{-1}\left( \bS_{i,j} +\alpha_{i,j}(\bA^-\Delta si)_{i+1,j}D_i^+ +\alpha_{i,j} (\bB^-\Delta sj)_{i,j+1}D_j^+\right) \bhQ _{i,j}\\
+&=\alpha_{i,j}RHS_{i,j}
+\end{split}
+\end{gather}
+
+This equation is calculated three steps.
+\subparagraph{First step}
+\begin{gather}
+\left( \bS_{i,j} -\alpha_{i,j}(\bA^+\Delta si)_{i-1,j}D_i^- -\alpha_{i,j}(\bB^+\Delta sj)_{i,j-1}D_j^-\right) \bhQ ^{**}_{i,j}=\alpha_{i,j}RHS_{i,j}\\
+\therefore \bS_{i,j}\bhQ ^{**}_{i,j} -\alpha_{i,j}(\bA^+\Delta si)_{i-1,j}\bhQ ^{**}_{i-1,j} -\alpha_{i,j}(\bB^+\Delta sj)_{i,j-1}\bhQ ^{**}_{i,j-1}=\alpha_{i,j}RHS_{i,j}\\
+\bS_{i,j}\bhQ ^{**}_{i,j} =\alpha_{i,j}(RHS_{i,j}+(\bA^+\Delta si)_{i-1,j}\bhQ ^{**}_{i-1,j} +(\bB^+\Delta sj)_{i,j-1}\bhQ ^{**}_{i,j-1})\\
+\bhQ ^{**}_{i,j} = \alpha_{i,j}\bS_{i,j}^{-1}(RHS_{i,j}+(\bA^+\Delta si)_{i-1,j}\bhQ ^{**}_{i-1,j} +(\bB^+\Delta sj)_{i,j-1}\bhQ ^{**}_{i,j-1})
+\end{gather}
+\subparagraph{Second step}
+\begin{gather}
+\bS_{i,j}^{-1}\bhQ ^*_{i,j}=\bhQ ^{**}_{i,j}\\
+\therefore \bhQ ^*_{i,j}=\bS_{i,j}\bhQ ^{**}_{i,j}
+\end{gather}
+\subparagraph{Third step}
+\begin{gather}
+\left( \bS_{i,j} +\alpha_{i,j}(\bA^-\Delta si)_{i+1,j}D_i^+ +\alpha_{i,j} (\bB^-\Delta sj)_{i,j+1}D_j^+\right) \bhQ _{i,j}=\bhQ ^*_{i,j}\\
+\therefore \bS_{i,j} \bhQ _{i,j} +\alpha_{i,j}(\bA^-\Delta si)_{i+1,j}\bhQ _{i+1,j} +\alpha_{i,j} (\bB^-\Delta sj)_{i,j+1}\bhQ _{i,j+1}=\bhQ ^*_{i,j}\\
+\bS_{i,j} \bhQ _{i,j} =\bhQ ^*_{i,j}-\alpha_{i,j}((\bA^-\Delta si)_{i+1,j}\bhQ _{i+1,j} +(\bB^-\Delta sj)_{i,j+1}\bhQ _{i,j+1})\\
+\bhQ _{i,j} =\bS^{-1}_{i,j}(\bhQ ^*_{i,j}-\alpha_{i,j}((\bA^-\Delta si)_{i+1,j}\bhQ _{i+1,j} +(\bB^-\Delta sj)_{i,j+1}\bhQ _{i,j+1}))
+\end{gather}
+
+In this equation, you want $\bS, \bS^{-1}$. They are
+\begin{gather}
+\begin{split}
+\bS_{i,j} &= \bI +\beta _ {i,j}\bG ^{-1}\\
+          &= \bI +\beta _ {i,j}\left( \bI -\frac{1}{\frac 1 \Phi+c^2}\bp \frac{\pa p}{\pa \bQ} \right)\\
+          &= (1+\beta _{i,j})\bI -\frac{\beta _ {i,j}}{\frac 1 \Phi+c^2}\bp \frac{\pa p}{\pa \bQ}\\
+          &= (1+\beta _{i,j})\left( \bI -\frac{1}{(\frac{1}{\beta _{i,j}}+1)(\frac 1 \Phi+c^2)}\bp \frac{\pa p}{\pa \bQ}\right)
+\end{split}\\
+\begin{split}
+\bS_{i,j}^{-1} &=\frac{1}{1+\beta _{i,j}} \left( \bI -\frac{1}{1/(-\frac{\beta _ {i,j}}{(1+\beta _{i,j})(\frac 1 \Phi+c^2)})+c^2} \bp \frac{\pa p}{\pa \bQ}\right)\\
+               &=\frac{1}{1+\beta _{i,j}} \left( \bI +\frac{\beta _ {i,j}}{\frac{1+\beta _ {i,j}} \Phi+c^2} \bp \frac{\pa p}{\pa \bQ}\right)
+\end{split}
+\end{gather}
+
+\end{document}

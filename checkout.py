@@ -201,6 +201,13 @@ elif(val == 5):
 	if(val_dt == 1):
 		print "ERROR: This scheme cannot be used at local time step."
 		sys.exit(1)
+elif(val == 6):
+	print "\tPre-conditioner using LU-SGS is selected."
+	engage("time_scheme/preconLU-SGS")
+	raw2pro("checkout/sch_precon.raw.f90","checkout/sch_precon.f90",[["DT_LOCAL_GLOBAL",DT_LOCAL_GLOBAL]])
+	if(val_dt == 0):
+		print "ERROR: This scheme cannot be used at global time step."
+		sys.exit(1)
 else:
 	print "\tOdd Input at time scheme! value is ",val
 	sys.exit(1)

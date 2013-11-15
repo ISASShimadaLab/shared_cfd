@@ -6,8 +6,8 @@ subroutine set_ABpm
 
    implicit none
    double precision rho,u,v,H,c,p,Vs
-   double precision Ur,Vv,alp,ud,cd,beta
-   double precision tmp,uds,dtau
+   double precision Ur,Vv,alp,ud,cd,phh
+   double precision tmp,uds
    double precision unA, unB, nuA, nuB
    double precision,dimension(dimq,dimq)::A,B,Atilde,Btilde
    double precision,dimension(dimq)::tA,tB
@@ -16,11 +16,11 @@ subroutine set_ABpm
 
    !$omp parallel do private(i,k,l,&
    !$omp                     rho,u,v,H,Vs,&
-   !$omp                     Ur,Vv,alp,ud,cd,beta,&
+   !$omp                     Ur,Vv,alp,ud,cd,phh,&
    !$omp                     p,c,tmp,&
    !$omp                     unA,unB,nuA,nuB,&
    !$omp                     A,B,Atilde,Btilde,&
-   !$omp                     gmmad,gamm,uds,dtau,&
+   !$omp                     gmmad,gamm,uds,&
    !$omp                     tA,tB)
    do j=nys,nye
       do i=nxs,nxe
@@ -55,25 +55,17 @@ subroutine set_ABpm
 
          !set new dt
          uds= nuA*(dsi(i,j)+dsi(i-1,j))+nuB*(dsj(i,j)+dsj(i,j-1))
-         dtau = cfl_tau*Vol(i,j)/max(uds,w(indxMu,i,j)/rho)
+         dt_mat(i,j) = cfl*Vol(i,j)/max(uds,w(indxMu,i,j)/rho)
 
          !set preconditioner
-         !set scalars
-         alpha(i,j)= 1d0/(Vol(i,j)/dtau + dsci(i,j)*nuA + dscj(i,j)*nuB)
-         beta      = 3d0*Vol(i,j)/(2d0*DT_LOCAL_GLOBAL) *alpha(i,j)
-         
-         pre_sca(1,i,j) = 1d0+beta                                       !for S and S^(-1)
-         pre_sca(2,i,j) = -1d0/(       1d0/phi(i,j)+c**2)                !for Gamma^(-1)
-         pre_sca(3,i,j) = -1d0/(       1d0/phi(i,j)+c**2)/(1d0/beta+1d0) !for S
-         pre_sca(4,i,j) = beta/((1d0+beta)/phi(i,j)+c**2)                !for S^(-1)
+         phh = -1d0/(c**2+1d0/phi(i,j))
 
-         !set vectors
          do k=1,nY
-            pre1(k,i,j) = w(4+k,i,j)
+            pre1(k,i,j) = phh*w(4+k,i,j)
          end do
-         pre1(nY+1,i,j) = u
-         pre1(nY+2,i,j) = v
-         pre1(nY+3,i,j) = H
+         pre1(nY+1,i,j) = phh*u
+         pre1(nY+2,i,j) = phh*v
+         pre1(nY+3,i,j) = phh*H
 
          do k=1,nY
             pre2(k,i,j) = 0.5d0*gmmad*Vs+DHi(k,i,j)
@@ -82,7 +74,7 @@ subroutine set_ABpm
          pre2(nY+2,i,j) =-gmmad*v
          pre2(nY+3,i,j) = gmmad
 
-         !set pure AB
+
          !set A
          A(nY+1,nY+1)= u*(3d0-gamm)
          A(nY+2,nY+1)= v
@@ -152,14 +144,13 @@ subroutine set_ABpm
             B(nY+3,k)=tB(nY+3)+DHi(k,i,j)*v
          end do
 
-         !multiply Gamma^(-1)
+
+         !multiply preM
          do k=1,dimq
             tmp = 0d0
             do l=1,dimq
                tmp = tmp + pre2(l,i,j)*A(l,k)
             end do
-
-            tmp = pre_sca(2,i,j) * tmp
 
             do l=1,dimq
                A(l,k) = A(l,k) + pre1(l,i,j)*tmp
@@ -172,14 +163,12 @@ subroutine set_ABpm
                tmp = tmp + pre2(l,i,j)*B(l,k)
             end do
 
-            tmp = pre_sca(2,i,j) * tmp
-
             do l=1,dimq
                B(l,k) = B(l,k) + pre1(l,i,j)*tmp
             end do
          end do
 
-         !set ABpm
+
          !set Atilde, Apm
          Atilde = vnci(1,i,j)*A+vnci(2,i,j)*B
 
@@ -201,37 +190,14 @@ subroutine set_ABpm
             Bp(k,k,i,j)=Bp(k,k,i,j)+nuB*0.5d0
             Bm(k,k,i,j)=Bm(k,k,i,j)-nuB*0.5d0
          end do
+
+         !set alpha
+         tmp = Vol(i,j)/DT_LOCAL_GLOBAL + dsci(i,j)*nuA + dscj(i,j)*nuB
+         alpha(i,j)= 1d0/tmp
       end do
    end do
    !$omp end parallel do
 end subroutine set_ABpm
-
-subroutine set_dqdt
-   use grbl_prmtr
-   use mod_mpi
-   use variable
-   use var_lusgs
-   implicit none
-   integer i,j
-
-   if(first_dual) then
-      !$omp parallel do private(i)
-      do j=nys,nye
-         do i=nxs,nxe
-            dqdt(:,i,j)=(q(:,i,j)-qp(:,i,j))/DT_LOCAL_GLOBAL
-         end do
-      end do
-      !$omp end parallel do
-   else
-      !$omp parallel do private(i)
-      do j=nys,nye
-         do i=nxs,nxe
-            dqdt(:,i,j)=(3d0*q(:,i,j)-4d0*qp(:,i,j)+qpp(:,i,j))/(2d0*DT_LOCAL_GLOBAL)
-         end do
-      end do
-      !$omp end parallel do
-   end if
-end subroutine set_dqdt
 
 subroutine set_vnc_dsc
    use grbl_prmtr
@@ -265,65 +231,3 @@ subroutine set_vnc_dsc
       end do
    end do
 end subroutine set_vnc_dsc
-
-
-
-subroutine check_internal_loop_convergence(step,step_res)
-   use mod_mpi
-   use var_lusgs
-   implicit none
-   integer,intent(in)::step
-   integer,intent(in)::step_res
-
-   if(myid .eq. 0 .and. res/res1 > res_rate_warning) then
-      print '(a,i12,es11.3)',"WARNING:NOT CONVERGED AT INTERNAL LOOP&
-                            & (step,res_rate) = ", step,res/res1
-      if(res/res1 > res_rate_error .and. step .ne. step_res + 1) &
-         stop "ERROR. EXCEED MAXIMUM RESIDUAL."
-   end if
-
-   first_dual = .false.
-end subroutine check_internal_loop_convergence
-
-subroutine read_InternalLoop
-   use mod_mpi
-   use var_lusgs
-   implicit none
-   character*100 buf
-   integer i
-
-   if(myid .eq. 0) then
-      open(8,file="control.inp")
-      do
-         read(8,'(a)',end=99) buf
-         if(buf(1:25)      .eq. 'InternalLoop CFL tau    :') then
-            read(buf(26:),*) cfl_tau
-         else if(buf(1:25) .eq. 'InternalLoop Omega Max  :') then
-            read(buf(26:),*) omega_max
-         else if(buf(1:25) .eq. 'InternalLoop Omega Min  :') then
-            read(buf(26:),*) omega_min
-         else if(buf(1:25) .eq. 'InternalLoop Dqrate Max :') then
-            read(buf(26:),*) Dqmax
-         else if(buf(1:25) .eq. 'InternalLoop ResRateWarn:') then
-            read(buf(26:),*) res_rate_warning
-         else if(buf(1:25) .eq. 'InternalLoop ResRateErr :') then
-            read(buf(26:),*) res_rate_error
-         else if(buf(1:25) .eq. 'InternalLoop OutOmega   :') then
-            read(buf(26:),*) ILwrite
-         else if(buf(1:25) .eq. 'InternalLoop Max Number :') then
-            read(buf(26:),*) NumInternalLoop
-         end if
-      end do
-99    close(8)
-   end if
-
-   call MPI_Bcast(cfl_tau,         1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
-   call MPI_Bcast(omega_max,       1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
-   call MPI_Bcast(omega_min,       1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
-   call MPI_Bcast(Dqmax,           1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
-   call MPI_Bcast(NumInternalLoop, 1, MPI_INTEGER,          0, MPI_COMM_WORLD, ierr)
-
-   first_dual = .true.
-end subroutine read_InternalLoop
-
-

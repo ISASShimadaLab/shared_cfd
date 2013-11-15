@@ -6,6 +6,6 @@ File Output Period      : 500
 
 
 #FOR MUSCL
-MUSCL ON(1)/OFF(0)      : 1
-MUSCL Precision Order   : 3
+MUSCL ON(1)/OFF(0)      : 0
+MUSCL Precision Order   : 2
 

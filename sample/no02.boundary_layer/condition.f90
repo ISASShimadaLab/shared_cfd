@@ -4,32 +4,11 @@ subroutine set_IC
    use variable
    use mod_mpi
    use chem_var
-   !use gas
    implicit none
    double precision rho,u,v,T
    double precision q_temp(dimq)
    integer i,j
 
-   !T   = 300d0
-   !rho = 1d5/(R_gas*T)
-   !u   = 0.1d0
-   !v   = 0d0
-
-   !q_temp(1:nY)=rho
-   !q_temp(nY+1)=rho*u
-   !q_temp(nY+2)=rho*v
-   !q_temp(nY+3)=rho*(1d0/(kappa_gas-1d0)*R_gas*T +0.5d0*(u**2+v**2))
-
-   !do i=nxs,nxe
-   !  do j=nys,nye
-   !     q(:,    i,j)=q_temp
-   !     w(4,    i,j)=1d5
-   !     w(indxg,i,j)=kappa_gas
-   !     w(indxR,i,j)=R_gas
-   !  end do
-   !end do
-
-   T   = 300d0
    u   = 0.1d0
    v   = 0d0
 
@@ -68,37 +47,18 @@ subroutine set_BC(step)
       !i=1/2
       !subsonic inflow
       do j=nys,nye
-         w(     1,0,j)=w(4,1,j)*MWf/(R_uni*Tf)
+         w(     1,0,j)=w(4,1,j)*MWo/(R_uni*To)
          w(     2,0,j)=0.1d0
          w(     3,0,j)=0d0
          w(     4,0,j)=w(4,1,j)
 
-         w(4+1:4+nY,0,j)=vwf(1:nY)
+         w(4+1:4+nY,0,j)=vwo(1:nY)
 
-         w(indxg, 0,j)=kappaf
-         w(indxht,0,j)=Ef+R_uni/MWf*Tf +0.5d0*(w(2,0,j)**2+w(3,0,j)**2)
-         w(indxR, 0,j)=R_uni/MWf
-         w(indxMu,0,j)=muf
-         vhi(:,   0,j)=vhif
-
-
-
-         !T   = 300d0
-         !rho = w(4,1,j)/(R_gas*T)
-         !w(     1,0,j)= rho
-         !w(     2,0,j)= 0.1d0
-         !w(     3,0,j)= 0d0
-         !w(     4,0,j)= w(4,1,j)
-
-         !w(4+1:4+nY,0,j)= 1d0
-
-         !w(indxg, 0,j)=kappa_gas
-         !w(indxht,0,j)=kappa_gas/(kappa_gas-1d0)*R_gas*T +0.5d0*(w(2,0,j)**2+w(3,0,j)**2)
-         !w(indxR, 0,j)=R_gas
-         !w(indxMu,0,j)=nu_gas*rho
-         !vhi(:,   0,j)=kappa_gas/(kappa_gas-1d0)*R_gas*T
-
-
+         w(indxg, 0,j)=kappao
+         w(indxht,0,j)=Eo+R_uni/MWo*To +0.5d0*(w(2,0,j)**2+w(3,0,j)**2)
+         w(indxR, 0,j)=R_uni/MWo
+         w(indxMu,0,j)=muo
+         vhi(:,   0,j)=vhio
 
          w(:,  -1,j) = w(:,  0,j)
          vhi(:,-1,j) = vhi(:,0,j)

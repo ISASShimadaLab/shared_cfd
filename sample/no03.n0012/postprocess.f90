@@ -22,9 +22,6 @@ program main
    character*50 filename,title
    integer*4,external::access
 
-
-   double precision  eta
-
    !read control parameters
    call read_control
 
@@ -110,15 +107,11 @@ program main
       !output file close
       close(66)
 
-      !eta = sqrt(1.6e-5*x(135,1)/u_mat(135,24))
-      !open(66,file=trim(filename)//".plt")
-      !do j=1,nj/2
-      !   if(r(135,j)/eta>10d0) then
-      !      exit
-      !   end if
-      !   write(66,*) r(135,j)/eta,u_mat(135,j)/u_mat(135,24)
-      !end do
-      !close(66)
+      open(66,file=trim(filename)//".plt")
+      do i=1,201
+         write(66,*) x(i,1)/0.1524d0,p_mat(i,1)/1.72424772532d5
+      end do
+      close(66)
 
       step=step+Dstep
    end do

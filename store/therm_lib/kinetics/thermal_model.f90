@@ -15,9 +15,6 @@ subroutine read_chemkin_parameter!{{{
    implicit none
 
    if(myid .eq. 0) then
-      vrhoo =1d-20
-      vrhof =1d-20
-
       open(8,file="control_chem.inp")
       read(8,'()')
       read(8,'(25x,i10)')    ns_tocalc
@@ -51,8 +48,8 @@ subroutine read_fo_composition!{{{
    integer i
 
    if(myid .eq. 0) then
-      vrhoo =0d0
-      vrhof =0d0
+      vrhoo =1d-20
+      vrhof =1d-20
 
       open(8,file="control_chem.inp")
       read(8,'()')

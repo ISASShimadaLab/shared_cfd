@@ -23,8 +23,8 @@ def data_set():
 	datRA.append(["time scale",("global","local"),"time step         : ","  #global(0)/local(1)"])
 	datRA.append(["time scheme",("Euler","two-step Runge-Kutta",\
 			"LU-SGS","Newton-Raphson",\
-			"Pre-Conditioner","Dual Time Step"),"time scheme       : ",\
-			"  #Euler(0)/Runge-Kutta two-step(1)/LU-SGS(2)/Newton-Raphson(3)/Pre-Conditioner(4)"])
+			"Pre-Conditioner","Dual Time Step","Pre-conditioner with LU-SGS"),"time scheme       : ",\
+			"  #Euler(0)/Runge-Kutta two-step(1)/LU-SGS(2)/Newton-Raphson(3)/Pre-Conditioner(4)/Dual Time Step(5)/Pre-conditioner with LU-SGS(6)"])
 	datRA.append(["high order scheme",("Up Wind","MUSCL"),"high order scheme : ","  #Up Wind(0)/MUSCL(1)"])
 	datRA.append(["viscosity",("non-viscous flow","viscous flow"),"viscosity         : ",\
 			"  #non-viscous flow(0)/viscous flow(1)"])
@@ -41,6 +41,7 @@ def data_set():
 
 	NG.append([[-1,-1],[ 0, 4,-1,-1,-1]])
 	NG.append([[-1,-1],[ 1, 5,-1,-1,-1]])
+	NG.append([[-1,-1],[ 0, 6,-1,-1,-1]])
 	NG.append([[ 1,-1],[-1,-1,-1,-1, 0]])
 	NG.append([[-1,-1],[ 1,-1,-1,-1, 2]])
 

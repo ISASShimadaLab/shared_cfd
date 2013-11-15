@@ -14,6 +14,7 @@ subroutine calc_next_step_implicit
                    -dsi(  i,  j)*(TGi(1:dimq,i  ,j  )-TGvi(1:dimq,i  ,j  ))&
                    +dsj(  i,j-1)*(TGj(1:dimq,i  ,j-1)-TGvj(1:dimq,i  ,j-1))&
                    -dsj(  i,  j)*(TGj(1:dimq,i  ,j  )-TGvj(1:dimq,i  ,j  ))
+         Dq(:,i,j)= Dq(:,i,j)+pre1(:,i,j)*dot_product(pre2(:,i,j),Dq(:,i,j))
       end do
    end do
    !$omp end parallel do
@@ -28,8 +29,8 @@ subroutine calc_next_step_implicit
       do i=max(nxs,sm-nye),min(sm-nys,nxe)
          j=sm-i
          Dq(:,i,j)=alpha(i,j)*(Dq(:,i,j)&
-                              +dsci(i-1,j  )*matmul(Ap(:,:,i-1,j  ),Dq(:,i-1,j  ))&
-                              +dscj(i  ,j-1)*matmul(Bp(:,:,i  ,j-1),Dq(:,i  ,j-1)))
+                              +dsci(i,j)*matmul(Ap(:,:,i,j),Dq(:,i-1,j  ))&
+                              +dscj(i,j)*matmul(Bp(:,:,i,j),Dq(:,i  ,j-1)))
       end do
       !$omp end parallel do
    end do
@@ -44,8 +45,8 @@ subroutine calc_next_step_implicit
       do i=max(nxs,sm-nye),min(sm-nys,nxe)
          j=sm-i
          Dq(:,i,j)=Dq(:,i,j)&
-                  -alpha(i,j)*(dsci(i+1,j  )*matmul(Am(:,:,i+1,j  ),Dq(:,i+1,j  ))&
-                              +dscj(i  ,j+1)*matmul(Bm(:,:,i  ,j+1),Dq(:,i  ,j+1)))
+                  -alpha(i,j)*(dsci(i,j)*matmul(Am(:,:,i,j),Dq(:,i+1,j  ))&
+                              +dscj(i,j)*matmul(Bm(:,:,i,j),Dq(:,i  ,j+1)))
       end do
       !$omp end parallel do
    end do

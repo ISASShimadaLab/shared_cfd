@@ -3,10 +3,11 @@
 !  on Jan 15, 2013.
 !
 elements
- N
+ C O
 end
 species
- N2
+ CO2
+ O2
 end
 thermo all
    300.000  1000.000  5000.000
