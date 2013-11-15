@@ -109,20 +109,31 @@ engage("core")
 filename = read_control_next(fp)
 
 fgrid = open(filename,'r')
-fgrid.readline()
-nijk = fgrid.readline().strip().split()
+Nplane = int(fgrid.readline().strip().split().pop())
+nijk=[]
+nijk_str=["","",""]
+nijk_max=[0,0,0]
+for i in range(Nplane):
+	nijk_mono = fgrid.readline().strip().split()
+	for i in range(0,3):
+		nijk_mono[i] = int(nijk_mono[i])-1
+		nijk_str[i]+=','+str(nijk_mono[i])
+		nijk_max[i] = max(nijk_max[i],nijk_mono[i])
+	if(nijk_mono[2] != 0):
+		print "This program cannot be applied yet to 3D problem."
+		print nijk_mono[2]
+		sys.exit(1)
+	nijk_mono.pop()
+	nijk.append(nijk_mono)
 fgrid.close()
-for i in range(0,3):
-	nijk[i] = int(nijk[i])-1
-if(nijk[2] != 0):
-	print "This program cannot be applied yet to 3D problem."
-	print nijk[2]
-	sys.exit(1)
 os.system("cp "+filename+" checkout/grid/")
 nY  = read_control_next(fp)
 fromto = [\
-	["NumI",str(nijk[0])],\
-	["NumJ",str(nijk[1])],\
+	["NPLANE",str(Nplane)],\
+	["NumI",nijk_str[0][1:]],\
+	["NumJ",nijk_str[1][1:]],\
+	["NIMAX",str(nijk_max[0])],\
+	["NJMAX",str(nijk_max[1])],\
 	["NumY",nY],\
 	["GridFileName",os.path.basename(filename)]]
 raw2pro("checkout/n_grid.raw.f90","checkout/n_grid.f90",fromto)
@@ -132,26 +143,42 @@ val = read_control_next_int(fp)
 if(val == 0):
 	print "\tPersonal Computer is selected."
 	engage("architecture/PC")
-
 elif(val >= 1):
 	print "\tM-System[Super Computer] is selected."
 	engage("architecture/SC")
 
 	import checkout.generate_proc_grid
 	[MPINumGrid,bwmax]=checkout.generate_proc_grid.split_grid_from_Nproc(val,nijk)
-	Nproc = MPINumGrid[0]*MPINumGrid[1]
+	Nproc=0
+	MPINumGridLine=['','']
+	MPINumGridMax=[0,0]
+	for MPINumGridMono in MPINumGrid:
+		Nproc += MPINumGridMono[0]*MPINumGridMono[1]
+		for i in range(2):
+			MPINumGridMax[i]   = max(MPINumGridMax[i],MPINumGridMono[i])
+			MPINumGridLine[i] += ','+str(MPINumGridMono[i])
 	import shutil
 	shutil.move("grid_separation.inp","checkout/")
 	raw2pro("checkout/mpirun.raw.sh","checkout/mpirun.sh",[["Nproc",str(Nproc)]])
 	fromto = [\
-		 ["NGX",str(MPINumGrid[0])],\
-		 ["NGY",str(MPINumGrid[1])],\
+		 ["NGXMAX",str(MPINumGridMax[0])],\
+		 ["NGYMAX",str(MPINumGridMax[1])],\
+		 ["NGX",MPINumGridLine[0][1:]],\
+		 ["NGY",MPINumGridLine[1][1:]],\
 		 ["BWMAX",str(bwmax)]]
 	raw2pro("checkout/mod_mpi.raw.f90","checkout/mod_mpi.f90",fromto)
-	print "\tActual NumProc is set to %3i x %3i = %3i" % (MPINumGrid[0],MPINumGrid[1],Nproc)
+	print "\tActual NumProc is set to"
+	for i,MPINumGridMono in enumerate(MPINumGrid):
+		print "\t\tPlane%3i : %3i x %3i = %3i" % (i+1,MPINumGridMono[0],MPINumGridMono[1],MPINumGridMono[0]*MPINumGridMono[1])
+	print "\t\t\t\tSum = %3i" % (Nproc)
 else:
 	print "\tOdd Input at architecture! value is ",val
 	sys.exit(1)
+
+print "***generation of condition.raw.f90***"
+import checkout.gen_cond
+checkout.gen_cond.gen_cond(os.path.basename(filename))
+print "\tDone."
 
 ####################################################################################
 print "***time scale***"
@@ -298,13 +325,14 @@ fmain.write(part_top)
 append_file_to_file(fmain,"checkout/main.head.f90")
 fmain.write(part_variable)
 fmain.write(part_init)
-append_file_to_file(fmain,"checkout/main.body.f90")
 fromto = [\
 ["part_top\n"           , part_top],\
 ["part_init\n"          , part_init],\
 ["part_point_implicit\n", part_point_implicit],\
 ["part_primitive\n"     , part_primitive],\
 ["part_main\n"          , part_main]]
+raw2pro("checkout/main.body.raw.f90","checkout/main.body.f90",fromto)
+append_file_to_file(fmain,"checkout/main.body.f90")
 if(part_point_implicit == ""):
 	raw2pro("checkout/main.main.raw.f90","checkout/main.main.f90",fromto)
 	if(os.path.exists("checkout/main.main.point_implicit.f90")):

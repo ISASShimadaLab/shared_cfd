@@ -3,7 +3,7 @@
 
 qsub <<!QSUB
 #@\$-q QJOB
-#@\$-r reaction
+#@\$-r share_code
 #@\$-lP Nproc
 #@\$-lm 5gb
 #@\$-cp 300

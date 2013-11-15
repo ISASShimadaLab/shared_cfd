@@ -1,8 +1,11 @@
 module grbl_prmtr
    implicit none
    !!!! BELOW ARE USER DEFINISIONS !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-   integer,parameter::ni=NumI  !the number of split of i-direction
-   integer,parameter::nj=NumJ  !the number of split of j-direction
+   integer,parameter::Nplane = NPLANE
+   integer,parameter::ni(Nplane)=(/NumI/)  !the number of split of i-direction
+   integer,parameter::nj(Nplane)=(/NumJ/)  !the number of split of j-direction
+   integer,parameter::nimax=NIMAX
+   integer,parameter::njmax=NJMAX
    integer,parameter::nY=NumY
    character*100,parameter::file_coordinate="grid/GridFileName"
    !!!! ABOVE ARE USER DEFINISIONS !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!

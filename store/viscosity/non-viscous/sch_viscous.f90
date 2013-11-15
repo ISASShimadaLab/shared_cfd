@@ -2,25 +2,27 @@ subroutine init_TGv
    use mod_mpi
    use variable
    implicit none
-   integer i,j
+   integer i,j,plane
 
-   !set TGvi
-   !$omp parallel do default(shared),private(i)
-   do j=nys,nye
-      do i=nxs-1,nxe
-         TGvi(:,i,j)=0d0
+   do plane = nps,npe
+      !set TGvi
+      !$omp parallel do default(shared),private(i)
+      do j=nys(plane),nye(plane)
+         do i=nxs(plane)-1,nxe(plane)
+            TGvi(:,i,j,plane)=0d0
+         end do
       end do
-   end do
-   !$omp end parallel do
+      !$omp end parallel do
 
-   !set TGvj
-   !$omp parallel do default(shared),private(i)
-   do j=nys-1,nye
-      do i=nxs,nxe
-         TGvj(:,i,j)=0d0
+      !set TGvj
+      !$omp parallel do default(shared),private(i)
+      do j=nys(plane)-1,nye(plane)
+         do i=nxs(plane),nxe(plane)
+            TGvj(:,i,j,plane)=0d0
+         end do
       end do
+      !$omp end parallel do
    end do
-   !$omp end parallel do
 end subroutine init_TGv
 
 subroutine set_TGv

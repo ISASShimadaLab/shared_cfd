@@ -1,33 +1,38 @@
 #!/usr/bin/python
-def plot_grid(ni,nj):
+def plot_grid(nijk):
+	space=20 #space between planes
 	#file read
 	fi = open("grid_separation.inp")
 	fo = open("vis_grid.dat","w")
-	
-	line  = fi.readline()
-	arr = line.split()
-	ng = len(arr)
-	for i in range(ng):
-	   tmp=int(arr[i])
-	   fo.write("%3.3i %3.3i\n" % (tmp,1))
-	   fo.write("%3.3i %3.3i\n" % (tmp,nj))
-	   fo.write("\n")
-	fo.write("%3.3i %3.3i\n" % (ni,1))
-	fo.write("%3.3i %3.3i\n" % (ni,nj))
-	fo.write("\n")
-	
-	line  = fi.readline()
-	arr = line.split()
-	ng = len(arr)
-	for j in range(ng):
-	   tmp=int(arr[j])
-	   fo.write("%3.3i %3.3i\n" % (1 ,tmp))
-	   fo.write("%3.3i %3.3i\n" % (ni,tmp))
-	   fo.write("\n")
-	fo.write("%3.3i %3.3i\n" % (1 ,nj))
-	fo.write("%3.3i %3.3i\n" % (ni,nj))
-	fo.write("\n")
-	
+
+	isum = 0
+	for nijk_mono in nijk:
+		ni=nijk_mono.pop(0)
+		nj=nijk_mono.pop(0)
+
+		line  = fi.readline()
+		arr = line.split()
+		for var in arr:
+		   var=int(var)
+		   fo.write("%3.3i %3.3i\n" % (var+isum,1))
+		   fo.write("%3.3i %3.3i\n" % (var+isum,nj))
+		   fo.write("\n")
+		fo.write("%3.3i %3.3i\n" % (ni+isum,1))
+		fo.write("%3.3i %3.3i\n" % (ni+isum,nj))
+		fo.write("\n")
+
+		line  = fi.readline()
+		arr = line.split()
+		for var in arr:
+		   var=int(var)
+		   fo.write("%3.3i %3.3i\n" % (1 +isum,var))
+		   fo.write("%3.3i %3.3i\n" % (ni+isum,var))
+		   fo.write("\n")
+		fo.write("%3.3i %3.3i\n" % (1 +isum,nj))
+		fo.write("%3.3i %3.3i\n" % (ni+isum,nj))
+		fo.write("\n")
+
+		isum +=ni+space
 	fi.close()
 	fo.close()
 
@@ -65,69 +70,113 @@ def makelist(arr,ng):
 		now+=delta
 	return [line,max_bw]
 
-def generate_grid_separation(ni,nj,ngx,ngy):
-	arr_x=ngx*[-1]
-	arr_y=ngy*[-1]
-
-	import os
-	if os.path.exists("split_ratio.py"):
-		import split_ratio
-		arr_x=split_ratio.ratio_x()
-		arr_y=split_ratio.ratio_y()
-		if len(arr_x) != ngx or len(arr_y) != ngy:
-			print "Odd array at split_ratio.py"
-			sys.exit(1)
-
+def generate_grid_separation(nijk,MPINumGrid):
+	max_bw=0
 	f=open("grid_separation.inp","w")
-	[line,max_bw_x] = makelist(arr_x,ni)
-	f.write(line+"\n")
-	[line,max_bw_y] = makelist(arr_y,nj)
-	f.write(line+"\n")
+
+	for plane,nijk_mono in enumerate(nijk):
+		MPINumGrid_mono = MPINumGrid[plane]
+		for cind,var_n in enumerate(nijk_mono):
+			var_g = MPINumGrid_mono[cind]
+			arr=var_g*[-1]
+
+			import os
+			if os.path.exists("split_ratio.py"):
+				import split_ratio
+				arr=split_ratio.ratio(plane,cind)
+				if len(arr) != var_g:
+					print "Odd array at split_ratio.py"
+					sys.exit(1)
+
+			[line,max_bw_candidate] = makelist(arr,var_n)
+			max_bw = max(max_bw,max_bw_candidate)
+			f.write(line+"\n")
 	f.close()
 	
-	plot_grid(ni,nj)
+	plot_grid(nijk)
 
-	return max(max_bw_x,max_bw_y)
+	return max_bw
 
 def split_grid(bw,nijk):
-	MPINumGrid = 3*[0]
-	for i in range(0,3):
-		MPINumGrid[i]  = int((nijk[i]-1)/bw+1)
+	MPINumGrid=[]
+	for plane in nijk:
+		MPINumGrid_mono = []
+		for var in plane:
+			MPINumGrid_mono.append(int((var-1)/bw+1))
+		MPINumGrid.append(MPINumGrid_mono)
 	return MPINumGrid
 
 def split_grid_from_Nproc(Nproc,nijk):
+	if Nproc <len(nijk):
+		print "Error: At least more than the number of plane is necessary for processors."
+		import sys
+		sys.exit(1)
 	bw = 1
 	while 1:
 		MPINumGrid = split_grid(bw,nijk)
-		Nproc_now = 1
-		for i in range(0,3):
-			if(MPINumGrid[i] != 0):
-				Nproc_now *= MPINumGrid[i]
+		Nproc_now = 0
+
+		for arr in MPINumGrid:
+			Nproc_plane = 1
+			for var in arr:
+				Nproc_plane *= var
+			Nproc_now += Nproc_plane
+
 		if(Nproc_now<=Nproc):
 			break
 		bw+=1
-	max_bw = generate_grid_separation(nijk[0],nijk[1],MPINumGrid[0],MPINumGrid[1])
+	max_bw = generate_grid_separation(nijk,MPINumGrid)
 	return [MPINumGrid,max_bw]
 
 if __name__ == "__main__":
-	import sys
-	array = sys.argv
-	del array[0]
-	if   len(array) == 2:
-		print "plot_grid"
-		[ni,nj] = map(int,array)
-		plot_grid(ni,nj)
-	if   len(array) == 3:
-		print "split_grid_from_Nproc"
-		nijk=3*[0]
-		[nijk[0],nijk[1],Nproc] = map(int,array)
-		MPINumGrid = split_grid_from_Nproc(Nproc,nijk)
-		print MPINumGrid
-	elif len(array) == 4:
-		print "generate_grid_separation"
-		[ni,nj,ngx,ngy] = map(int,array)
-		print generate_grid_separation(ni,nj,ngx,ngy)
-	else:
-		print "Odd Command Parameters."
-		sys.exit(1)
+	# set nijk
+	nijk =[]
 
+#	# MB_test00.x
+#	# 1st plane
+#	nijk_plane=[]
+#	nijk_plane.append(2)
+#	nijk_plane.append(2)
+#	nijk.append(nijk_plane)
+#
+#	# 2nd plane
+#	nijk_plane=[]
+#	nijk_plane.append(2)
+#	nijk_plane.append(2)
+#	nijk.append(nijk_plane)
+
+	# MB_test2.x
+	# 1st plane
+	nijk_plane=[]
+	nijk_plane.append(50)
+	nijk_plane.append(100)
+	nijk.append(nijk_plane)
+
+	# 2nd plane
+	nijk_plane=[]
+	nijk_plane.append(50)
+	nijk_plane.append(50)
+	nijk.append(nijk_plane)
+
+#	# MB_test4.x
+#	# 1st plane
+#	nijk_plane=[]
+#	nijk_plane.append(40)
+#	nijk_plane.append(10)
+#	nijk.append(nijk_plane)
+#
+#	# 2nd plane
+#	nijk_plane=[]
+#	nijk_plane.append(40)
+#	nijk_plane.append(40)
+#	nijk.append(nijk_plane)
+#
+#	# 3rd plane
+#	nijk_plane=[]
+#	nijk_plane.append(40)
+#	nijk_plane.append(70)
+#	nijk.append(nijk_plane)
+
+
+	Nproc = 20
+	print split_grid_from_Nproc(Nproc,nijk)

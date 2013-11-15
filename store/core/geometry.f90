@@ -28,126 +28,141 @@ subroutine init_xrh!{{{
    use mod_mpi
    implicit none
    double precision t1,t2,t3
-   double precision temp_mat((ni+1)*(nj+1))
-   integer i,nr,nall
+   double precision temp_mat((nimax+1)*(njmax+1))
+   integer i,nr,nall,plane
 
    if(myid .eq. 0) then
       open(77,file=trim(file_coordinate))
 
       !read the number of plane and the number of nodes
       read(77,*) t1
-      !if(t1 .ne. 1) stop "Not one geometry plane. t1=",t1
-      if(t1 .ne. 1) then
-         print *,"t1=",t1
-         stop "Not one geometry plane."
-      end if
-      read(77,*) t1,t2,t3
-      if(t1 .ne. ni+1 .or. t2 .ne. nj+1 .or. t3 .ne. 1) stop "The number of node is odd."
+      if(t1 .ne. Nplane) stop "The number of plane is odd"
 
-      !calc the number of nodes
-      nall=(ni+1)*(nj+1)
-      nr=nall/4
 
-      !read x_{i+1/2}
-      do i=1,nr
-         read(77,*) temp_mat((i-1)*4+1:i*4)
+      do plane = 1,Nplane
+         read(77,*) t1,t2,t3
+         if(t1 .ne. ni(plane)+1 .or. t2 .ne. nj(plane)+1 .or. t3 .ne. 1) stop "The number of node is odd."
       end do
-      if(nr*4 .ne. nall) read(77,*) temp_mat(nr*4+1:nall)
-      xh(0:ni,0:nj)=reshape(temp_mat,(/ni+1,nj+1/))
-      xh(:,:)=xh(:,:)
 
-      !read r_{i+1/2}
-      do i=1,nr
-         read(77,*) temp_mat((i-1)*4+1:i*4)
+      do plane = 1,Nplane
+         !calc the number of nodes
+         nall=(ni(plane)+1)*(nj(plane)+1)
+         nr=nall/4
+
+         !read x_{i+1/2}
+         do i=1,nr
+            read(77,*) temp_mat((i-1)*4+1:i*4)
+         end do
+         if(nr*4 .ne. nall) read(77,*) temp_mat(nr*4+1:nall)
+         xh(0:ni(plane),0:nj(plane),plane)=reshape(temp_mat(1:nall),(/ni(plane)+1,nj(plane)+1/))
+
+         !read r_{i+1/2}
+         do i=1,nr
+            read(77,*) temp_mat((i-1)*4+1:i*4)
+         end do
+         if(nr*4 .ne. nall) read(77,*) temp_mat(nr*4+1:nall)
+         rh(0:ni(plane),0:nj(plane),plane)=reshape(temp_mat(1:nall),(/ni(plane)+1,nj(plane)+1/))
+
+         !read z_{i+1/2} (now throw away)
+         do i=1,nr
+            read(77,*) temp_mat((i-1)*4+1:i*4)
+         end do
+         if(nr*4 .ne. nall) read(77,*) temp_mat(nr*4+1:nall)
       end do
-      if(nr*4 .ne. nall) read(77,*) temp_mat(nr*4+1:nall)
-      rh(0:ni,0:nj)=reshape(temp_mat,(/ni+1,nj+1/))
 
       close(77)
    end if
 
-   call MPI_Bcast(xh(0,0), 2*(ni+1)*(nj+1), MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
-   call MPI_Bcast(rh(0,0), 2*(ni+1)*(nj+1), MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
+   call MPI_Bcast(xh(0,0,1), 2*(nimax+1)*(njmax+1)*Nplane, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
+   call MPI_Bcast(rh(0,0,1), 2*(nimax+1)*(njmax+1)*Nplane, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
 end subroutine init_xrh!}}}
 subroutine set_xr!{{{
    implicit none
    double precision nx,nr
-   integer i,j
+   integer i,j,plane
 
-   do j=1,nj
-      do i=1,ni
-         x(i,j)=1d0/4d0*(xh(i-1,j-1)+xh(i,j-1)+xh(i-1,j)+xh(i,j))
-         r(i,j)=1d0/4d0*(rh(i-1,j-1)+rh(i,j-1)+rh(i-1,j)+rh(i,j))
+   do plane = 1,Nplane
+      do j=1,nj(plane)
+         do i=1,ni(plane)
+            x(i,j,plane)=1d0/4d0*(xh(i-1,j-1,plane)+xh(i,j-1,plane)+xh(i-1,j,plane)+xh(i,j,plane))
+            r(i,j,plane)=1d0/4d0*(rh(i-1,j-1,plane)+rh(i,j-1,plane)+rh(i-1,j,plane)+rh(i,j,plane))
+         end do
       end do
-   end do
 
-   do j=1,nj
-      x(   0,j)=2d0*x( 1,j)-x(   2,j)
-      r(   0,j)=2d0*r( 1,j)-r(   2,j)
-      x(ni+1,j)=2d0*x(ni,j)-x(ni-1,j)
-      r(ni+1,j)=2d0*r(ni,j)-r(ni-1,j)
-   end do
+      do j=1,nj(plane)
+         x(   0,j,plane)=2d0*x( 1,j,plane)-x(   2,j,plane)
+         r(   0,j,plane)=2d0*r( 1,j,plane)-r(   2,j,plane)
+         x(ni+1,j,plane)=2d0*x(ni,j,plane)-x(ni-1,j,plane)
+         r(ni+1,j,plane)=2d0*r(ni,j,plane)-r(ni-1,j,plane)
+      end do
 
-   do i=0,ni+1
-      x(i,   0)=2d0*x(i, 1)-x(i,   2)
-      r(i,   0)=2d0*r(i, 1)-r(i,   2)
-      x(i,nj+1)=2d0*x(i,nj)-x(i,nj-1)
-      r(i,nj+1)=2d0*r(i,nj)-r(i,nj-1)
+      do i=0,ni(plane)+1
+         x(i,   0,plane)=2d0*x(i, 1,plane)-x(i,   2,plane)
+         r(i,   0,plane)=2d0*r(i, 1,plane)-r(i,   2,plane)
+         x(i,nj+1,plane)=2d0*x(i,nj,plane)-x(i,nj-1,plane)
+         r(i,nj+1,plane)=2d0*r(i,nj,plane)-r(i,nj-1,plane)
+      end do
    end do
 end subroutine set_xr!}}}
 subroutine set_Area_Vol!{{{
    implicit none
-   integer i,j
+   integer i,j,plane
    double precision Aabd,Abcd
 
-   do j=1,nj
-      do i=1,ni
-         Aabd=Area_Triangle(xh(i-1,j-1),rh(i-1,j-1),xh(i,j-1),rh(i,j-1),xh(i-1,j),rh(i-1,j))
-         Abcd=Area_Triangle(xh(  i,j-1),rh(  i,j-1),xh(i,  j),rh(i,  j),xh(i-1,j),rh(i-1,j))
-         Vol(i,j)=Aabd+Abcd
+   do plane = 1,Nplane
+      do j=1,nj(plane)
+         do i=1,ni(plane)
+            Aabd=Area_Triangle(xh(i-1,j-1,plane),rh(i-1,j-1,plane),xh(i,j-1,plane),rh(i,j-1,plane),xh(i-1,j,plane),rh(i-1,j,plane))
+            Abcd=Area_Triangle(xh(  i,j-1,plane),rh(  i,j-1,plane),xh(i,  j,plane),rh(i,  j,plane),xh(i-1,j,plane),rh(i-1,j,plane))
+            Vol(i,j,plane)=Aabd+Abcd
+         end do
       end do
    end do
 end subroutine set_Area_Vol!}}}
 subroutine set_dsij!{{{
    implicit none
-   integer i,j
+   integer i,j,plane
 
-   do j=0,nj
-      do i=1,ni
-         dsj(i,j)=dis_point(xh(i-1,j),rh(i-1,j),xh(i,j),rh(i,j))
+   do plane = 1,Nplane
+      do j=0,nj(plane)
+         do i=1,ni(plane)
+            dsj(i,j,plane)=dis_point(xh(i-1,j,plane),rh(i-1,j,plane),xh(i,j,plane),rh(i,j,plane))
+         end do
       end do
-   end do
 
-   do j=1,nj
-      do i=0,ni
-         dsi(i,j)=dis_point(xh(i,j-1),rh(i,j-1),xh(i,j),rh(i,j))
+      do j=1,nj(plane)
+         do i=0,ni(plane)
+            dsi(i,j,plane)=dis_point(xh(i,j-1,plane),rh(i,j-1,plane),xh(i,j,plane),rh(i,j,plane))
+         end do
       end do
    end do
 end subroutine set_dsij!}}}
 subroutine set_vn!{{{
    implicit none
    double precision nx,nr,std
-   integer i,j
+   integer i,j,plane
 
-   do j=1,nj
-      do i=0,ni
-        nx=  rh(i,j)-rh(i,j-1)
-        nr=-(xh(i,j)-xh(i,j-1))
-        std=sqrt(nx**2+nr**2)
+   do plane=1,Nplane
+      do j=1,nj(plane)
+         do i=0,ni(plane)
+           nx=  rh(i,j,plane)-rh(i,j-1,plane)
+           nr=-(xh(i,j,plane)-xh(i,j-1,plane))
+           std=sqrt(nx**2+nr**2)
 
-        vni(1,i,j)=nx/std
-        vni(2,i,j)=nr/std
+           vni(1,i,j,plane)=nx/std
+           vni(2,i,j,plane)=nr/std
+         end do
       end do
-   end do
 
-   do j=0,nj
-      do i=1,ni
-        nx=-(rh(i,j)-rh(i-1,j))
-        nr=  xh(i,j)-xh(i-1,j)
-        std=sqrt(nx**2+nr**2)
+      do j=0,nj(plane)
+         do i=1,ni(plane)
+           nx=-(rh(i,j,plane)-rh(i-1,j,plane))
+           nr=  xh(i,j,plane)-xh(i-1,j,plane)
+           std=sqrt(nx**2+nr**2)
 
-        vnj(1,i,j)=nx/std
-        vnj(2,i,j)=nr/std
+           vnj(1,i,j,plane)=nx/std
+           vnj(2,i,j,plane)=nr/std
+         end do
       end do
    end do
 end subroutine set_vn!}}}
@@ -165,12 +180,14 @@ double precision function dis_point(x1,y1,x2,y2)!{{{
 end function dis_point!}}}
 subroutine out_geo_bin!{{{
    implicit none
-   integer i,j
+   integer i,j,plane
 
    open(45,file="geometry.bin",form="unformatted")
-   write(45) ni
-   write(45) nj
-   write(45) ((x(i,j),r(i,j),i=1,ni),j=1,nj)
+   do plane = 1,Nplane
+      write(45) ni(plane)
+      write(45) nj(plane)
+      write(45) ((xh(i,j,plane),rh(i,j,plane),i=0,ni(plane)),j=0,nj(plane))
+   end do
    close(45)
 end subroutine out_geo_bin!}}}
 end module geometry

@@ -1,4 +1,4 @@
-compiler=ifort -fast -parallel -convert big_endian
+compiler=ifort -fast -parallel -convert big_endian -assume byterecl
 
 remote=/large/y/y535/2dcfd/share_code
 directory=../checkout/

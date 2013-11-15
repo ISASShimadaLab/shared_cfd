@@ -1,43 +1,77 @@
 module mod_mpi
    use grbl_prmtr
    implicit none
-   integer nxs,nys,nxe,nye
+   integer nps,npe
+   integer,dimension(Nplane)::nxs,nys,nxe,nye
    integer MPI_LOGICAL,MPI_DOUBLE_PRECISION,MPI_INTEGER,MPI_COMM_WORLD,MPI_SUM,MPI_MIN,MPI_CHARACTER
-   integer ierr,ireq,istatus(1)
-   integer ierrs
+   integer,dimension(Nplane)::ireq,istatus,ierrs
+   integer ierr
    integer,parameter::myid=0
    integer,parameter::Nproc=1
-   integer,parameter::bw =ni+nj
-   integer,parameter::bwmax =bw
-   integer,parameter::ngx=1
-   integer,parameter::ngy=1
-   integer,parameter::ng =1
-   integer,parameter::bwx=ni
-   integer,parameter::bwy=nj
-   integer,parameter::bwxs=ni/ngx
-   integer,parameter::bwys=nj/ngy
-   integer,parameter::gxl =ni-bwxs*ngx
-   integer,parameter::gyl =nj-bwys*ngy
-   integer,parameter::gx =1
-   integer,parameter::gy =1
-   integer,parameter::gn =-1
-   integer,parameter::gs =-1
-   integer,parameter::ge =-1
-   integer,parameter::gw =-1
-   integer nxs_mat(ngx)
-   integer nxe_mat(ngx)
-   integer nys_mat(ngy)
-   integer nye_mat(ngy)
+   integer,parameter::bwmax =1 ! THIS VALUE IS NOT USED IN PERSONAL COMPUTER.
+   integer,parameter::ngxmax=1
+   integer,parameter::ngymax=1
+   integer,parameter::ngx(Nplane)=  1
+   integer,parameter::ngy(Nplane)=  1
+   integer,parameter::gx(Nplane) =  1
+   integer,parameter::gy(Nplane) =  1
+   integer,parameter::gn(Nplane) = -1
+   integer,parameter::gs(Nplane) = -1
+   integer,parameter::ge(Nplane) = -1
+   integer,parameter::gw(Nplane) = -1
+   integer bwx(Nplane)
+   integer bwy(Nplane)
+   integer nxs_mat(ngxmax,Nplane)
+   integer nxe_mat(ngxmax,Nplane)
+   integer nys_mat(ngymax,Nplane)
+   integer nye_mat(ngymax,Nplane)
+   integer proc_list(ngxmax,ngymax,Nplane)
+
+   integer,allocatable::cut_copro(:,:)
+   integer num_cut_copro
+
+   integer,allocatable::MPIComm(:,:)
+   integer NumMPIComm
 end module mod_mpi
 
 subroutine set_MPI
    use mod_mpi
    implicit none
-   nxs=1
-   nys=1
-   nxe=ni
-   nye=nj
+   integer plane
+
+   do plane=1,Nplane
+      bwx(plane) = ni(plane)
+      bwy(plane) = nj(plane)
+      nxs(plane) = 1
+      nys(plane) = 1
+      nxe(plane) = ni(plane)
+      nye(plane) = nj(plane)
+   end do
+
+   nps=1
+   npe=Nplane
+
+   proc_list(:,:,:)=0
+
+   call set_cut_copro
 end subroutine set_MPI
+
+subroutine set_cut_copro
+   use mod_mpi
+   implicit none
+   character*100 line
+   integer i,j
+
+   open(45,file="cut_copro000.inp")
+   read(45,'(a)') !for comment line
+   read(45,*) num_cut_copro
+   allocate(cut_copro(11,num_cut_copro))
+   read(45,'(a)') !for comment line
+   do i=1,num_cut_copro
+      read(45,'(11i6)') cut_copro(:,num_cut_copro)
+   end do
+   close(45)
+end subroutine set_cut_copro
 
 subroutine     MPI_Finalize(ierr)
    integer ierr

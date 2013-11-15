@@ -1,200 +1,319 @@
 module to_vis
+   use grbl_prmtr
    implicit none
-   integer nxs_vis,nxe_vis,nys_vis,nye_vis
-   character*50 dirname
+   integer,dimension(Nplane)::nxs_vis,nxe_vis,nys_vis,nye_vis
+   character*50 dirname,filename
    integer Dstep,step,OverWrite
    double precision tt
+
+   integer offset,ng
 end module to_vis
 
 program main
-   use grbl_prmtr
    use to_vis
    implicit none
-   double precision,dimension(ni,nj)::x,r
-   double precision,dimension(ni,nj)::rho_mat,T_mat,u_mat,v_mat,p_mat
-   double precision,dimension(ni,nj)::M_mat,R_gas,gmma,w_res,ei_mat,MW_mat
-   double precision,dimension(dimq,ni,nj)::q
-   double precision,dimension(ni,nj,dimq)::w_mat
+   double precision,dimension(     0:nimax+1,0:njmax+1,     Nplane)::xh,rh
+   double precision,dimension(dimq,0:nimax+1,0:njmax+1,     Nplane)::q,qh
+   double precision,dimension(     0:nimax+1,0:njmax+1,     Nplane)::rho_mat,T_mat,u_mat,v_mat,p_mat
+   double precision,dimension(     0:nimax+1,0:njmax+1,     Nplane)::M_mat,R_gas,gmma,w_res,ei_mat,MW_mat
+   double precision,dimension(     0:nimax+1,0:njmax+1,dimq,Nplane)::w_mat
    double precision rho,u,v,T
    integer nx_bin,ny_bin,step_bin
-   integer i,j,k
+   integer i,j,k,plane
    double precision,parameter::R_uni=8.314472d3
-   character*50 filename,title
+   character*50 title,str_num
    integer*4,external::access
-
-
-   double precision  eta
 
    !read control parameters
    call read_control
 
    !read geometry binary
    open(55,file=trim(dirname)//"geometry.bin",form="unformatted")
-   read(55) nx_bin
-   read(55) ny_bin
-   read(55) ((x(i,j),r(i,j),i=1,ni),j=1,nj)
+   do plane = 1,Nplane
+      read(55) nx_bin
+      read(55) ny_bin
+      read(55) ((xh(i,j,plane),rh(i,j,plane),i=0,ni(plane)),j=0,nj(plane))
+   end do
    close(55)
 
    !process time history
    do
       write(filename,'("result/result",i12.12)') step
       if(access(trim(dirname)//trim(filename)//".bin","r") .ne. 0) exit
-      write(*       ,'("result/result",i12.12)') step
-      if(OverWrite .eq. 0 .and. access(trim(filename)//".vtk","r") .eq. 0) then
+      write(*       ,'(a)') filename
+      write(filename,'("result/result001.",i12.12)') step
+      if(OverWrite .eq. 0 .and. access(trim(filename)//".vts","r") .eq. 0) then
          step=step+Dstep
          cycle
       end if
+      write(filename,'("result/result",i12.12)') step
 
       !read q binary
       open(55,file=trim(dirname)//trim(filename)//".bin",form="unformatted")
       read(55) step_bin
       read(55) tt
-      read(55) (((q(i,j,k),i=1,dimq),R_gas(j,k),gmma(j,k),p_mat(j,k),j=1,ni),k=1,nj)
+      read(55) ((((q(i,j,k,plane),i=1,dimq),R_gas(j,k,plane),gmma(j,k,plane),p_mat(j,k,plane),j=0,ni(plane)+1),k=0,nj(plane)+1),plane=1,Nplane)
       close(55)
 
-      !Process data
-      do j=1,nj
-         do i=1,ni
-            rho=0d0
-            do k=1,nY
-               rho=rho+q(k,i,j)
-            end do
-            u  =q(nY+1,i,j)/rho
-            v  =q(nY+2,i,j)/rho
-            T  =p_mat( i,j)/rho/R_gas(i,j)
-
-            rho_mat(i,j)=rho
-              T_mat(i,j)=T
-              u_mat(i,j)=u
-              v_mat(i,j)=v
-              M_mat(i,j)=sqrt((u**2+v**2) / (gmma(i,j)*p_mat(i,j)/rho))
-             ei_mat(i,j)=q(nY+3,i,j)/rho -0.5d0*(u**2+v**2)
-             MW_mat(i,j)=R_uni/R_gas(i,j)
-
-            w_res(i,j)=0d0
-            do k=1,nY
-               w_mat(i,j,k)=q(k,i,j)/rho
-               if(k>3) then
-                  w_res(i,j)=w_res(i,j)+w_mat(i,j,k)
-               end if
+      !calc qh
+      do plane=1,Nplane
+         do j=0,nj(plane)
+            do i=0,ni(plane)
+               qh(:,i,j,plane)=1d0/4d0*(q(:,i  ,j  ,plane)&
+                                       +q(:,i  ,j+1,plane)&
+                                       +q(:,i+1,j  ,plane)&
+                                       +q(:,i+1,j+1,plane))
             end do
          end do
       end do
 
-      !output file open
-      open(66,file=trim(filename)//".vtk")
+      !Process data
+      do plane=1,Nplane
+         do j=0,nj(plane)
+            do i=0,ni(plane)
+               rho=0d0
+               do k=1,nY
+                  rho=rho+qh(k,i,j,plane)
+               end do
+               u  =qh(nY+1,i,j,plane)/rho
+               v  =qh(nY+2,i,j,plane)/rho
+               T  =p_mat( i,j,plane)/rho/R_gas(i,j,plane)
 
-      call vtk_header(x,r)
+               rho_mat(i,j,plane)=rho
+                 T_mat(i,j,plane)=T
+                 u_mat(i,j,plane)=u
+                 v_mat(i,j,plane)=v
+                 M_mat(i,j,plane)=sqrt((u**2+v**2) / (gmma(i,j,plane)*p_mat(i,j,plane)/rho))
+                ei_mat(i,j,plane)=qh(nY+3,i,j,plane)/rho -0.5d0*(u**2+v**2)
+                MW_mat(i,j,plane)=R_uni/R_gas(i,j,plane)
 
-      !thermodynamical
-      call vtk_scalar(rho_mat,"Density")
-      call vtk_scalar(u_mat,"Velocity_x")
-      call vtk_scalar(v_mat,"Velocity_y")
-      call vtk_scalar(p_mat,"Pressure")
-      call vtk_scalar(gmma,"SpecificHeatRatio")
-      call vtk_vector(u_mat,v_mat,"Velocity")
-      call vtk_scalar(T_mat,"Temperature")
-      call vtk_scalar(MW_mat,"Molecular_Weight")
-      call vtk_scalar(ei_mat,"InternalEnergy")
-
-      call vtk_scalar(M_mat,"MachNumber")
-
-      !other conservative quantities
-      do k=1,min(3,nY)
-         write(title,'(a,i3.3)') 'phi',k
-         call vtk_scalar(w_mat(:,:,k),title)
+               w_res(i,j,plane)=0d0
+               do k=1,nY
+                  w_mat(i,j,k,plane)=qh(k,i,j,plane)/rho
+                  if(k>3) then
+                     w_res(i,j,plane)=w_res(i,j,plane)+w_mat(i,j,k,plane)
+                  end if
+               end do
+            end do
+         end do
       end do
 
-      call vtk_scalar(w_res,"phi_res")
+      do plane = 1,Nplane
+         !output file open
+         write(filename,"('result/result',i3.3,'.',i12.12,'.vts')") plane,step
 
-      !output file close
-      close(66)
+         !header
+         call vtk_header(plane)
 
-      !eta = sqrt(1.6e-5*x(135,1)/u_mat(135,24))
-      !open(66,file=trim(filename)//".plt")
-      !do j=1,nj/2
-      !   if(r(135,j)/eta>10d0) then
-      !      exit
-      !   end if
-      !   write(66,*) r(135,j)/eta,u_mat(135,j)/u_mat(135,24)
-      !end do
-      !close(66)
+         call vtk_scalar("Density")
+         call vtk_scalar("Velocity_x")
+         call vtk_scalar("Velocity_y")
+         call vtk_scalar("Pressure")
+         call vtk_scalar("SpecificHeatRatio")
+         call vtk_vector("Velocity")
+         call vtk_scalar("Temperature")
+         call vtk_scalar("Molecular_Weight")
+         call vtk_scalar("InternalEnergy")
+
+         call vtk_scalar("MachNumber")
+
+         do k=1,min(3,nY)
+            write(title,'(a,i3.3)') 'phi',k
+            call vtk_scalar(title)
+         end do
+
+         call vtk_scalar("phi_res")
+
+         !binary
+         call vtk_header_bin(plane,xh(:,:,plane),rh(:,:,plane))
+
+         call vtk_scalar_bin(plane,rho_mat(:,:,plane))
+         call vtk_scalar_bin(plane,u_mat(:,:,plane))
+         call vtk_scalar_bin(plane,v_mat(:,:,plane))
+         call vtk_scalar_bin(plane,p_mat(:,:,plane))
+         call vtk_scalar_bin(plane,gmma(:,:,plane))
+         call vtk_vector_bin(plane,u_mat(:,:,plane),v_mat(:,:,plane))
+         call vtk_scalar_bin(plane,T_mat(:,:,plane))
+         call vtk_scalar_bin(plane,MW_mat(:,:,plane))
+         call vtk_scalar_bin(plane,ei_mat(:,:,plane))
+
+         call vtk_scalar_bin(plane,M_mat(:,:,plane))
+
+         do k=1,min(3,nY)
+            call vtk_scalar_bin(plane,w_mat(:,:,k,plane))
+         end do
+
+         call vtk_scalar_bin(plane,w_res(:,:,plane))
+
+         !output file close
+         call vtk_footer_bin
+      end do
 
       step=step+Dstep
    end do
 contains
-   !begin of subroutines{{{
-   subroutine vtk_header(x,r)
+   subroutine vtk_header(plane)!{{{
       implicit none
-      double precision,dimension(ni,nj),intent(in)::x,r
+      integer,intent(in)::plane
+
+      ng=(nxe_vis(plane)-nxs_vis(plane)+1)*(nye_vis(plane)-nys_vis(plane)+1)
+
+      open(55,file=trim(filename))
+      write(55,'(a)') '<?xml version="1.0"?>'
+      write(55,'(a)') '<VTKFile type="StructuredGrid" version="0.1" byte_order="BigEndian">'
+      write(55,'(a,6i4,a)') '<StructuredGrid WholeExtent="',&
+                             nxs_vis(plane),&
+                             nxe_vis(plane),&
+                             nys_vis(plane),&
+                             nye_vis(plane),&
+                             0,0,'">'
+
+      write(55,'(a)') '<FieldData>'
+      write(55,'(a,e12.5,a)') '<DataArray type="Float32" Name="TIME" &
+                           &NumberOfTuples="1" format="ascii">',&
+                           tt,&
+                           '</DataArray>'
+      write(55,'(a,i12,a)') '<DataArray type="Int32" Name="CYCLE" &
+                           &NumberOfTuples="1" format="ascii">',&
+                           step,&
+                           '</DataArray>'
+      write(55,'(a)') '</FieldData>'
+
+      write(55,'(a,6i4,a)') '<Piece Extent="',&
+                             nxs_vis(plane),&
+                             nxe_vis(plane),&
+                             nys_vis(plane),&
+                             nye_vis(plane),&
+                            0,0,'">'
+   
+      offset=0
+      write(55,'(a)') "<Points>"
+      write(55,'(a,i8,a,es12.5,a,es12.5,a)') &
+                      '<DataArray type="Float32" &
+                      &Name="xyz" &
+                      &NumberOfComponents="3" &
+                      &format="appended" &
+                      &offset="',offset,'">'
+      write(55,'(a)') "</DataArray>"
+      offset=offset+ng*4*3+4
+      write(55,'(a)') "</Points>"
+   
+      write(55,'(a)') "<PointData>"
+
+      ! Indices Vector
+      write(55,'(a,i8,a,es12.5,a,es12.5,a)') &
+                      '<DataArray type="Float32" &
+                      &Name="Indices" &
+                      &NumberOfComponents="3" &
+                      &format="appended" &
+                      &offset="',offset,'">'
+      write(55,'(a)') "</DataArray>"
+      offset=offset+ng*4*3+4
+   end subroutine vtk_header!}}}
+   subroutine vtk_header_bin(plane,xh,rh)!{{{
+      implicit none
+      integer,intent(in)::plane
+      double precision,dimension(0:nimax+1,0:njmax+1),intent(in)::xh,rh
       integer i,j
 
-      !header
-      write(66,'(a26)') '# vtk DataFile Version 2.0'
-      write(66,'(a7)') '2D Data'
-      write(66,'(a5)') 'ASCII'
-      write(66,'(a23)') 'DATASET STRUCTURED_GRID'
-      write(66,'(a11,i3,a1,i3,a1,i1)') 'DIMENSIONS ', nxe_vis-nxs_vis+1, ' ', nye_vis-nys_vis+1, ' ', 1
-
-
-      write(66,'(a17)') 'FIELD FieldData 2'
-
-      write(66,'(a15)') 'TIME 1 1 double'
-      write(66,'(e14.6e3)')  tt
-      write(66,'(a13)') 'CYCLE 1 1 int'
-      write(66,'(i0)')  step
-
-      !grid
-      write(66,'(a7,i7,a6)') 'POINTS ', (nxe_vis-nxs_vis+1)*(nye_vis-nys_vis+1)*1, ' float'
-      do j = nys_vis, nye_vis
-        do i = nxs_vis, nxe_vis
-          write(66,'(e14.6e3,2(1x,e14.6e3))') x(i,j), r(i,j), 0.d0
-        end do
+      write(55,'(a)') "</PointData>"
+   
+      write(55,'(a)') "</Piece>"
+      write(55,'(a)') "</StructuredGrid>"
+      write(55,'(a)') '<AppendedData encoding="raw">'
+   
+      close(55)
+   
+      open(55,file=trim(filename),form='binary',recl=4,access='append')
+      write(55) '_'
+   
+      write(55) 4*ng*3
+      do j = nys_vis(plane), nye_vis(plane)
+        do i = nxs_vis(plane), nxe_vis(plane)
+            write(55) real(xh(i,j))
+            write(55) real(rh(i,j))
+            write(55) 0e0
+         end do
       end do
-      write(66,*)
  
-      write(66,'(a11,i7)') 'POINT_DATA ', (nxe_vis-nxs_vis+1)*(nye_vis-nys_vis+1)*1
-      write(66,'(a22)') 'VECTORS Indices float'
-      do j = nys_vis, nye_vis
-        do i = nxs_vis, nxe_vis
-          write(66,'(e14.6e3,2(1x,e14.6e3))') dble(i), dble(j), 0.d0
-        end do
+      write(55) 4*ng*3
+      do j = nys_vis(plane), nye_vis(plane)
+        do i = nxs_vis(plane), nxe_vis(plane)
+            write(55) real(i)
+            write(55) real(j)
+            write(55) 0e0
+         end do
       end do
-      write(66,*)
-   end subroutine vtk_header
-   subroutine vtk_scalar(arr,title)
+   end subroutine vtk_header_bin!}}}
+   subroutine vtk_footer_bin!{{{
       implicit none
-      double precision,dimension(ni,nj),intent(in)::arr
+      close(55)
+   
+      open(55,file=trim(filename),access='append')
+      write(55,'()')
+      write(55,'(a)') "</AppendedData>"
+      write(55,'(a)') "</VTKFile>"
+      close(55)
+   end subroutine vtk_footer_bin!}}}
+   subroutine vtk_scalar(title)!{{{
+      implicit none
       character(*),intent(in)::title
+
+      write(55,'(a,i8,a,es12.5,a,es12.5,a)') &
+                      '<DataArray type="Float32" &
+                      &Name="'//trim(title)//'" &
+                      &format="appended" &
+                      &offset="',offset,'">'
+      write(55,'(a)') "</DataArray>"
+      offset=offset+ng*4+4;
+   end subroutine vtk_scalar!}}}
+   subroutine vtk_vector(title)!{{{
+      implicit none
+      character(*),intent(in)::title
+
+      write(55,'(a,i8,a,es12.5,a,es12.5,a)') &
+                      '<DataArray type="Float32" &
+                      &Name="'//trim(title)//'" &
+                      &NumberOfComponents="3" &
+                      &format="appended" &
+                      &offset="',offset,'">'
+      write(55,'(a)') "</DataArray>"
+      offset=offset+ng*4*3+4
+   end subroutine vtk_vector!}}}
+   subroutine vtk_scalar_bin(plane,arr)!{{{
+      implicit none
+      integer,intent(in)::plane
+      double precision,dimension(0:nimax+1,0:njmax+1),intent(in)::arr
 
       integer i,j
 
-      write(66,'(a)') 'SCALARS '//trim(title)//' float 1'
-      write(66,'(a20)') 'LOOKUP_TABLE default'
-      do j = nys_vis, nye_vis
-        do i = nxs_vis, nxe_vis
-          write(66,'(e14.6e3)') arr(i,j)
+      write(55) 4*ng
+      do j = nys_vis(plane), nye_vis(plane)
+        do i = nxs_vis(plane), nxe_vis(plane)
+          write(55) real(arr(i,j))
         end do
       end do
-      write(66,*)
-   end subroutine vtk_scalar
-   subroutine vtk_vector(arr1,arr2,title)
+   end subroutine vtk_scalar_bin!}}}
+   subroutine vtk_vector_bin(plane,arr1,arr2)!{{{
       implicit none
-      double precision,dimension(ni,nj),intent(in)::arr1,arr2
-      character(*),intent(in)::title
+      integer,intent(in)::plane
+      double precision,dimension(0:nimax+1,0:njmax+1),intent(in)::arr1,arr2
 
       integer i,j
 
-      write(66,'(a22)') 'VECTORS '//title//' float'
-      do j = nys_vis, nye_vis
-        do i = nxs_vis, nxe_vis
-          write(66,'(e14.6e3,2(1x,e14.6e3))') arr1(i,j), arr2(i,j), 0.d0
+      write(55) 4*ng*3
+      do j = nys_vis(plane), nye_vis(plane)
+        do i = nxs_vis(plane), nxe_vis(plane)
+          write(55) real(arr1(i,j))
+          write(55) real(arr2(i,j))
+          write(55) 0e0
         end do
       end do
-      write(66,*)
-   end subroutine vtk_vector
-   subroutine read_control
+   end subroutine vtk_vector_bin!}}}
+
+   subroutine read_control!{{{
       implicit none
+      integer i
 
       open(8,file="control.inp")
 
@@ -203,18 +322,21 @@ contains
       read(8,'(25x,i10)') step
       read(8,'(25x,a)')   dirname
       read(8,'(25x,i10)') OverWrite
-      read(8,'(25x,i10)') nxs_vis
-      read(8,'(25x,i10)') nxe_vis
-      read(8,'(25x,i10)') nys_vis
-      read(8,'(25x,i10)') nye_vis
+      do i=1,Nplane
+         read(8,'(25x,i10)') nxs_vis(i)
+         read(8,'(25x,i10)') nxe_vis(i)
+         read(8,'(25x,i10)') nys_vis(i)
+         read(8,'(25x,i10)') nye_vis(i)
+      end do
       close(8)
 
       dirname = adjustl(dirname)
       if(OverWrite .ne. 0 .and. OverWrite .ne. 1) stop "Odd OverWrite Value"
       if(Dstep < 1)   stop "Odd Dstep."
       if(step < 1)    step = Dstep
-      if(nxe_vis < 1) nxe_vis = ni
-      if(nye_vis < 1) nye_vis = nj
-   end subroutine read_control
-   !end of subroutines}}}
+      do i=1,Nplane
+         if(nxe_vis(i) < 1) nxe_vis(i) = ni(i)
+         if(nye_vis(i) < 1) nye_vis(i) = nj(i)
+      end do
+   end subroutine read_control!}}}
 end program main

@@ -5,8 +5,8 @@ logical function check_convergence(step,step_res)
    implicit none
    integer,intent(in)::step
    integer,intent(in)::step_res
-   double precision tmp,tmpt
-   integer i,j
+   double precision tmp,tmpt,sm
+   integer i,j,plane
    integer*8 rest_time
 
    if(mod(step,OutPeriod) .ne. 0) then
@@ -15,13 +15,17 @@ logical function check_convergence(step,step_res)
    end if
 
    tmp =0d0
-   do j=nys,nye
-      do i=nxs,nxe
-         tmp =tmp +(q(nY+3,i,j)-qp(nY+3,i,j))**2
+   sm = 0d0
+   do plane = nps,npe
+      do j=nys(plane),nye(plane)
+         do i=nxs(plane),nxe(plane)
+            tmp =tmp +(q(nY+3,i,j,plane)-qp(nY+3,i,j,plane))**2
+         end do
       end do
+      sm = sm + dble((nxe(plane)-nxs(plane)+1)*(nye(plane)-nys(plane)+1))
    end do
 
-   tmpt=sqrt(tmp)/dble(bwx*bwy)
+   tmpt=sqrt(tmp)/sm
    if(tmpt .ne. tmpt) then
       print *,"NaN at procid=",myid
       call exit(1)

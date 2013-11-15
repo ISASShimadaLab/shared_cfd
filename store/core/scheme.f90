@@ -3,27 +3,29 @@ subroutine set_w!{{{
    use grbl_prmtr
    use variable
    implicit none
-   integer i,j,k
+   integer i,j,k,plane
    double precision tmp
 
    !w1=rho, w2=u, w3=v, w4=p, w_(dimq+1)=gamma, w_(dimq+2)=ht(J/kg)
-   !$omp parallel do private(i,k,tmp)
-   do j=nys,nye
-      do i=nxs,nxe
-         tmp =0d0
-         do k=1,nY
-            tmp=tmp+q(k,i,j)
-         end do
-         w(1,i,j)= tmp
-         tmp=1d0/tmp
-         w(2,i,j)= q(nY+1,i,j)*tmp
-         w(3,i,j)= q(nY+2,i,j)*tmp
-         do k=1,nY
-            w(k+4,i,j)=q(k,i,j)*tmp
+   do plane = nps,npe
+      !$omp parallel do private(i,k,tmp)
+      do j=nys(plane),nye(plane)
+         do i=nxs(plane),nxe(plane)
+            tmp =0d0
+            do k=1,nY
+               tmp=tmp+q(k,i,j,plane)
+            end do
+            w(1,i,j,plane)= tmp
+            tmp=1d0/tmp
+            w(2,i,j,plane)= q(nY+1,i,j,plane)*tmp
+            w(3,i,j,plane)= q(nY+2,i,j,plane)*tmp
+            do k=1,nY
+               w(k+4,i,j,plane)=q(k,i,j,plane)*tmp
+            end do
          end do
       end do
+      !$omp end parallel do
    end do
-   !$omp end parallel do
 end subroutine set_w!}}}
 
 subroutine set_TG!{{{
@@ -35,41 +37,43 @@ subroutine set_TG!{{{
    use grbl_prmtr
    use variable
    implicit none
-   integer i,j
+   integer i,j,plane
 
-   !$omp parallel do default(private) shared(j,nxs,nxe,nys,nye,wHli,wHri,TGi,vni)
-   do j=nys,nye
-      do i=nxs-1,nxe
-         call tg_SLAU      (wHli(1:dimw,i,j),wHri(1:dimw,i,j),TGi(1:dimq,i,j),vni(1:2,i,j))
-         !if(i .eq. 1 .and. j .eq. 1) then
-         !   print '("wHli")'
-         !   print '(20es15.7)',wHli(1:dimw,i,j)
-         !   print '("wHri")'
-         !   print '(20es15.7)',wHri(1:dimw,i,j)
-         !   print '("TGi")'
-         !   print '(20es15.7)',TGi(1:dimq,i,j)
-         !   call exit(0)
-         !end if
+   do plane = nps,npe
+      !$omp parallel do default(private) shared(j,nxs,nxe,nys,nye,wHli,wHri,TGi,vni,plane)
+      do j=nys(plane),nye(plane)
+         do i=nxs(plane)-1,nxe(plane)
+            call tg_SLAU      (wHli(1:dimw,i,j,plane),wHri(1:dimw,i,j,plane),TGi(1:dimq,i,j,plane),vni(1:2,i,j,plane))
+            !if(i .eq. 1 .and. j .eq. 1) then
+            !   print '("wHli")'
+            !   print '(20es15.7)',wHli(1:dimw,i,j,plane)
+            !   print '("wHri")'
+            !   print '(20es15.7)',wHri(1:dimw,i,j,plane)
+            !   print '("TGi")'
+            !   print '(20es15.7)',TGi(1:dimq,i,j,plane)
+            !   call exit(0)
+            !end if
+         end do
       end do
-   end do
-   !$omp end parallel do
+      !$omp end parallel do
 
-   !$omp parallel do private(i)
-   do j=nys-1,nye
-      do i=nxs,nxe
-        call tg_SLAU      (wHlj(1:dimw,i,j),wHrj(1:dimw,i,j),TGj(1:dimq,i,j),vnj(1:2,i,j))
-        !if(i .eq. 1 .and. j .eq. 0) then
-        !   print '("wHlj")'
-        !   print '(20es15.7)',wHlj(1:dimw,i,j)
-        !   print '("wHrj")'
-        !   print '(20es15.7)',wHrj(1:dimw,i,j)
-        !   print '("TGj")'
-        !   print '(20es15.7)',TGj(1:dimq,i,j)
-        !   call exit(0)
-        !end if
+      !$omp parallel do private(i)
+      do j=nys(plane)-1,nye(plane)
+         do i=nxs(plane),nxe(plane)
+           call tg_SLAU      (wHlj(1:dimw,i,j,plane),wHrj(1:dimw,i,j,plane),TGj(1:dimq,i,j,plane),vnj(1:2,i,j,plane))
+           !if(i .eq. 1 .and. j .eq. 0) then
+           !   print '("wHlj")'
+           !   print '(20es15.7)',wHlj(1:dimw,i,j,plane)
+           !   print '("wHrj")'
+           !   print '(20es15.7)',wHrj(1:dimw,i,j,plane)
+           !   print '("TGj")'
+           !   print '(20es15.7)',TGj(1:dimq,i,j,plane)
+           !   call exit(0)
+           !end if
+         end do
       end do
+      !$omp end parallel do
    end do
-   !$omp end parallel do
 end subroutine set_TG!}}}
 
 subroutine tg_SLAU(wHl,wHr,tg,vn)!{{{

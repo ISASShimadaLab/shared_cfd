@@ -2,19 +2,21 @@ subroutine calc_next_step
    use mod_mpi
    use variable
    implicit none
-   integer i,j
+   integer i,j,plane
    double precision vol_dqdt(1:dimq)
 
-   !$omp parallel do private(i,vol_dqdt)
-   do j=nys,nye
-      do i=nxs,nxe
-         vol_dqdt=+dsi(i-1,  j)*(TGi(1:dimq,i-1,j  )-TGvi(1:dimq,i-1,j  ))&
-                  -dsi(  i,  j)*(TGi(1:dimq,i  ,j  )-TGvi(1:dimq,i  ,j  ))&
-                  +dsj(  i,j-1)*(TGj(1:dimq,i  ,j-1)-TGvj(1:dimq,i  ,j-1))&
-                  -dsj(  i,  j)*(TGj(1:dimq,i  ,j  )-TGvj(1:dimq,i  ,j  ))
+   do plane = nps,npe
+      !$omp parallel do private(i,vol_dqdt)
+      do j=nys(plane),nye(plane)
+         do i=nxs(plane),nxe(plane)
+            vol_dqdt=+dsi(i-1,  j,plane)*(TGi(1:dimq,i-1,j  ,plane)-TGvi(1:dimq,i-1,j  ,plane))&
+                     -dsi(  i,  j,plane)*(TGi(1:dimq,i  ,j  ,plane)-TGvi(1:dimq,i  ,j  ,plane))&
+                     +dsj(  i,j-1,plane)*(TGj(1:dimq,i  ,j-1,plane)-TGvj(1:dimq,i  ,j-1,plane))&
+                     -dsj(  i,  j,plane)*(TGj(1:dimq,i  ,j  ,plane)-TGvj(1:dimq,i  ,j  ,plane))
 
-         q(:,i,j)=qp(:,i,j)+DT_LOCAL_GLOBAL/Vol(i,j)*vol_dqdt
+            q(:,i,j,plane)=qp(:,i,j,plane)+DT_LOCAL_GLOBAL/Vol(i,j,plane)*vol_dqdt
+         end do
       end do
+      !$omp end parallel do
    end do
-   !$omp end parallel do
 end subroutine calc_next_step
