@@ -190,7 +190,7 @@ if(val_dt == 0):
 elif(val_dt == 1):
 	print "\tLocal Time Step is selected."
 	engage("time_step/local")
-	DT_LOCAL_GLOBAL = "dt_mat(i,j)"
+	DT_LOCAL_GLOBAL = "dt_mat(i,j,plane)"
 else:
 	print "\tOdd Input at time step! value is ",val_dt
 	sys.exit(1)

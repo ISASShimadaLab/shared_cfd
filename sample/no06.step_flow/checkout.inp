@@ -1,7 +1,7 @@
 grid file name    : MB_test2.x #Grid file name (*.x)
 nY                : 1  #The number of gas types
-NumOfProcessors   : 0  #The Maximum Number of Processors @ M-System[Super Computer] / 0 @ Personal Computer
-time step         : 0  #global(0)/local(1)
+NumOfProcessors   : 30 #The Maximum Number of Processors @ M-System[Super Computer] / 0 @ Personal Computer
+time step         : 1  #global(0)/local(1)
 time scheme       : 0  #Euler(0)/Runge-Kutta 2nd-order(1)/LU-SGS(2)/Newton-Raphson(3)/Pre-Conditioner(4)
 high order scheme : 0  #Up Wind(0)/MUSCL(1)
 viscosity         : 0  #non-viscous flow(0)/viscous flow(1)
