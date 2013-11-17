@@ -53,12 +53,12 @@ subroutine calc_next_step_implicit(step_internal)
             Dq(:,i,j,plane)=Dq(:,i,j,plane)&
                            -alpha(i,j,plane)*(dsci(i+1,j  ,plane)*matmul(Am(:,:,i+1,j  ,plane),Dq(:,i+1,j  ,plane))&
                                              +dscj(i  ,j+1,plane)*matmul(Bm(:,:,i  ,j+1,plane),Dq(:,i  ,j+1,plane)))
-   
+
             res =res +Dq(nY+3,i,j,plane)**2
             !do k=1,dimq
             !   res =res +Dq(k,i,j,plane)**2
             !end do
-   
+
             do k=1,nY
                if(Dq(k,i,j,plane)<0d0) then
                   omega = min(omega,-q(k,i,j,plane)/Dq(k,i,j,plane)*Dqmax)
@@ -83,9 +83,9 @@ subroutine calc_next_step_implicit(step_internal)
       if(ILwrite) write(66,'(i3,100e9.1)') step_internal,omega,res/res1
    end if
    !!!!!!!!! END OF FOR PARAMETERS ADJUSTMENTS !!!!!!!!!
-   
+
    omega      = min(omega_max,omega)
-   
+
    do plane = nps,npe
       !add Dq
       !$omp parallel do private(i)

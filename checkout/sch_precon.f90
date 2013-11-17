@@ -6,7 +6,8 @@ subroutine set_ABpm
 
    implicit none
    double precision rho,u,v,H,c,p,Vs
-   double precision tmp
+   double precision Ur,Vv,alp,ud,cd,phh
+   double precision tmp,uds
    double precision unA, unB, nuA, nuB
    double precision,dimension(dimq,dimq)::A,B,Atilde,Btilde
    double precision,dimension(dimq)::tA,tB
@@ -16,10 +17,11 @@ subroutine set_ABpm
    do plane=nps,npe
       !$omp parallel do private(i,k,l,&
       !$omp                     rho,u,v,H,Vs,&
+      !$omp                     Ur,Vv,alp,ud,cd,phh,&
       !$omp                     p,c,tmp,&
       !$omp                     unA,unB,nuA,nuB,&
       !$omp                     A,B,Atilde,Btilde,&
-      !$omp                     gmmad,gamm,&
+      !$omp                     gmmad,gamm,uds,&
       !$omp                     tA,tB)
       do j=nys(plane),nye(plane)
          do i=nxs(plane),nxe(plane)
@@ -37,9 +39,42 @@ subroutine set_ABpm
             !unA,unB,nuA,nuB
             unA=vnci(1,i,j,plane)*u+vnci(2,i,j,plane)*v
             unB=vncj(1,i,j,plane)*u+vncj(2,i,j,plane)*v
-            nuA = abs(unA)+c
-            nuB = abs(unB)+c
-           
+
+            Vv  = w(indxMu,i,j,plane)/rho/min(dsci(i,j,plane),dscj(i,j,plane))
+            Ur  = min(max(Vv,sqrt(Vs)),c)
+            phi(i,j,plane) = 1d0/Ur**2 -1d0/c**2
+            alp = 0.5d0*(1d0-(Ur/c)**2)
+
+            ud  = unA*(1d0-alp)
+            cd  = sqrt(alp**2 *unA**2 +Ur**2)
+            nuA = abs(ud)+cd
+
+            ud  = unB*(1d0-alp)
+            cd  = sqrt(alp**2 *unB**2 +Ur**2)
+            nuB = abs(ud)+cd
+
+            !set new dt
+            uds= nuA*(dsi(i,j,plane)+dsi(i-1,j,plane))+nuB*(dsj(i,j,plane)+dsj(i,j-1,plane))
+            dt_mat(i,j,plane) = cfl*Vol(i,j,plane)/max(uds,w(indxMu,i,j,plane)/rho)
+
+            !set preconditioner
+            phh = -1d0/(c**2+1d0/phi(i,j,plane))
+
+            do k=1,nY
+               pre1(k,i,j,plane) = phh*w(4+k,i,j,plane)
+            end do
+            pre1(nY+1,i,j,plane) = phh*u
+            pre1(nY+2,i,j,plane) = phh*v
+            pre1(nY+3,i,j,plane) = phh*H
+
+            do k=1,nY
+               pre2(k,i,j,plane) = 0.5d0*gmmad*Vs+DHi(k,i,j,plane)
+            end do
+            pre2(nY+1,i,j,plane) =-gmmad*u
+            pre2(nY+2,i,j,plane) =-gmmad*v
+            pre2(nY+3,i,j,plane) = gmmad
+
+
             !set A
             A(nY+1,nY+1)= u*(3d0-gamm)
             A(nY+2,nY+1)= v
@@ -109,6 +144,31 @@ subroutine set_ABpm
                B(nY+3,k)=tB(nY+3)+DHi(k,i,j,plane)*v
             end do
 
+
+            !multiply preM
+            do k=1,dimq
+               tmp = 0d0
+               do l=1,dimq
+                  tmp = tmp + pre2(l,i,j,plane)*A(l,k)
+               end do
+
+               do l=1,dimq
+                  A(l,k) = A(l,k) + pre1(l,i,j,plane)*tmp
+               end do
+            end do
+
+            do k=1,dimq
+               tmp = 0d0
+               do l=1,dimq
+                  tmp = tmp + pre2(l,i,j,plane)*B(l,k)
+               end do
+
+               do l=1,dimq
+                  B(l,k) = B(l,k) + pre1(l,i,j,plane)*tmp
+               end do
+            end do
+
+
             !set Atilde, Apm
             Atilde = vnci(1,i,j,plane)*A+vnci(2,i,j,plane)*B
 
@@ -132,7 +192,7 @@ subroutine set_ABpm
             end do
 
             !set alpha
-            tmp= 3d0*Vol(i,j,plane)/(2d0*DT_LOCAL_GLOBAL) + dsci(i,j,plane)*nuA+dscj(i,j,plane)*nuB
+            tmp= 3d0*Vol(i,j,plane)/(2d0*dt_mat(i,j,plane)) + dsci(i,j,plane)*nuA+dscj(i,j,plane)*nuB
             alpha(i,j,plane)=1d0/tmp
          end do
       end do
@@ -153,7 +213,7 @@ subroutine set_dqdt
          !$omp parallel do private(i)
          do j=nys(plane),nye(plane)
             do i=nxs(plane),nxe(plane)
-               dqdt(:,i,j,plane)=(q(:,i,j,plane)-qp(:,i,j,plane))/DT_LOCAL_GLOBAL
+               dqdt(:,i,j,plane)=(q(:,i,j,plane)-qp(:,i,j,plane))/dt_mat(i,j,plane)
             end do
          end do
          !$omp end parallel do
@@ -163,7 +223,7 @@ subroutine set_dqdt
          !$omp parallel do private(i)
          do j=nys(plane),nye(plane)
             do i=nxs(plane),nxe(plane)
-               dqdt(:,i,j,plane)=(3d0*q(:,i,j,plane)-4d0*qp(:,i,j,plane)+qpp(:,i,j,plane))/(2d0*DT_LOCAL_GLOBAL)
+               dqdt(:,i,j,plane)=(3d0*q(:,i,j,plane)-4d0*qp(:,i,j,plane)+qpp(:,i,j,plane))/(2d0*dt_mat(i,j,plane))
             end do
          end do
          !$omp end parallel do
@@ -179,6 +239,11 @@ subroutine set_vnc_dsc
    implicit none
    double precision,dimension(2)::a,b,c,d
    integer i,j,plane
+
+   dsci(:,:,:)=0d0
+   dscj(:,:,:)=0d0
+   vnci(:,:,:,:)=0d0
+   vncj(:,:,:,:)=0d0
 
    do plane = nps,npe
       do j=nys(plane),nye(plane)

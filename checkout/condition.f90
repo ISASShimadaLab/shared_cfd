@@ -98,7 +98,7 @@ subroutine set_BC(step)
          if(gy(plane) .eq. 1) then
             !j=1/2
             !slip wall
-            do i=nxs(plane),min(nxe(plane),54)
+            do i=nxs(plane)-1,min(nxe(plane)+1,54)
                w(:,  i, 0,plane) =  w(:,  i,1,plane)
                w(3,  i, 0,plane) = -w(3,  i,1,plane)
                vhi(:,i, 0,plane) =  vhi(:,i,1,plane)
@@ -108,7 +108,7 @@ subroutine set_BC(step)
             end do
 
             !non-slip wall
-            do i=max(nxs(plane),55),nxe(plane)
+            do i=max(nxs(plane)-1,55),nxe(plane)+1
                w(:,  i, 0,plane) =  w(:,  i,1,plane)
                w(2,  i, 0,plane) = -w(2,  i,1,plane)
                w(3,  i, 0,plane) = -w(3,  i,1,plane)
@@ -121,10 +121,11 @@ subroutine set_BC(step)
 
          if(gy(plane) .eq.  ngy(plane)) then
             !j=nj+1/2
-            do i=max(    1,nxs(plane)),min(nxe(plane),  223)
+            do i=max(    0,nxs(plane)-1),min(nxe(plane)+1,  224)
                w(:,  i,nj(plane)+1,plane) = w(:,  i,nj(plane)  ,plane)
                w(4,  i,nj(plane)+1,plane) = 1d5
                vhi(:,i,nj(plane)+1,plane) = vhi(:,i,nj(plane)  ,plane)
+
                w(:,  i,nj(plane)+2,plane) = w(:,  i,nj(plane)+1,plane)
                vhi(:,i,nj(plane)+2,plane) = vhi(:,i,nj(plane)+1,plane)
             end do
@@ -134,7 +135,7 @@ subroutine set_BC(step)
 
    call MPI_COMMUNICATIONS_J_DIRECTION
 
-   call set_corners
+   !call set_corners
 contains
 subroutine section_exchange!{{{
    implicit none
