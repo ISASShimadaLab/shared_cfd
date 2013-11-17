@@ -1,5 +1,5 @@
 #FOR GENERAL PARAMETERS
-Max Step Number         : 1.e5
+Max Step Number         : 1.e6
 convergent RMS          : 1.e-14
 CFL Number              : 0.3
 File Output Period      : 5000
