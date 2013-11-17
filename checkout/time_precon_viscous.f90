@@ -20,64 +20,30 @@ subroutine calc_next_step_implicit(step_internal)
                             -dsi(  i,  j,plane)*(TGi(1:dimq,i  ,j  ,plane)-TGvi(1:dimq,i  ,j  ,plane))&
                             +dsj(  i,j-1,plane)*(TGj(1:dimq,i  ,j-1,plane)-TGvj(1:dimq,i  ,j-1,plane))&
                             -dsj(  i,  j,plane)*(TGj(1:dimq,i  ,j  ,plane)-TGvj(1:dimq,i  ,j  ,plane))
-         end do
-      end do
-      !$omp end parallel do
-
-      !$omp parallel do private(i)
-      do j=nys(plane),nye(plane)
-         do i=nxs(plane),nxe(plane)
             Dq(:,i,j,plane)= Dq(:,i,j,plane)+pre1(:,i,j,plane)*dot_product(pre2(:,i,j,plane),Dq(:,i,j,plane))
             Dq(:,i,j,plane)= Dq(:,i,j,plane)-Vol(i,j,plane)*dqdt(:,i,j,plane)
-            !write(20,'(2i3,4es30.20)') i,j,Dq(:,i,j,plane)
          end do
       end do
       !$omp end parallel do
-      !call exit(0)
 
-      !set BC Delta q
-      i = nxs(plane)-1
-      do j = nys(plane)-1,nye(plane)+1
-         Dq(:,i,j,plane)=0d0
-      end do
-      j = nys(plane)-1
-      do i = nxs(plane)-1,nxe(plane)+1
-         Dq(:,i,j,plane)=0d0
-      end do
+      Dq(:,nxs(plane)-1,nys(plane)-1:nye(plane)+1,plane)=0d0
+      Dq(:,nxs(plane)-1:nxe(plane)+1,nys(plane)-1,plane)=0d0
 
-
-     
-      !do j=nys(plane),nye(plane)
-      !   do i=nxs(plane),nxe(plane)
-      !      !do k=1,4
-      !      !   write(20,'(3i3,4es15.7)') i,j,k,Bp(:,k,i,j,plane)
-      !      !end do
-      !      write(20,'(2i3,4es15.7)') i,j,dsci(i,j,plane),dscj(i,j,plane)
-      !   end do
-      !end do
-
-      !call exit(0)
       !calculate forward
       do sm=nxs(plane)+nys(plane),nxe(plane)+nye(plane)
-         !!$omp parallel do private(j)
+         !$omp parallel do private(j)
          do i=max(nxs(plane),sm-nye(plane)),min(sm-nys(plane),nxe(plane))
             j=sm-i
             Dq(:,i,j,plane)=alpha(i,j,plane)*(Dq(:,i,j,plane)&
                                              +dsci(i-1,j  ,plane)*matmul(Ap(:,:,i-1,j  ,plane),Dq(:,i-1,j  ,plane))&
                                              +dscj(i  ,j-1,plane)*matmul(Bp(:,:,i  ,j-1,plane),Dq(:,i  ,j-1,plane)))
          end do
-         !!$omp end parallel do
+         !$omp end parallel do
       end do
 
       !set BC Delta q
-      i = nxs(plane)+1
-      do j = nys(plane),nye(plane)+1
-         Dq(:,i,j,plane)=0d0
-      end do
-      j = nys(plane)+1
-      do i = nxs(plane),nxe(plane)+1
-         Dq(:,i,j,plane)=0d0
-      end do
+      Dq(:,nxe(plane)+1,nys(plane):nye(plane)+1,plane)=0d0
+      Dq(:,nxs(plane):nxe(plane)+1,nye(plane)+1,plane)=0d0
 
       !calculate backward
       do sm=nxe(plane)+nye(plane),nxs(plane)+nys(plane),-1
@@ -126,11 +92,9 @@ subroutine calc_next_step_implicit(step_internal)
       do j=nys(plane),nye(plane)
          do i=nxs(plane),nxe(plane)
             q(:,i,j,plane)=q(:,i,j,plane)+omega*Dq(:,i,j,plane)
-            write(20,'(2i3,4es15.7)') i,j,q(:,i,j,plane)
          end do
       end do
       !$omp end parallel do
-      call exit(0)
    end do
 end subroutine calc_next_step_implicit
 
