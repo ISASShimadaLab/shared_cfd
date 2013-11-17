@@ -60,8 +60,13 @@ subroutine set_cut_copro
    use mod_mpi
    implicit none
    character*100 line
+   integer*4,external::access
    integer i,j
 
+   if(access('cut_copro000.inp',"r") .ne. 0) then
+        num_cut_copro=0
+        return
+   end if
    open(45,file="cut_copro000.inp")
    read(45,'(a)') !for comment line
    read(45,*) num_cut_copro

@@ -3,6 +3,7 @@
 origin="sample/no00.shock_tube"
 
 # move input file and checkout
+cp $origin/*.x .
 cp $origin/checkout.inp .
 ./checkout.py
 
