@@ -55,7 +55,7 @@ subroutine set_BC(step)
       case(  1)
          if(gx(plane) .eq. 1) then
             !i=1/2
-            do j=max(    1,nys(plane)),min(nye(plane),  100)
+            do j=max(    1,nys(plane)),min(nye(plane),   20)
                w(1,     0,j,plane) = rho
                w(2,     0,j,plane) = u
                w(3,     0,j,plane) = 0d0
@@ -85,11 +85,25 @@ subroutine set_BC(step)
             end do
          end if
       case(  2)
+         if(gx(plane) .eq. 1) then
+            !i=1/2
+            do j=max(    1,nys(plane)),min(nye(plane),  300)
+               w(:,   0,j,plane) = w(:,   1,j,plane)
+               w(3,   0,j,plane) =-w(3,   1,j,plane)
+               vhi(:, 0,j,plane) = vhi(:, 1,j,plane)
+                                              
+               w(:,  -1,j,plane) = w(:,   0,j,plane)
+               vhi(:,-1,j,plane) = vhi(:, 0,j,plane)
+            end do
+         end if
+
          if(gx(plane) .eq. ngx(plane)) then
             !i=ni+1/2
-            do j=max(    1,nys(plane)),min(nye(plane),   80)
+            do j=max(   61,nys(plane)),min(nye(plane),  300)
                w(:,  ni(plane)+1,j,plane) = w(:,  ni(plane)  ,j,plane)
+               w(3,  ni(plane)+1,j,plane) =-w(3,  ni(plane)  ,j,plane)
                vhi(:,ni(plane)+1,j,plane) = vhi(:,ni(plane)  ,j,plane)
+
                w(:,  ni(plane)+2,j,plane) = w(:,  ni(plane)+1,j,plane)
                vhi(:,ni(plane)+2,j,plane) = vhi(:,ni(plane)+1,j,plane)
             end do
@@ -114,38 +128,32 @@ subroutine set_BC(step)
                vhi(:,i,-1,plane) = vhi(:,i, 0,plane)
             end do
          end if
-
-         if(gy(plane) .eq.  ngy(plane)) then
-            !j=nj+1/2
-            do i=max(    1,nxs(plane)),min(nxe(plane),   60)
-               w(:,  i,nj(plane)+1,plane) = w(:,  i,nj(plane)  ,plane)
-               w(3,  i,nj(plane)+1,plane) =-w(3,  i,nj(plane)  ,plane)
-               vhi(:,i,nj(plane)+1,plane) = vhi(:,i,nj(plane)  ,plane)
-
-               w(:,  i,nj(plane)+2,plane) = w(:,  i,nj(plane)+1,plane)
-               vhi(:,i,nj(plane)+2,plane) = vhi(:,i,nj(plane)+1,plane)
-            end do
-         end if
       case(  2)
          if(gy(plane) .eq. 1) then
             !j=1/2
-            do i=max(    1,nxs(plane)),min(nxe(plane),  240)
-               w(:,  i, 0,plane) = w(:,  i, 1,plane)
-               w(3,  i, 0,plane) =-w(3,  i, 1,plane)
-               vhi(:,i, 0,plane) = vhi(:,i, 1,plane)
+            do i=max(    1,nxs(plane)),min(nxe(plane),   80)
+               w(1,     i,0,plane) = rho
+               w(2,     i,0,plane) = u
+               w(3,     i,0,plane) = 0d0
+               w(4,     i,0,plane) = p
+               w(5,     i,0,plane) = 1d0
+               w(indxg ,i,0,plane) = kappa_gas
+               w(indxht,i,0,plane) = kappa_gas/(kappa_gas-1d0)*R_gas*T +0.5d0*u**2
+               w(indxR ,i,0,plane) = R_gas
+               w(indxMu,i,0,plane) = 0d0
 
-               w(:,  i,-1,plane) = w(:,  i, 0,plane)
-               vhi(:,i,-1,plane) = vhi(:,i, 0,plane)
+               vhi(:,i, 0,plane) = kappa_gas/(kappa_gas-1d0)*R_gas*T
+
+               w(:,  i,-1,plane) = w(:,   i,0,plane)
+               vhi(:,i,-1,plane) = vhi(:, i,0,plane)
             end do
          end if
 
          if(gy(plane) .eq.  ngy(plane)) then
             !j=nj+1/2
-            do i=max(    1,nxs(plane)),min(nxe(plane),  240)
+            do i=max(    1,nxs(plane)),min(nxe(plane),   80)
                w(:,  i,nj(plane)+1,plane) = w(:,  i,nj(plane)  ,plane)
-               w(3,  i,nj(plane)+1,plane) =-w(3,  i,nj(plane)  ,plane)
                vhi(:,i,nj(plane)+1,plane) = vhi(:,i,nj(plane)  ,plane)
-
                w(:,  i,nj(plane)+2,plane) = w(:,  i,nj(plane)+1,plane)
                vhi(:,i,nj(plane)+2,plane) = vhi(:,i,nj(plane)+1,plane)
             end do
