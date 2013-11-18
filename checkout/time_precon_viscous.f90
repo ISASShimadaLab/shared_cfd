@@ -7,6 +7,7 @@ subroutine calc_next_step_implicit(step_internal)
    integer,intent(in)::step_internal
    integer i,j,k,sm,plane
    double precision Dq(1:dimq,0:nimax+1,0:njmax+1,Nplane)
+   double precision Dq_small(1:dimq)
    double precision omega,tmp
 
    omega=1d300
@@ -20,6 +21,13 @@ subroutine calc_next_step_implicit(step_internal)
                             -dsi(  i,  j,plane)*(TGi(1:dimq,i  ,j  ,plane)-TGvi(1:dimq,i  ,j  ,plane))&
                             +dsj(  i,j-1,plane)*(TGj(1:dimq,i  ,j-1,plane)-TGvj(1:dimq,i  ,j-1,plane))&
                             -dsj(  i,  j,plane)*(TGj(1:dimq,i  ,j  ,plane)-TGvj(1:dimq,i  ,j  ,plane))
+         end do
+      end do
+      !$omp end parallel do
+
+      !$omp parallel do private(i)
+      do j=nys(plane),nye(plane)
+         do i=nxs(plane),nxe(plane)
             Dq(:,i,j,plane)= Dq(:,i,j,plane)+pre1(:,i,j,plane)*dot_product(pre2(:,i,j,plane),Dq(:,i,j,plane))
             Dq(:,i,j,plane)= Dq(:,i,j,plane)-Vol(i,j,plane)*dqdt(:,i,j,plane)
          end do
@@ -31,15 +39,17 @@ subroutine calc_next_step_implicit(step_internal)
 
       !calculate forward
       do sm=nxs(plane)+nys(plane),nxe(plane)+nye(plane)
-         !$omp parallel do private(j)
+         !$omp parallel do private(j,Dq_small)
          do i=max(nxs(plane),sm-nye(plane)),min(sm-nys(plane),nxe(plane))
             j=sm-i
-            Dq(:,i,j,plane)=alpha(i,j,plane)*(Dq(:,i,j,plane)&
-                                             +dsci(i-1,j  ,plane)*matmul(Ap(:,:,i-1,j  ,plane),Dq(:,i-1,j  ,plane))&
-                                             +dscj(i  ,j-1,plane)*matmul(Bp(:,:,i  ,j-1,plane),Dq(:,i  ,j-1,plane)))
+            Dq_small = dsci(i-1,j  ,plane)*matmul(Ap(:,:,i-1,j  ,plane),Dq(:,i-1,j  ,plane))&
+                      +dscj(i  ,j-1,plane)*matmul(Bp(:,:,i  ,j-1,plane),Dq(:,i  ,j-1,plane))
+            Dq(:,i,j,plane)=alpha(i,j,plane)*(Dq(:,i,j,plane)+Dq_small)
+            !write(20,'(2i3,es15.7)') i,j,Dq(:,i,j,plane)
          end do
          !$omp end parallel do
       end do
+      !call exit(0)
 
       !set BC Delta q
       Dq(:,nxe(plane)+1,nys(plane):nye(plane)+1,plane)=0d0
