@@ -1,9 +1,10 @@
-origin=`pwd`
-cd ../../
+#origin=`pwd`
+#cd ../../
+origin="sample/no01.AdvectionOfN2O2"
 
 # move input file and checkout
+cp $origin/*.x .
 cp $origin/checkout.inp .
-cp $origin/debug0.x .
 ./checkout.py
 
 # move necessary input files

@@ -275,26 +275,28 @@ subroutine set_thermo_prop!{{{
    use chem_var
    implicit none
    double precision ei,T,MW,kappa,xi
-   integer i,j
+   integer i,j,plane
 
-   !$omp parallel do private(i,ei,T,MW,kappa,xi)
-   do j=nys,nye
-      do i=nxs,nxe
-         !values necessary to calculate thermo values
-         ei=q(nY+3,i,j)/w(1,i,j)-0.5d0*(w(2,i,j)**2+w(3,i,j)**2)
-         T=w(4,i,j)/(w(1,i,j)*w(indxR,i,j))
+   do plane = nps,npe
+      !$omp parallel do private(i,ei,T,MW,kappa,xi)
+      do j=nys(plane),nye(plane)
+         do i=nxs(plane),nxe(plane)
+            !values necessary to calculate thermo values
+            ei=q(nY+3,i,j,plane)/w(1,i,j,plane)-0.5d0*(w(2,i,j,plane)**2+w(3,i,j,plane)**2)
+            T=w(4,i,j,plane)/(w(1,i,j,plane)*w(indxR,i,j,plane))
 
-         !calc therm
-         call calc_T(     q(1:nY,i,j),w(1,i,j),ei, T, kappa,MW,DHi(:,i,j),vhi(:,i,j),w(indxMu,i,j))
+            !calc therm
+            call calc_T(q(1:nY,i,j,plane),w(1,i,j,plane),ei, T, kappa,MW,DHi(:,i,j,plane),vhi(:,i,j,plane),w(indxMu,i,j,plane))
 
-         !calculate R_gas and w
-         w(indxR,   i,j)=R_uni/MW
-         w(     4,i,j)=w(1,i,j)*w(indxR,i,j)*T
-         w(indxg, i,j)=kappa
-         w(indxht,i,j)=(q(nY+3,i,j)+w(4,i,j))/w(1,i,j)
+            !calculate R_gas and w
+            w(indxR, i,j,plane)=R_uni/MW
+            w(     4,i,j,plane)=w(1,i,j,plane)*w(indxR,i,j,plane)*T
+            w(indxg, i,j,plane)=kappa
+            w(indxht,i,j,plane)=(q(nY+3,i,j,plane)+w(4,i,j,plane))/w(1,i,j,plane)
+         end do
       end do
+      !$omp end parallel do
    end do
-   !$omp end parallel do
 end subroutine set_thermo_prop!}}}
 
 ! reaction
@@ -386,22 +388,24 @@ subroutine proceed_reaction!{{{
    use mod_mpi
    use variable
    implicit none
-   integer i,j
+   integer i,j,plane
    double precision T
 
-   !$omp parallel do private(i,T)
-   do j=nys,nye
-      do i=nxs,nxe
-         T=w(4,i,j)/w(1,i,j)/w(indxR,i,j)
-         if(T>1500d0 .or. (w(5,i,j)<1d0-1d-11 .and. T>700d0)) then
-            call reaction(T,q(1:nY,i,j),dt_grbl)
-         !   write(myid+100,'(2(i4.4,x),2(es15.7,x),i1,x,i3.3)') i,j,x(i,j),r(i,j),1,myid
-         !else
-         !   write(myid+100,'(2(i4.4,x),2(es15.7,x),i1,x,i3.3)') i,j,x(i,j),r(i,j),0,myid
-         end if
+   do plane = nps,npe
+      !$omp parallel do private(i,T)
+      do j=nys(plane),nye(plane)
+         do i=nxs(plane),nxe(plane)
+            T=w(4,i,j,plane)/w(1,i,j,plane)/w(indxR,i,j,plane)
+            if(T>1500d0 .or. (w(5,i,j,plane)<1d0-1d-11 .and. T>700d0)) then
+               call reaction(T,q(1:nY,i,j,plane),dt_grbl)
+            !   write(myid+100,'(2(i4.4,x),2(es15.7,x),i1,x,i3.3)') i,j,x(i,j),r(i,j),1,myid
+            !else
+            !   write(myid+100,'(2(i4.4,x),2(es15.7,x),i1,x,i3.3)') i,j,x(i,j),r(i,j),0,myid
+            end if
+         end do
       end do
+      !$omp end parallel do
    end do
-   !$omp end parallel do
 
    !close(myid+100)
 
@@ -412,23 +416,23 @@ subroutine distribute_reaction!{{{
    use mod_mpi
    use variable
    implicit none
-   integer i,j,k,kk
+   integer i,j,k,kk,plane
    double precision T
 
    double precision tmp_send((nY+1)*bwmax*bwmax)
-   integer data_send(2,bwmax*bwmax)
+   integer data_send(3,bwmax*bwmax)
    integer tocalc
 
-   integer num_send( 2,ng)
-   integer num_receive(0:ng-1)
-   integer list(2,1:ng)
+   integer num_send( 2,Nproc)
+   integer num_receive(0:Nproc-1)
+   integer list(2,1:Nproc)
    integer buf,buf2
    integer nsend,ndata
    integer bwrec,resrec
    integer res1,res2
 
-   integer lists(2,1:ng)
-   integer listr(2,1:ng)
+   integer lists(2,1:Nproc)
+   integer listr(2,1:Nproc)
    integer nums,numr
 
    double precision qrecv(nY+1,bwmax*bwmax)
@@ -438,16 +442,19 @@ subroutine distribute_reaction!{{{
    !!!! search S calculation
    nums=0
    tocalc=0
-   do j=nys,nye
-      do i=nxs,nxe
-         T=w(4,i,j)/w(1,i,j)/w(indxR,i,j)
-         if(T>1500d0 .or. (w(5,i,j)<1d0-1d-11 .and. T>700d0)) then
-            tmp_send(tocalc*(nY+1)+1: tocalc*(nY+1)+nY)=q(1:nY,i,j)
-            tmp_send(tocalc*(nY+1)+nY+1)=T
-            tocalc=tocalc + 1
-            data_send(1,tocalc)=i
-            data_send(2,tocalc)=j
-         end if
+   do plane = nps,npe
+      do j=nys(plane),nye(plane)
+         do i=nxs(plane),nxe(plane)
+            T=w(4,i,j,plane)/w(1,i,j,plane)/w(indxR,i,j,plane)
+            if(T>1500d0 .or. (w(5,i,j,plane)<1d0-1d-11 .and. T>700d0)) then
+               tmp_send(tocalc*(nY+1)+1: tocalc*(nY+1)+nY)=q(1:nY,i,j,plane)
+               tmp_send(tocalc*(nY+1)+nY+1)=T
+               tocalc=tocalc + 1
+               data_send(1,tocalc)=i
+               data_send(2,tocalc)=j
+               data_send(3,tocalc)=plane
+            end if
+         end do
       end do
    end do
    !!!! end search S calculation
@@ -456,7 +463,7 @@ subroutine distribute_reaction!{{{
       ! receive each data
       nsend=0
       ndata=0
-      do i=0,ng-1
+      do i=0,Nproc-1
          if(i .eq. 0) then
             buf=tocalc
          else
@@ -473,9 +480,9 @@ subroutine distribute_reaction!{{{
       ! end receive each data
 
       !calc num_receive
-      bwrec=ndata/ng
-      resrec=ndata-ng*bwrec
-      do i=0,ng-1
+      bwrec=ndata/Nproc
+      resrec=ndata-Nproc*bwrec
+      do i=0,Nproc-1
          if(i<resrec) then
             num_receive(i)=bwrec+1
          else
@@ -524,7 +531,7 @@ subroutine distribute_reaction!{{{
       !make receive list
       j=1
       res2=0
-      do i=0,ng-1
+      do i=0,Nproc-1
          res1=num_receive(i)
          k=0
          do
@@ -623,7 +630,8 @@ subroutine distribute_reaction!{{{
             else
                do k=1,lists(2,j)
                   q(1:nY,data_send(1,buf2+k),&
-                         data_send(2,buf2+k))&
+                         data_send(2,buf2+k),&
+                         data_send(3,buf2+k))&
                          =qrecv(1:nY,buf-1+k)
                end do
                exit
@@ -639,7 +647,7 @@ subroutine distribute_reaction!{{{
          call MPI_Recv(tmp_send,lists(2,i)*(nY+1), MPI_DOUBLE_PRECISION,&
                          lists(1,i),0,MPI_COMM_WORLD, istatus,ierr)
          do j=1,lists(2,i)
-            q(1:nY,data_send(1,buf+j),data_send(2,buf+j))&
+            q(1:nY,data_send(1,buf+j),data_send(2,buf+j),data_send(3,buf+j))&
                     =tmp_send((j-1)*(nY+1)+1:(j-1)*(nY+1)+nY)
          end do
       end if
