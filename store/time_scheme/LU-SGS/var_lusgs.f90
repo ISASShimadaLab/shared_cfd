@@ -7,8 +7,8 @@ module var_lusgs
 
    double precision alpha(1:nimax, 1:njmax,Nplane)
 
-   double precision dsci(1:nimax,1:njmax,Nplane)
-   double precision dscj(1:nimax,1:njmax,Nplane)
+   double precision dsci(0:nimax+1,0:njmax+1,Nplane)
+   double precision dscj(0:nimax+1,0:njmax+1,Nplane)
 
    double precision vnci(1:2,1:nimax,1:njmax,Nplane)
    double precision vncj(1:2,1:nimax,1:njmax,Nplane)
