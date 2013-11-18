@@ -2,7 +2,7 @@
 Max Step Number         : 1.e7
 convergent RMS          : 1.e-14
 CFL Number              : 1.
-File Output Period      : 500
+File Output Period      : 50
 
 #For Internal Loop Control
 InternalLoop Omega Max  : 5.e-1
