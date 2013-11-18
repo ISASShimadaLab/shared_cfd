@@ -1,1 +1,0 @@
-command RUN !ulimit -s unlimited;./main
