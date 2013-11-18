@@ -180,6 +180,11 @@ subroutine set_vnc_dsc
    double precision,dimension(2)::a,b,c,d
    integer i,j,plane
 
+   dsci(:,:,:)=0d0
+   dscj(:,:,:)=0d0
+   vnci(:,:,:,:)=0d0
+   vncj(:,:,:,:)=0d0
+
    do plane = nps,npe
       do j=nys(plane),nye(plane)
          do i=nxs(plane),nxe(plane)
