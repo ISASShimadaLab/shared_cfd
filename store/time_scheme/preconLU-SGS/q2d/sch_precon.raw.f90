@@ -195,6 +195,8 @@ subroutine set_ABpm
             !set alpha
             tmp = Vol(i,j,plane)/DT_LOCAL_GLOBAL + dsci(i,j,plane)*nuA+dscj(i,j,plane)*nuB
             alpha(i,j,plane)=1d0/tmp
+            tmp = 1d0/(alpha(i,j,plane)*Area(i,j,plane))-dpdq(nY+2,i,j,plane)/(1d0+phi(i,j,plane)*c**2)
+            phiq(i,j,plane)=1d0/tmp
          end do
       end do
       !$omp end parallel do

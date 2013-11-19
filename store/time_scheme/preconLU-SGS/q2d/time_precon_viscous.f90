@@ -6,6 +6,7 @@ subroutine calc_next_step_implicit
    integer i,j,sm,plane
    double precision Dq(1:dimq,0:nimax+1,0:njmax+1,Nplane)
    double precision Dq_small(1:dimq)
+   double precision dp
 
    do plane = nps,npe
       !set RHS
@@ -28,12 +29,17 @@ subroutine calc_next_step_implicit
 
       !calculate forward
       do sm=nxs(plane)+nys(plane),nxe(plane)+nye(plane)
-         !$omp parallel do private(j,Dq_small)
+         !$omp parallel do private(j,Dq_small,dp)
          do i=max(nxs(plane),sm-nye(plane)),min(sm-nys(plane),nxe(plane))
             j=sm-i
             Dq_small = dsci(i-1,j  ,plane)*matmul(Ap(:,:,i-1,j  ,plane),Dq(:,i-1,j  ,plane))&
                       +dscj(i  ,j-1,plane)*matmul(Bp(:,:,i  ,j-1,plane),Dq(:,i  ,j-1,plane))
             Dq(:,i,j,plane)=alpha(i,j,plane)*(Dq(:,i,j,plane)+Dq_small)
+
+            dq = phiq(i,j,plane)*dot_product(dpdq(:,i,j,plane),Dq(:,i,j,plane))
+            Dq_small = phi(i,j,plane)*dpdq(nY+2,i,j,plane)*dp*pre1(:,i,j,plane)
+            Dq_small(nY+2) = Dq_small(nY+2) + dp
+            Dq(:,i,j,plane)=Dq(:,i,j,plane)+Dq_small
          end do
          !$omp end parallel do
       end do

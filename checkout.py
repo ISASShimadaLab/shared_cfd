@@ -237,12 +237,15 @@ elif(val == 4):
 		print "ERROR: This scheme cannot be used at global time step."
 		sys.exit(1)
 elif(val == 5):
-	print "\tDual Time is selected."
-	engage("time_scheme/dual/"+DIMENSION)
-	raw2pro("checkout/sch_dual.raw.f90","checkout/sch_dual.f90",[["DT_LOCAL_GLOBAL",DT_LOCAL_GLOBAL]])
+	if(DIMENSION == 'q2d'):
+		print "ERROR: This scheme cannot be used at axi-symmetric problem now."
+		sys.exit(1)
 	if(val_dt == 1):
 		print "ERROR: This scheme cannot be used at local time step."
 		sys.exit(1)
+	print "\tDual Time is selected."
+	engage("time_scheme/dual/"+DIMENSION)
+	raw2pro("checkout/sch_dual.raw.f90","checkout/sch_dual.f90",[["DT_LOCAL_GLOBAL",DT_LOCAL_GLOBAL]])
 elif(val == 6):
 	print "\tPre-conditioner using LU-SGS is selected."
 	engage("time_scheme/preconLU-SGS/"+DIMENSION)
