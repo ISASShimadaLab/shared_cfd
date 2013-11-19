@@ -1,0 +1,5 @@
+
+# axi-symmetry
+Sq.o: Sq.f90 variable.o
+	$(compiler) -c $<
+

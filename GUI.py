@@ -20,6 +20,7 @@ def data_set():
 			"NumOfProcessors   : ",\
 			"  #The Maximum Number of Processors @ M-System[Super Computer] / 0 @ Personal Computer"])
 
+	datRA.append(["dimension",("two dimension","axi-symmetry"),"dimension         : ","  #two dimension(0) / axi-symmetry(1)"])
 	datRA.append(["time scale",("global","local"),"time step         : ","  #global(0)/local(1)"])
 	datRA.append(["time scheme",("Euler","two-step Runge-Kutta",\
 			"LU-SGS","Newton-Raphson",\
@@ -39,11 +40,11 @@ def data_set():
 	datOption.append([["Number of Elements","1"],["Number of Reactions","1"]])
 	datOption.append([["Number of Elements","1"],["Number of Reactions","1"]])
 
-	NG.append([[-1,-1],[ 0, 4,-1,-1,-1]])
-	NG.append([[-1,-1],[ 1, 5,-1,-1,-1]])
-	NG.append([[-1,-1],[ 0, 6,-1,-1,-1]])
-	NG.append([[ 1,-1],[-1,-1,-1,-1, 0]])
-	NG.append([[-1,-1],[ 1,-1,-1,-1, 2]])
+	NG.append([[-1,-1],[-1, 0, 4,-1,-1,-1]])
+	NG.append([[-1,-1],[-1, 1, 5,-1,-1,-1]])
+	NG.append([[-1,-1],[-1, 0, 6,-1,-1,-1]])
+	NG.append([[ 1,-1],[-1,-1,-1,-1,-1, 0]])
+	NG.append([[-1,-1],[-1, 1,-1,-1,-1, 2]])
 
 class OptionPanel:
 	inphead = "ParametersForAbove: "
@@ -198,7 +199,7 @@ def process_values(typeID,partID):
 		for arr in NG:
 			if arr[1][partID] == RA[partID].GetSelection():
 				checkvalues(typeID,partID,arr)
-		if(partID == 4):
+		if(partID == 5):
 			option.change_plane(RA[partID].GetSelection())
 	elif(typeID == 4): # option panel
 		option.check_validation()

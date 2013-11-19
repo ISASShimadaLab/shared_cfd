@@ -5,6 +5,15 @@ subroutine init_TGv
    integer i,j,plane
 
    do plane = nps,npe
+      !set Svq
+      !$omp parallel do default(shared),private(i)
+      do j=nys(plane),nye(plane)
+         do i=nxs(plane),nxe(plane)
+            Svq(:,i,j,plane)=0d0
+         end do
+      end do
+      !$omp end parallel do
+
       !set TGvi
       !$omp parallel do default(shared),private(i)
       do j=nys(plane),nye(plane)

@@ -15,12 +15,16 @@ module variable
 
    double precision   TGi(1:dimq,   0:nimax,   1:njmax,Nplane)
    double precision   TGj(1:dimq,   1:nimax,   0:njmax,Nplane)
+   double precision    Sq(1:dimq,   1:nimax,   1:njmax,Nplane)
    double precision  TGvi(1:dimq,   0:nimax,   1:njmax,Nplane)
    double precision  TGvj(1:dimq,   1:nimax,   0:njmax,Nplane)
+   double precision   Svq(1:dimq,   1:nimax,   1:njmax,Nplane)
 
    double precision   Vol(1:nimax,1:njmax,Nplane)
+   double precision  Area(1:nimax,1:njmax,Nplane)
    double precision   dsi(0:nimax,1:njmax,Nplane)
    double precision   dsj(1:nimax,0:njmax,Nplane)
+   double precision geojacc(1:2,1:2,1:nimax,1:njmax,Nplane) !for viscous flow
    double precision geojaci(1:2,1:2,0:nimax,1:njmax,Nplane) !for viscous flow
    double precision geojacj(1:2,1:2,1:nimax,0:njmax,Nplane) !for viscous flow
 

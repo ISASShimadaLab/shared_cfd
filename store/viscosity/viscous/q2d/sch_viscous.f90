@@ -7,6 +7,25 @@ subroutine set_geojac!{{{
    double precision det
    integer i,j,plane
 
+   ! set geojacc
+   do plane=nps,npe
+      do j=nys(plane),nye(plane)
+         do i=nxs(plane),nxe(plane)
+            dxdxi  = (x(i+1,j  ,plane)-x(i-1,j  ,plane))*0.5d0
+            dydxi  = (r(i+1,j  ,plane)-r(i-1,j  ,plane))*0.5d0
+            dxdeta = (x(i  ,j+1,plane)-x(i  ,j-1,plane))*0.5d0
+            dydeta = (r(i  ,j+1,plane)-r(i  ,j-1,plane))*0.5d0
+
+            det= dxdxi*dydeta - dydxi*dxdeta
+
+            geojacc(1,1,i,j,plane) = dydeta/det!d( xi)/d(x)
+            geojacc(1,2,i,j,plane) =-dxdeta/det!d( xi)/d(y)
+            geojacc(2,1,i,j,plane) =-dydxi /det!d(eta)/d(x)
+            geojacc(2,2,i,j,plane) = dxdxi /det!d(eta)/d(y)
+         end do
+      end do
+   end do
+
    ! set geojaci
    do plane=nps,npe
       do j=nys(plane),nye(plane)
@@ -70,7 +89,7 @@ subroutine set_TGv!{{{
    double precision dTdx, dTdr
    double precision rho,u,v,T
    double precision Rgas,gamm
-   double precision t_xx,t_xr,t_rr
+   double precision t_xx,t_xr,t_rr,t_tt
    double precision qx,qr
    double precision divu
    double precision lhi(nY),hidwdx,hidwdr
@@ -151,8 +170,8 @@ subroutine set_TGv!{{{
                hidwdr=hidwdr+dwdr(4+k)*lhi(k)
             end do
 
-            !!!2 dimentional-plane
-            divu=dudx+dvdr
+            !cylindrical
+            divu=dudx+dvdr+v/r(i,j,plane)
 
             t_xx=-2d0/3d0*mu*divu+2d0*mu*dudx
             t_rr=-2d0/3d0*mu*divu+2d0*mu*dvdr
@@ -240,8 +259,8 @@ subroutine set_TGv!{{{
                hidwdr=hidwdr+dwdr(4+k)*lhi(k)
             end do
 
-            !!2 dimentional-plane
-            divu=dudx+dvdr
+            !cylindrical
+            divu=dudx+dvdr+v/r(i,j,plane)
 
             t_xx=-2d0/3d0*mu*divu+2d0*mu*dudx
             t_rr=-2d0/3d0*mu*divu+2d0*mu*dvdr
@@ -264,6 +283,36 @@ subroutine set_TGv!{{{
             Fv(nY+3)=u*t_xr+v*t_rr-qr
 
             TGvj(:,i,j,plane)=Ev*vnj(1,i,j,plane)+Fv*vnj(2,i,j,plane)
+         end do
+      end do
+      !$omp end parallel do
+      !}}}
+
+      !set Svq!{{{
+      !$omp parallel do default(shared),&
+      !$omp             private(i,v,mu,&
+      !$omp                     dudxi,dudeta,dudx,&
+      !$omp                     dvdxi,dvdeta,dvdr,&
+      !$omp                     divu,t_tt)
+      do j=nys(plane),nye(plane)
+         do i=nxs(plane),nxe(plane)
+            v   = w(3,     i,j,plane)
+            mu  = w(indxMu,i,j,plane)
+
+            dudxi  =  (w(2,i+1,j,plane) -w(2,i-1,j,plane))*0.5d0
+            dvdxi  =  (w(3,i+1,j,plane) -w(3,i-1,j,plane))*0.5d0
+            dudeta =  (w(2,i,j+1,plane) -w(2,i,j-1,plane))*0.5d0
+            dvdeta =  (w(3,i,j+1,plane) -w(3,i,j-1,plane))*0.5d0
+
+            dudx=dudxi*geojacc(1,1,i,j,plane)+dudeta*geojacc(2,1,i,j,plane)
+            dvdr=dvdxi*geojacc(1,2,i,j,plane)+dvdeta*geojacc(2,2,i,j,plane)
+
+            !cylindrical
+            divu=dudx+dvdr+v/r(i,j,plane)
+            t_tt=-2d0/3d0*mu*divu+2d0*mu*v/r(i,j,plane)
+
+            Svq(:,   i,j,plane)= 0d0
+            Svq(nY+2,i,j,plane)=-t_tt
          end do
       end do
       !$omp end parallel do

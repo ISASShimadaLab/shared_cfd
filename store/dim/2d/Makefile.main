@@ -1,0 +1,5 @@
+
+#about dimension
+init_Sq.o: init_Sq.f90 variable.o $(arc)
+	$(compiler) -c $<
+

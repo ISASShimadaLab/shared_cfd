@@ -1,9 +1,9 @@
 
 #user definition
-condition.o: condition.f90 $(core) $(arc) $(time_scheme) $(viscous) $(thermalmodel) $(highorder)
+condition.o: condition.f90 $(core) $(arc) $(dim) $(time_scheme) $(viscous) $(thermalmodel) $(highorder)
 	$(compiler) -c $<
 
-main : main.f90 $(core) $(arc) $(time_scheme) $(viscous) $(thermalmodel) $(highorder) condition.o
+main : main.f90 $(core) $(arc) $(dim) $(time_scheme) $(viscous) $(thermalmodel) $(highorder) condition.o
 	$(compiler) -o $@ $^
 
 clean: remove

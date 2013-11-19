@@ -181,6 +181,21 @@ checkout.gen_cond.gen_cond(os.path.basename(filename))
 print "\tDone."
 
 ####################################################################################
+print "***dimension***"
+val = read_control_next_int(fp)
+if(val == 0):
+	print "\ttwo dimension is selected."
+	engage("dim/2d")
+	DIMENSION = "2d"
+elif(val == 1):
+	print "\taxi-symmetry is selected."
+	engage("dim/q2d")
+	DIMENSION = "q2d"
+else:
+	print "\tOdd Input at dimension! value is ",val
+	sys.exit(1)
+
+####################################################################################
 print "***time scale***"
 val_dt = read_control_next_int(fp)
 if(val_dt == 0):
@@ -260,7 +275,7 @@ if(val == 0):
 	engage("viscosity/non-viscous")
 elif(val == 1):
 	print "\tviscous flow is selected."
-	engage("viscosity/viscous")
+	engage("viscosity/viscous/"+DIMENSION)
 else:
 	print "\tOdd Input at viscosity! value is ",val
 	sys.exit(1)
