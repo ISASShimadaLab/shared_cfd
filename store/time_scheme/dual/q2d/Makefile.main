@@ -1,0 +1,8 @@
+#Time Scheme
+var_dual.o: var_dual.f90 n_grid.o
+	$(compiler) -c $<
+sch_dual.o: sch_dual.f90 var_dual.o variable.o $(arc)
+	$(compiler) -c $<
+time_dual_viscous.o: time_dual_viscous.f90 var_dual.o
+	$(compiler) -c $<
+

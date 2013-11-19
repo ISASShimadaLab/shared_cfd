@@ -1,0 +1,8 @@
+#Time Scheme
+var_NR.o: var_NR.f90 n_grid.o
+	$(compiler) -c $<
+sch_NR.o: sch_NR.f90 var_NR.o variable.o $(arc)
+	$(compiler) -c $<
+time_NR_viscous.o: time_NR_viscous.f90 var_NR.o
+	$(compiler) -c $<
+

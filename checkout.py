@@ -223,29 +223,29 @@ elif(val == 1):
 	raw2pro("checkout/time_RK2_viscous.raw.f90","checkout/time_RK2_viscous.f90",[["DT_LOCAL_GLOBAL",DT_LOCAL_GLOBAL]])
 elif(val == 2):
 	print "\tLU-SGS is selected."
-	engage("time_scheme/LU-SGS")
+	engage("time_scheme/LU-SGS/"+DIMENSION)
 	raw2pro("checkout/sch_lusgs.raw.f90","checkout/sch_lusgs.f90",[["DT_LOCAL_GLOBAL",DT_LOCAL_GLOBAL]])
 elif(val == 3):
 	print "\tNR is selected."
-	engage("time_scheme/NR")
+	engage("time_scheme/NR/"+DIMENSION)
 	raw2pro("checkout/sch_NR.raw.f90","checkout/sch_NR.f90",[["DT_LOCAL_GLOBAL",DT_LOCAL_GLOBAL]])
 elif(val == 4):
 	print "\tPre-conditioner is selected."
-	engage("time_scheme/precon")
+	engage("time_scheme/precon/"+DIMENSION)
 	raw2pro("checkout/sch_precon.raw.f90","checkout/sch_precon.f90",[["DT_LOCAL_GLOBAL",DT_LOCAL_GLOBAL]])
 	if(val_dt == 0):
 		print "ERROR: This scheme cannot be used at global time step."
 		sys.exit(1)
 elif(val == 5):
 	print "\tDual Time is selected."
-	engage("time_scheme/dual")
+	engage("time_scheme/dual/"+DIMENSION)
 	raw2pro("checkout/sch_dual.raw.f90","checkout/sch_dual.f90",[["DT_LOCAL_GLOBAL",DT_LOCAL_GLOBAL]])
 	if(val_dt == 1):
 		print "ERROR: This scheme cannot be used at local time step."
 		sys.exit(1)
 elif(val == 6):
 	print "\tPre-conditioner using LU-SGS is selected."
-	engage("time_scheme/preconLU-SGS")
+	engage("time_scheme/preconLU-SGS/"+DIMENSION)
 	raw2pro("checkout/sch_precon.raw.f90","checkout/sch_precon.f90",[["DT_LOCAL_GLOBAL",DT_LOCAL_GLOBAL]])
 	if(val_dt == 0):
 		print "ERROR: This scheme cannot be used at global time step."
