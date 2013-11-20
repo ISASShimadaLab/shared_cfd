@@ -1,19 +1,19 @@
 #Input File for PostProcessing
-File Read Freq.         : 10000
-From Where              : 600000
+File Read Freq.         : 50000
+From Where              : -1
 Database Place          : 
-OverWrite? Yes(1)/No(0) : 1
+OverWrite? Yes(1)/No(0) : 0
 1st Plane i start index : 50
-1st Plane i end   index : 319
+1st Plane i end   index : -1
 1st Plane j start index : 0
-1st Plane j end   index : 10
-2nd Plane i start index : 50
-2nd Plane i end   index : -1
+1st Plane j end   index : -1
+2nd Plane i start index : 0
+2nd Plane i end   index : 260
 2nd Plane j start index : 0
 2nd Plane j end   index : -1
-3rd Plane i start index : 0
-3rd Plane i end   index : 260
+3rd Plane i start index : 50
+3rd Plane i end   index : 319
 3rd Plane j start index : 0
-3rd Plane j end   index : -1
+3rd Plane j end   index : 10
 
 #Database Place          :  ../checkout/
