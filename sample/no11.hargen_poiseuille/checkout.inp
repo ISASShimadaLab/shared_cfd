@@ -1,0 +1,10 @@
+grid file name    : hargen_poiseuille.x #Grid file name (*.x)
+nY                : 1  #The number of gas types
+NumOfProcessors   : 0  #The Maximum Number of Processors @ M-System[Super Computer] / 0 @ Personal Computer
+dimension         : 1  #two dimension(0)/axi-symmetry(1)
+time step         : 1  #global(0)/local(1)
+time scheme       : 2  #Euler(0)/Runge-Kutta two-step(1)/LU-SGS(2)/Newton-Raphson(3)/Pre-Conditioner(4)/Dual Time Step(5)/Pre-conditioner with LU-SGS(6)
+high order scheme : 1  #Up Wind(0)/MUSCL(1)
+viscosity         : 1  #non-viscous flow(0)/viscous flow(1)
+thermal model     : 0  #Ideal Gas(0)/Cold flow using chemical kinetics database(1) / Chemical Kinetics Model(2)
+ParametersForAbove: 1.4 287 1.6e-5  #depends on the model. see text.
