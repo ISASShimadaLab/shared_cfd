@@ -73,7 +73,7 @@ subroutine set_cut_copro
    allocate(cut_copro(11,num_cut_copro))
    read(45,'(a)') !for comment line
    do i=1,num_cut_copro
-      read(45,'(11i6)') cut_copro(:,num_cut_copro)
+      read(45,'(11i6)') cut_copro(:,i)
    end do
    close(45)
 end subroutine set_cut_copro
