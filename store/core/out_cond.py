@@ -2,10 +2,17 @@
 import os
 from mod_cond import *
 
-def out_cond(toSetManually):
+def out_cond(toSetManually,MaxMPIcomm):
 	os.system("cat checkout/condition.head.f90 >  checkout/condition.raw.f90")
 	fp = open("checkout/condition.raw.f90",'a')
 	
+	########## Declaration
+	fp.write("   integer,parameter::MaxMPIcomm = %i\n\n" % MaxMPIcomm)
+
+	########## Cut Lines
+	fp.write("   call section_exchange\n")
+	fp.write("   call MPI_COMMUNICATIONS_CUT_LINE\n\n")
+
 	########## I-DIRECTION
 	fp.write("""
    !boundary right and left
@@ -128,6 +135,7 @@ def out_cut(touch,nijk,Nproc):
 			fo.close()
 
 def out_MPI(MPIcomm,nijk,Nproc):
+	MaxMPIcomm = 0
 	file_MPI = Nproc*[""]
 	for var in MPIcomm:
 		[line1,line2] = var.lineMPI(nijk)
@@ -141,3 +149,5 @@ def out_MPI(MPIcomm,nijk,Nproc):
 			fp.write("#cind width order     p     c     s    pm 2send\n")
 			fp.write(line)
 			fp.close()
+			MaxMPIcomm = max(MaxMPIcomm, line.count('\n'))
+	return MaxMPIcomm

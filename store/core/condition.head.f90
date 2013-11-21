@@ -28,6 +28,3 @@ subroutine set_BC(step)
    integer i,j,plane
 
    integer,parameter::DLength=dimw+nY !for MPI Communication
-
-   call section_exchange
-   call MPI_COMMUNICATIONS_CUT_LINE

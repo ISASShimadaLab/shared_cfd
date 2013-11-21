@@ -12,12 +12,12 @@ def gen_cond(filename):
 	touch = set_touch(BD)
 	toSetManually = set_toSetManually(Nplane,nijk,touch)
 	
-	out_cond(toSetManually)
-	
 	[bmpi,Nproc]=fetch_myid(Nplane,nijk)
 	[touch,MPIcomm]= modify_touch(touch,bmpi,nijk,Nproc)
 	
+	MaxMPIcomm = out_MPI(MPIcomm,nijk,Nproc)
 	out_cut(touch,nijk,Nproc)
-	out_MPI(MPIcomm,nijk,Nproc)
+	
+	out_cond(toSetManually,MaxMPIcomm)
 	os.system('rm -f checkout/condition.head.f90 checkout/condition.tail.f90 checkout/fetchMPI.py checkout/mod_cond.py checkout/out_cond.py checkout/read_plot3d.py checkout/set_cond_var.py')
 

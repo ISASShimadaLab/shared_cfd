@@ -34,6 +34,7 @@ subroutine set_BC(step)
    integer i,j,plane
 
    integer,parameter::DLength=dimw+nY !for MPI Communication
+   integer,parameter::MaxMPIcomm = 4
 
    call section_exchange
    call MPI_COMMUNICATIONS_CUT_LINE
@@ -290,8 +291,9 @@ end subroutine section_exchange!}}}
 subroutine MPI_COMMUNICATIONS_CUT_LINE!{{{
    implicit none
    double precision  tmp(DLength*2*bwmax)
-   double precision tmps(DLength*2*bwmax,Nplane)
-   integer cnt,cnts(Nplane),flag(Nplane),toProc(Nplane)
+   double precision tmpc(DLength*2*bwmax,MaxMPIcomm)
+   integer cnt
+   integer,dimension(MaxMPIcomm)::cntc,toProc,ierrc,ireqc
    integer inc,i
    integer cind,width,order,p,c,s,pm
 
@@ -306,25 +308,25 @@ subroutine MPI_COMMUNICATIONS_CUT_LINE!{{{
       pm        = MPIComm(7,i)
       toProc(i) = MPIComm(8,i)
 
-      cnts(i)=0
+      cntc(i)=0
       if(cind .eq. 0) then
          do inc=0,width-1
             !print '(a7,4i3,9es9.1)',"send",myid,p,c,s+inc*order,w(:,  c,   s+inc*order,p)
-            tmps(cnts(i)+1:cnts(i)+nY,  i) = vhi(:,c,   s+inc*order,p); cnts(i)=cnts(i)+nY
-            tmps(cnts(i)+1:cnts(i)+dimw,i) = w(:,  c,   s+inc*order,p); cnts(i)=cnts(i)+dimw
+            tmpc(cntc(i)+1:cntc(i)+nY,  i) = vhi(:,c,   s+inc*order,p); cntc(i)=cntc(i)+nY
+            tmpc(cntc(i)+1:cntc(i)+dimw,i) = w(:,  c,   s+inc*order,p); cntc(i)=cntc(i)+dimw
             !print '(a7,4i3,9es9.1)',"send",myid,p,c-pm,s+inc*order,w(:,  c-pm,   s+inc*order,p)
-            tmps(cnts(i)+1:cnts(i)+nY,  i) = vhi(:,c-pm,s+inc*order,p); cnts(i)=cnts(i)+nY
-            tmps(cnts(i)+1:cnts(i)+dimw,i) = w(:,  c-pm,s+inc*order,p); cnts(i)=cnts(i)+dimw
+            tmpc(cntc(i)+1:cntc(i)+nY,  i) = vhi(:,c-pm,s+inc*order,p); cntc(i)=cntc(i)+nY
+            tmpc(cntc(i)+1:cntc(i)+dimw,i) = w(:,  c-pm,s+inc*order,p); cntc(i)=cntc(i)+dimw
          end do
       else
          do inc=0,width-1
-            tmps(cnts(i)+1:cnts(i)+nY,  i) = vhi(:,s+inc*order,c,   p); cnts(i)=cnts(i)+nY
-            tmps(cnts(i)+1:cnts(i)+dimw,i) = w(:,  s+inc*order,c,   p); cnts(i)=cnts(i)+dimw
-            tmps(cnts(i)+1:cnts(i)+nY,  i) = vhi(:,s+inc*order,c-pm,p); cnts(i)=cnts(i)+nY
-            tmps(cnts(i)+1:cnts(i)+dimw,i) = w(:,  s+inc*order,c-pm,p); cnts(i)=cnts(i)+dimw
+            tmpc(cntc(i)+1:cntc(i)+nY,  i) = vhi(:,s+inc*order,c,   p); cntc(i)=cntc(i)+nY
+            tmpc(cntc(i)+1:cntc(i)+dimw,i) = w(:,  s+inc*order,c,   p); cntc(i)=cntc(i)+dimw
+            tmpc(cntc(i)+1:cntc(i)+nY,  i) = vhi(:,s+inc*order,c-pm,p); cntc(i)=cntc(i)+nY
+            tmpc(cntc(i)+1:cntc(i)+dimw,i) = w(:,  s+inc*order,c-pm,p); cntc(i)=cntc(i)+dimw
          end do
       end if
-      call MPI_Isend(tmps(:,i),cnts(i),MPI_DOUBLE_PRECISION,toProc(i),0,MPI_COMM_WORLD,ireq(i),ierrs(i))
+      call MPI_Isend(tmpc(:,i),cntc(i),MPI_DOUBLE_PRECISION,toProc(i),0,MPI_COMM_WORLD,ireqc(i),ierrc(i))
    end do
 
    !receive
@@ -361,7 +363,7 @@ subroutine MPI_COMMUNICATIONS_CUT_LINE!{{{
 
    !wait
    do i = 1,NumMPIComm
-      call MPI_Wait(ireq(i),istatus,ierrs(i))
+      call MPI_Wait(ireqc(i),istatus,ierrc(i))
    end do
 end subroutine MPI_COMMUNICATIONS_CUT_LINE!}}}
 subroutine MPI_COMMUNICATIONS_I_DIRECTION!{{{
