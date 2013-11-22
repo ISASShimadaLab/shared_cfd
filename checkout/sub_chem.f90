@@ -1,123 +1,208 @@
+!read control.inp
+subroutine read_fo_composition!{{{
+   use chem
+   use mod_mpi
+   use chem_var
+   implicit none
+   character*100 buf,buf2
+   double precision amount
+   integer ind
+
+   double precision DHit(nY)
+   integer i
+
+   if(myid .eq. 0) then
+      vrhoo =1d-20
+      vrhof =1d-20
+
+      open(8,file="control_chem.inp")
+      read(8,'()')
+      read(8,'()')
+      read(8,'(25x,es15.7)') po
+      read(8,'(25x,es15.7)') To
+      read(8,'()')
+      do
+         read(8,'(a)') buf
+         if(buf(1:3) .eq. 'end') exit
+         buf=adjustl(trim(buf)) !delete front and back spaces
+         ind=index(buf,' ')
+         if(ind .eq. 0) stop "Bad format at control_chem.inp while reading Oxygen Compositions"
+         read(buf(ind+1:),*) amount
+         vrhoo(search_species(buf(1:ind-1))) = amount
+      end do
+      read(8,'(25x,es15.7)') pf
+      read(8,'(25x,es15.7)') Tf
+      read(8,'()')
+      do
+         read(8,'(a)') buf
+         if(buf(1:3) .eq. 'end') exit
+         buf=adjustl(trim(buf)) !delete front and back spaces
+         ind=index(buf,' ')
+         if(ind .eq. 0) stop "Bad format at control_chem.inp while reading Fuel Compositions"
+         read(buf(ind+1:),*) amount
+         vrhof(search_species(buf(1:ind-1))) = amount
+      end do
+      close(8)
+   end if
+
+   !print *,"ns_tocalc = ",ns_tocalc
+
+   !!! MPI COMMUNICATIONS
+   call MPI_Bcast(po,       1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
+   call MPI_Bcast(To,       1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
+   call MPI_Bcast(vrhoo,   ns, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
+
+   call MPI_Bcast(pf,       1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
+   call MPI_Bcast(Tf,       1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
+   call MPI_Bcast(vrhof,   ns, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
+
+
+   !!! calculate other properties for oxygen and fuel
+   call rho_rel2abs(po,To, vrhoo, rhoo,Eo)
+   call calc_T(vrhoo,rhoo,Eo, To, kappao,MWo,DHit,vhio,muo)
+   vwo(1:nY) = vrhoo(1:nY)/rhoo
+
+   call rho_rel2abs(pf,Tf, vrhof, rhof,Ef)
+   call calc_T(vrhof,rhof,Ef, Tf, kappaf,MWf,DHit,vhif,muf)
+   vwf(1:nY) = vrhof(1:nY)/rhof
+contains
+   integer function search_species(str)
+      use chem
+      character(*),intent(in)::str
+      integer i
+   
+      do i=1,ns_tocalc
+         if(trim(SYM_SPC(i)) .eq. trim(str)) then
+            search_species=i
+            return
+         end if
+      end do
+      search_species=-1
+   end function search_species
+end subroutine read_fo_composition!}}}
+
 subroutine set_therm_data!{{{
    use mod_mpi
    use const_chem
    use chem
    implicit none
-   !variables{{{
-   integer not_yet
-
    character*18     sname
    character*300    comment
    character*6      optional_ID_code
    character*2      name_element(5)
    double precision num_element(5)
-   integer          phase
-   integer          num_T_exp
-   double precision Texp(8)
-   double precision H0a
+   integer          phase,num_T_exp
+   double precision Texp(8),H0a
 
-   logical flag_element,to_read
-
+   logical to_record
    integer i,j,k,l
-   !}}}
 
-   !set elements name to use{{{
+   !set elements name to use
    elements_name(1)="O "
    elements_name(2)="N "
    elements_name(3)="C "
    elements_name(4)="H "
-   !}}}
 
    if(myid .eq. 0) then
       open(10,file='thermo.inp',status='old')
-
-      !header{{{
+      !!! header
       do
-         read(10,'(A)',END=999) comment
+         read(10,'(A)') comment
          if(comment(1:1) .ne. '!') exit
       end do
+      read(10,'()')!ranges
+      !!! end of header
 
-      read(10,'(A18,A62)',END=999) comment
-      !}}}
-
-      to_read = .false.
       ns=1
-
-      do
-            !save or delete{{{
-            if(to_read) then
-                 !print *,ns
-                 !print *,"name:",species_name(ns)
-                 !print *,"O,H:",(A(i,ns),i=1,ne)
-                 !print *,"MW:",MW(ns)
-                 !print *,"the number of T section:",num_sctn(ns)
-                 !print *,"coefficient:"
-                 !print '(2f9.2,9es15.7)',((Trange(j,i,ns),j=1,2),(co(j,i,ns),j=1,9),i=1,num_sctn(ns))
-                 ns=ns+1
-            else
-                 to_read = .true.
-            end if
-            !}}}
-
+      do_species1:do
             !first line --- name, comment
-            read(10,'(A18,A62)',END=999) sname, comment
-            if(sname(1:1) .eq. '!') cycle
+            read(10,'(A18,A62)') sname, comment
+            if(sname(1:3) .eq. 'END') exit
+            print *,sname
+
+            read(10,'(I2,1x ,A6,1x ,5(A2,F6.2),1x ,I1,F13.7,F15.3)') &
+               num_sctn(ns), optional_ID_code, (name_element(k), num_element(k), k=1,5),&
+               phase, mw(ns), DH0(ns)
+
+            !set number of elements
+            outer1:do k=1,5 
+               if(name_element(k) .eq. "  ") exit
+               do i=1,ne
+                  if(elements_name(i) .eq. name_element(k)) then
+                     cycle outer1
+                  end if
+               end do
+            end do outer1
+
+            do l=1, num_sctn(ns)
+               read(10,'()')
+               read(10,'()')
+               read(10,'()')
+            end do
+      end do do_species1
+
+      close(10)
+      !!! END OF FETCH ATOMS
+
+
+      !!! START RECORD SPECIES
+      open(10,file='thermo.inp',status='old')
+
+      !!! header
+      do
+         read(10,'(A)') comment
+         if(comment(1:1) .ne. '!') exit
+      end do
+      read(10,'()')!ranges
+      !!! end of header
+
+      ns=1
+      to_record = .true.
+      do_species:do
+            !first line --- name, comment
+            read(10,'(A18,A62)') sname, comment
             if(sname(1:3) .eq. 'END') exit
             species_name(ns)=sname
 
-            !second line --- other property{{{
+            !second line --- other property
             !read other informations
             read(10,'(I2,1x ,A6,1x ,5(A2,F6.2),1x ,I1,F13.7,F15.3)') &
                num_sctn(ns), optional_ID_code, (name_element(k), num_element(k), k=1,5),&
                phase, mw(ns), DH0(ns)
 
             !for condensed phase
-            if(phase .ne. 0) to_read=.false.
+            if(phase .ne. 0) to_record = .false.
 
-            !set number of elements{{{
-            !initialize
-            do i=1,ne
-               Ac(i,ns)=0d0
-            end do
-
-            !for all elements read
-            do k=1,5 
-               flag_element=.false.
+            !set number of elements
+            Ac(1:ne,ns)=0d0
+            outer:do k=1,5 
+               if(name_element(k) .eq. "  ") exit
 
                do i=1,ne
                   if(elements_name(i) .eq. name_element(k)) then
-                     flag_element=.true.
                      Ac(i,ns)=num_element(k)
-                     exit
+                     cycle outer
                   end if
                end do
+               to_record = .false.
+            end do outer
 
-               if(flag_element .eq. .false. .and. name_element(k) .ne. "  ") to_read = .false.
-            end do
-            !}}}
-            !}}}
-
-            !other line ---coefficients of thermodynamical functions{{{
+            !other line ---coefficients of thermodynamical functions
             do l=1, num_sctn(ns)
                read(10,'(1x ,F10.3,1x ,F10.3, I1, 8F5.1, 2x ,F15.3)') &
-                  (Trange(k,l,ns), k=1,2), num_T_exp, (Texp(k),k=1,8), H0a
-               read(10,'(5D16.9)') (co(k,l,ns),k=1,5)
-               read(10,'(2D16.8,16x,2D16.8)') (co(k,l,ns),k=6,7),(co(k,l,ns),k=8,9)
+                  Trange(1:2,l,ns), num_T_exp, Texp(1:8), H0a
+               read(10,'(5D16.9)') co(1:5,l,ns)
+               read(10,'(2D16.8,16x,2D16.8)') co(6:9,l,ns)
 
-               if(num_T_exp .ne. 7 .or. .not. (Texp(1) .eq. -2d0 &
-                                         .and. Texp(2) .eq. -1d0 &
-                                         .and. Texp(3) .eq.  0d0 & 
-                                         .and. Texp(4) .eq.  1d0 &
-                                         .and. Texp(5) .eq.  2d0 &
-                                         .and. Texp(6) .eq.  3d0 &
-                                         .and. Texp(7) .eq.  4d0 )) then
+               if(num_T_exp .ne. 7) then
                   print *,"Error: Odd function at species:",species_name(j)
-                  call exit(1)
+                  stop
                end if
             end do
-            !}}}
-      end do
-999   continue
+
+            if(to_record) ns=ns+1
+            to_record=.true.
+      end do do_species
       ns=ns-1
 
       print *,"the number of species to use:",ns

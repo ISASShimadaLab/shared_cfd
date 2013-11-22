@@ -1,6 +1,6 @@
 module const_chem
    implicit none
-   double precision,parameter::Ru=8.31451d0     !universal gas constant
+   double precision,parameter::Ru=8.3144621d0   !universal gas constant
    double precision,parameter::pst=1d5          !standard state pressure
    double precision,parameter::omega=0.1d0      !relaxation factor
    double precision,parameter::eps=1d-6         !epsilon for convergence

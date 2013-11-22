@@ -1,0 +1,18 @@
+#Control parameters for chemistry
+Oxygen Pressure(Pa)     : 1.e5
+Oxygen Temperature(K)   : 300.
+Oxygen Number of Species: 2
+Oxygen Composition(mass ratio):
+O2 1
+N2 1
+end
+Fuel Pressure(Pa)       : 1.e5
+Fuel Temperature(K)     : 300.
+Fuel Number of Species  : 2
+Fuel Composition(mass ratio):
+O2 1
+end
+Products Composition(mass ratio):
+O2 2
+N2 1
+end
