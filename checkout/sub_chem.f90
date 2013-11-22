@@ -17,9 +17,9 @@ subroutine read_fo_composition!{{{
 
       open(8,file="control_chem.inp")
       read(8,'()')
-      read(8,'()')
       read(8,'(25x,es15.7)') po
       read(8,'(25x,es15.7)') To
+      read(8,'(25x,es15.7)') Numo
       read(8,'()')
       do
          read(8,'(a)') buf
@@ -32,6 +32,7 @@ subroutine read_fo_composition!{{{
       end do
       read(8,'(25x,es15.7)') pf
       read(8,'(25x,es15.7)') Tf
+      read(8,'(25x,es15.7)') Numf
       read(8,'()')
       do
          read(8,'(a)') buf
