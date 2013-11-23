@@ -4,6 +4,7 @@ program driver
    double precision xi,E,T, MWave,kappa,mu,MWini
    double precision,dimension(1:ne)::n,b0
 
+   call read_fo_composition
    call set_therm_data
    call set_trans_data
 

@@ -4,88 +4,107 @@ subroutine read_fo_composition!{{{
    use mod_mpi
    use chem_var
    implicit none
-   character*100 buf,buf2
+   character*100 buf,buf2,bufline(100)
    double precision amount
    integer ind
 
-   double precision DHit(nY)
    integer i
 
    if(myid .eq. 0) then
-      vrhoo =1d-20
-      vrhof =1d-20
+      no =1d-20
+      nf =1d-20
 
       open(8,file="control_chem.inp")
       read(8,'()')
       read(8,'(25x,es15.7)') po
       read(8,'(25x,es15.7)') To
-      read(8,'(25x,es15.7)') Numo
       read(8,'()')
+      !count
+      numo=0
       do
          read(8,'(a)') buf
          if(buf(1:3) .eq. 'end') exit
-         buf=adjustl(trim(buf)) !delete front and back spaces
+         numo = numo + 1
+         bufline(numo)=buf
+      end do
+      print *,po,To,numo
+      allocate(SYM_OXID(numo),COMP_OXID(numo))
+      !record
+      do i=1,numo
+         buf=adjustl(trim(bufline(i))) !delete front and back spaces
          ind=index(buf,' ')
          if(ind .eq. 0) stop "Bad format at control_chem.inp while reading Oxygen Compositions"
          read(buf(ind+1:),*) amount
-         vrhoo(search_species(buf(1:ind-1))) = amount
+         SYM_OXID(i)   = buf(1:ind-1)
+         COMP_OXID(i) = amount
+         print *,SYM_OXID(i),COMP_OXID(i)
       end do
+
       read(8,'(25x,es15.7)') pf
       read(8,'(25x,es15.7)') Tf
-      read(8,'(25x,es15.7)') Numf
       read(8,'()')
+      !count
+      numf=0
       do
          read(8,'(a)') buf
          if(buf(1:3) .eq. 'end') exit
-         buf=adjustl(trim(buf)) !delete front and back spaces
+         numf = numf + 1
+         bufline(numf)=buf
+      end do
+      print *,pf,Tf,numf
+      allocate(SYM_FUEL(numf),COMP_FUEL(numf))
+      !record
+      do i=1,numf
+         buf=adjustl(trim(bufline(i))) !delete front and back spaces
          ind=index(buf,' ')
          if(ind .eq. 0) stop "Bad format at control_chem.inp while reading Fuel Compositions"
          read(buf(ind+1:),*) amount
-         vrhof(search_species(buf(1:ind-1))) = amount
+         SYM_FUEL(i)   = buf(1:ind-1)
+         COMP_FUEL(i) = amount
+         print *,SYM_FUEL(i),COMP_FUEL(i)
       end do
       close(8)
    end if
 
-   !print *,"ns_tocalc = ",ns_tocalc
+   !!!! MPI COMMUNICATIONS
+   !call MPI_Bcast(po,       1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
+   !call MPI_Bcast(To,       1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
+   !call MPI_Bcast(vrhoo,   ns, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
 
-   !!! MPI COMMUNICATIONS
-   call MPI_Bcast(po,       1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
-   call MPI_Bcast(To,       1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
-   call MPI_Bcast(vrhoo,   ns, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
-
-   call MPI_Bcast(pf,       1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
-   call MPI_Bcast(Tf,       1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
-   call MPI_Bcast(vrhof,   ns, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
+   !call MPI_Bcast(pf,       1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
+   !call MPI_Bcast(Tf,       1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
+   !call MPI_Bcast(vrhof,   ns, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
 
 
-   !!! calculate other properties for oxygen and fuel
-   call rho_rel2abs(po,To, vrhoo, rhoo,Eo)
-   call calc_T(vrhoo,rhoo,Eo, To, kappao,MWo,DHit,vhio,muo)
-   vwo(1:nY) = vrhoo(1:nY)/rhoo
+   !!!! calculate other properties for oxygen and fuel
+   !call rho_rel2abs(po,To, vrhoo, rhoo,Eo)
+   !call calc_T(vrhoo,rhoo,Eo, To, kappao,MWo,DHit,vhio,muo)
+   !vwo(1:nY) = vrhoo(1:nY)/rhoo
 
-   call rho_rel2abs(pf,Tf, vrhof, rhof,Ef)
-   call calc_T(vrhof,rhof,Ef, Tf, kappaf,MWf,DHit,vhif,muf)
-   vwf(1:nY) = vrhof(1:nY)/rhof
-contains
-   integer function search_species(str)
-      use chem
-      character(*),intent(in)::str
-      integer i
-   
-      do i=1,ns_tocalc
-         if(trim(SYM_SPC(i)) .eq. trim(str)) then
-            search_species=i
-            return
-         end if
-      end do
-      search_species=-1
-   end function search_species
+   !call rho_rel2abs(pf,Tf, vrhof, rhof,Ef)
+   !call calc_T(vrhof,rhof,Ef, Tf, kappaf,MWf,DHit,vhif,muf)
+   !vwf(1:nY) = vrhof(1:nY)/rhof
+!contains
+!   integer function search_species(str)
+!      use chem
+!      character(*),intent(in)::str
+!      integer i
+!   
+!      do i=1,
+!         if(trim(SYM_SPC(i)) .eq. trim(str)) then
+!            search_species=i
+!            return
+!         end if
+!      end do
+!      search_species=-1
+!   end function search_species
 end subroutine read_fo_composition!}}}
 
 subroutine set_therm_data!{{{
    use mod_mpi
    use const_chem
    use chem
+   use chem_var
    implicit none
    character*18     sname
    character*300    comment
@@ -99,50 +118,46 @@ subroutine set_therm_data!{{{
    integer i,j,k,l
 
    !set elements name to use
-   elements_name(1)="O "
-   elements_name(2)="N "
-   elements_name(3)="C "
-   elements_name(4)="H "
+   SYM_ELM(1)="O "
+   SYM_ELM(2)="N "
+   SYM_ELM(3)="C "
+   SYM_ELM(4)="H "
 
    if(myid .eq. 0) then
       open(10,file='thermo.inp',status='old')
-      !!! header
       do
          read(10,'(A)') comment
          if(comment(1:1) .ne. '!') exit
       end do
       read(10,'()')!ranges
-      !!! end of header
 
       ns=1
       do_species1:do
-            !first line --- name, comment
             read(10,'(A18,A62)') sname, comment
             if(sname(1:3) .eq. 'END') exit
-            print *,sname
 
             read(10,'(I2,1x ,A6,1x ,5(A2,F6.2),1x ,I1,F13.7,F15.3)') &
                num_sctn(ns), optional_ID_code, (name_element(k), num_element(k), k=1,5),&
                phase, mw(ns), DH0(ns)
 
-            !set number of elements
-            outer1:do k=1,5 
-               if(name_element(k) .eq. "  ") exit
-               do i=1,ne
-                  if(elements_name(i) .eq. name_element(k)) then
-                     cycle outer1
-                  end if
-               end do
-            end do outer1
+            if(existInReactant(sname)) then
+               outer1:do k=1,5 
+                  if(name_element(k) .eq. "  ") exit
+                  do i=1,ne
+                     if(SYM_ELM(i) .eq. name_element(k)) then
+                        cycle outer1
+                     end if
+                  end do
+               end do outer1
+            end if
 
-            do l=1, num_sctn(ns)
-               read(10,'()')
-               read(10,'()')
+            do l=1, num_sctn(ns)*3
                read(10,'()')
             end do
       end do do_species1
 
       close(10)
+      call exit(0)
       !!! END OF FETCH ATOMS
 
 
@@ -163,7 +178,7 @@ subroutine set_therm_data!{{{
             !first line --- name, comment
             read(10,'(A18,A62)') sname, comment
             if(sname(1:3) .eq. 'END') exit
-            species_name(ns)=sname
+            SYM_SPC(ns)=sname
 
             !second line --- other property
             !read other informations
@@ -180,7 +195,7 @@ subroutine set_therm_data!{{{
                if(name_element(k) .eq. "  ") exit
 
                do i=1,ne
-                  if(elements_name(i) .eq. name_element(k)) then
+                  if(SYM_ELM(i) .eq. name_element(k)) then
                      Ac(i,ns)=num_element(k)
                      cycle outer
                   end if
@@ -196,7 +211,7 @@ subroutine set_therm_data!{{{
                read(10,'(2D16.8,16x,2D16.8)') co(6:9,l,ns)
 
                if(num_T_exp .ne. 7) then
-                  print *,"Error: Odd function at species:",species_name(j)
+                  print *,"Error: Odd function at species:",SYM_SPC(j)
                   stop
                end if
             end do
@@ -211,15 +226,29 @@ subroutine set_therm_data!{{{
       close(10)
    end if
 
-   call MPI_Bcast(           ns,          1,          MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
-   call MPI_Bcast(     num_sctn,         ns,          MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
-   call MPI_Bcast(           MW,         ns, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
-   call MPI_Bcast(          DH0,         ns, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
-   call MPI_Bcast(       Trange, max_ns*6*2, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
-   call MPI_Bcast(           co, max_ns*6*9, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
-   call MPI_Bcast(           Ac,  ne*max_ns, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
-   call MPI_Bcast( species_name,  max_ns*18,        MPI_CHARACTER, 0, MPI_COMM_WORLD, ierr)
-   call MPI_Bcast(elements_name,      ne*18,        MPI_CHARACTER, 0, MPI_COMM_WORLD, ierr)
+   call MPI_Bcast(      ns,          1,          MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
+   call MPI_Bcast(num_sctn,         ns,          MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
+   call MPI_Bcast(      MW,         ns, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
+   call MPI_Bcast(     DH0,         ns, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
+   call MPI_Bcast(  Trange, max_ns*6*2, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
+   call MPI_Bcast(      co, max_ns*6*9, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
+   call MPI_Bcast(      Ac,  ne*max_ns, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
+   call MPI_Bcast( SYM_SPC,  max_ns*18,        MPI_CHARACTER, 0, MPI_COMM_WORLD, ierr)
+   call MPI_Bcast( SYM_ELM,      ne*18,        MPI_CHARACTER, 0, MPI_COMM_WORLD, ierr)
+contains
+   logical function existInReactant(str)
+      implicit none
+      character(*),intent(in)::str
+      integer i
+      existInReactant = .true.
+      do i=1,numo
+         if(trim(SYM_OXID(i)) .eq. trim(str)) return
+      end do
+      do i=1,numf
+         if(trim(SYM_FUEL(i)) .eq. trim(str)) return
+      end do
+      existInReactant = .false.
+   end function existInReactant
 end subroutine set_therm_data!}}}
 
 subroutine set_trans_data!{{{
@@ -306,28 +335,6 @@ subroutine set_trans_data!{{{
    call MPI_Bcast(  Trange_trans, 2*3*max_ns, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
    call MPI_Bcast(         tr2th,     max_ns,          MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
 end subroutine set_trans_data!}}}
-
-subroutine print_property(rho,T,E,n)!{{{
-   use const_chem
-   use chem
-   implicit none
-   double precision,intent(in)::rho,T,E,n(max_ns)
-
-   double precision sn
-   integer j
-
-   sn=sum(n(1:ns),1)
-
-   print '(a20,f15.7)',"pressure(bar)=",rho*sn*Ru*T*1d-5
-   print '(a20,f15.7)',"density(kg/m^3)=",rho
-   print '(a20,f15.7)',"average MW=",1d3/sn
-   print '(a20,f15.7)',"temperature(K)=",T
-   print '(a20,f15.7)',"Energy(J/kg)=",E*1d-3
-   print '(a)',"mole fraction="
-   do j=1,ns
-      if(1d-5<n(j)/sn) print '(a,f9.5)',species_name(j),n(j)/sn
-   end do
-end subroutine print_property!}}}
 
 subroutine calc_therm(rho,xi,E, T,n, MWave,kappa,mu)!{{{
    use const_chem
@@ -665,7 +672,7 @@ integer function search_species(str)!{{{
    integer i
 
    do i=1,ns
-      if(trim(species_name(i)) .eq. trim(str)) then
+      if(trim(SYM_ELM(i)) .eq. trim(str)) then
          search_species=i
          return
       end if

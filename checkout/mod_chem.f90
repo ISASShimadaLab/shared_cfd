@@ -21,8 +21,8 @@ module chem
    double precision,dimension(2,6,max_ns)::Trange
    double precision,dimension(9,6,max_ns)::co
 
-   character*18,dimension(max_ns)::species_name
-   character*18,dimension(ne)::elements_name
+   character*18,dimension(max_ns)::SYM_SPC
+   character*2 ,dimension(ne)::    SYM_ELM
 
    !for trans
    double precision trans(4,3,max_ns),Trange_trans(2,3,max_ns)
@@ -39,21 +39,29 @@ module chem_var
    implicit none
    double precision      n_save(1:max_ns,1:ni,1:nj)
 
+   integer            numf
    double precision   rhof
+   double precision     pf
    double precision     Tf
    double precision     Ef
-   double precision     nf(1:max_ns)
    double precision    MWf
    double precision kappaf
-   double precision    b0f(1:ne)
    double precision    muf
+   double precision    b0f(1:ne)
+   double precision     nf(1:max_ns)
+   character*18,    dimension(:),allocatable::SYM_FUEL
+   double precision,dimension(:),allocatable::COMP_FUEL
 
+   integer            numo
    double precision   rhoo
+   double precision     po
    double precision     To
    double precision     Eo
-   double precision     no(1:max_ns)
    double precision    MWo
    double precision kappao
-   double precision    b0o(1:ne)
    double precision    muo
+   double precision    b0o(1:ne)
+   double precision     no(1:max_ns)
+   character*18,    dimension(:),allocatable::SYM_OXID
+   double precision,dimension(:),allocatable::COMP_OXID
 end module chem_var
