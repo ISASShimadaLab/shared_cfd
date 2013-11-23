@@ -1,6 +1,7 @@
 #!/usr/bin/python
 import sys
 
+######################## CLASSES ##################################################
 class SPCelm:
 	def __init__(self,name,elm_dic):
 		self.name    = name
@@ -10,21 +11,42 @@ class CONTROL:
 		self.fuel = fuel
 		self.oxid = oxid
 		self.prod = prod
-	def species(self):
+
 		arr = []
 		arr.extend(self.fuel.keys())
 		arr.extend(self.oxid.keys())
 		arr.extend(self.prod.keys())
-		return list(set(arr))
-	def set_species(self,species):
-		self.species = species
-	def elements(self):
-		arr = []
-		for SPC in self.species:
-			arr.extend(SPC.elm_dic.keys())
-		return list(set(arr))
-	def check_consistency():
+		self.species = list(set(arr))
+	def set_species(self,dic_species):
+		self.dic_species = dic_species
+		arr =[]
+		for var in self.dic_species.values(): arr.extend(var.keys())
+		self.elements = list(set(arr))
+	def check_consistency(self):
+		reac_sum={}
+		for key in self.elements:reac_sum[key]=0
+		for spc,amount in self.fuel.items():
+			for key,var in self.dic_species[spc].items():
+				reac_sum[key]+=var*amount
+		for spc,amount in self.oxid.items():
+			for key,var in self.dic_species[spc].items():
+				reac_sum[key]+=var*amount
 
+		prod_sum={}
+		for key in self.elements:prod_sum[key]=0
+		for spc,amount in self.prod.items():
+			for key,var in self.dic_species[spc].items():
+				prod_sum[key]+=var*amount
+
+		for key in self.elements:
+			if abs(2*(reac_sum[key]-prod_sum[key])/(reac_sum[key]+prod_sum[key]))>0.01:
+			 	print "Consistency check failed!"
+			 	print "Please check the compositions of reactants and products again."
+			 	sys.exit(1)
+		print "Consistency check succeeded!"
+
+	
+######################## FUNCTIONS ################################################
 def read_thermo():
 	fp = open("thermo.inp")
 	while True:
@@ -82,21 +104,45 @@ def read_control_chem():
 	return CONTROL(fuel,oxid,prod)
 
 def fetch_elm_info(SPClist,control):
-	controlSPC = control.species()
-	arr = []
+	controlSPC = control.species
+	dic = {}
 	for SPCmono in SPClist:
 		for species in controlSPC:
 			if(SPCmono.name == species):
-				arr.append(SPCmono)
+				dic[species] = SPCmono.elm_dic
 				break
-	control.set_species(arr)
+	control.set_species(dic)
 	return control
-	
 
+def trimSPC(SPClist,elements):
+	trimed = []
+	for SPC in SPClist:
+		flag = True
+		for elm in SPC.elm_dic.keys():
+			if not elm in elements : flag = False
+		if flag: trimed.append(SPC.name)
+	return trimed
 
-if __name__ == "__main__":
+def out_arr(filename,arr):
+	fp = open(filename,"w")
+	for var in arr:fp.write(var+"\n")
+	fp.close()
+	return len(arr)
+
+######################## MAIN ################################################
+def preCEA(var):
 	SPClist = read_thermo()
 	control = read_control_chem()
 	control = fetch_elm_info(SPClist,control)
-	print control.elements()
+	if var ==0:
+		control.check_consistency()
+		trimedSPC = control.species
+	else:
+		trimedSPC = trimSPC(SPClist,control.elements)
+	numelm = out_arr("elements_to_use.inp",control.elements)
+	numspc = out_arr("species_to_use.inp", trimedSPC)
+	return [numelm,numspc]
 
+if __name__ == "__main__":
+	var = 0 #0:flamesheet, 1: CEA
+	print preCEA(var)

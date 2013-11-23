@@ -1,127 +1,37 @@
-!read control.inp
-subroutine read_fo_composition!{{{
-   use chem
+! read data files
+subroutine read_elmspc_to_use!{{{
    use mod_mpi
-   use chem_var
+   use chem
    implicit none
-   character*100 buf,buf2,bufline(100)
-   double precision amount
-   integer ind
-
    integer i
 
    if(myid .eq. 0) then
-      no =1d-20
-      nf =1d-20
+      open(22,file='elements_to_use.inp')
+      do i=1,ne
+         read(22,'(a2)') SYM_ELM(i)
+      end do
+      close(22)
 
-      open(8,file="control_chem.inp")
-      read(8,'()')
-      read(8,'(25x,es15.7)') po
-      read(8,'(25x,es15.7)') To
-      read(8,'()')
-      !count
-      numo=0
-      do
-         read(8,'(a)') buf
-         if(buf(1:3) .eq. 'end') exit
-         numo = numo + 1
-         bufline(numo)=buf
+      open(22,file='species_to_use.inp')
+      do i=1,ns
+         read(22,'(a18)') SYM_SPC(i)
       end do
-      print *,po,To,numo
-      allocate(SYM_OXID(numo),COMP_OXID(numo))
-      !record
-      do i=1,numo
-         buf=adjustl(trim(bufline(i))) !delete front and back spaces
-         ind=index(buf,' ')
-         if(ind .eq. 0) stop "Bad format at control_chem.inp while reading Oxygen Compositions"
-         read(buf(ind+1:),*) amount
-         SYM_OXID(i)   = buf(1:ind-1)
-         COMP_OXID(i) = amount
-         print *,SYM_OXID(i),COMP_OXID(i)
-      end do
-
-      read(8,'(25x,es15.7)') pf
-      read(8,'(25x,es15.7)') Tf
-      read(8,'()')
-      !count
-      numf=0
-      do
-         read(8,'(a)') buf
-         if(buf(1:3) .eq. 'end') exit
-         numf = numf + 1
-         bufline(numf)=buf
-      end do
-      print *,pf,Tf,numf
-      allocate(SYM_FUEL(numf),COMP_FUEL(numf))
-      !record
-      do i=1,numf
-         buf=adjustl(trim(bufline(i))) !delete front and back spaces
-         ind=index(buf,' ')
-         if(ind .eq. 0) stop "Bad format at control_chem.inp while reading Fuel Compositions"
-         read(buf(ind+1:),*) amount
-         SYM_FUEL(i)   = buf(1:ind-1)
-         COMP_FUEL(i) = amount
-         print *,SYM_FUEL(i),COMP_FUEL(i)
-      end do
-      close(8)
+      close(22)
    end if
-
-   !!!! MPI COMMUNICATIONS
-   !call MPI_Bcast(po,       1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
-   !call MPI_Bcast(To,       1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
-   !call MPI_Bcast(vrhoo,   ns, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
-
-   !call MPI_Bcast(pf,       1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
-   !call MPI_Bcast(Tf,       1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
-   !call MPI_Bcast(vrhof,   ns, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
-
-
-   !!!! calculate other properties for oxygen and fuel
-   !call rho_rel2abs(po,To, vrhoo, rhoo,Eo)
-   !call calc_T(vrhoo,rhoo,Eo, To, kappao,MWo,DHit,vhio,muo)
-   !vwo(1:nY) = vrhoo(1:nY)/rhoo
-
-   !call rho_rel2abs(pf,Tf, vrhof, rhof,Ef)
-   !call calc_T(vrhof,rhof,Ef, Tf, kappaf,MWf,DHit,vhif,muf)
-   !vwf(1:nY) = vrhof(1:nY)/rhof
-!contains
-!   integer function search_species(str)
-!      use chem
-!      character(*),intent(in)::str
-!      integer i
-!   
-!      do i=1,
-!         if(trim(SYM_SPC(i)) .eq. trim(str)) then
-!            search_species=i
-!            return
-!         end if
-!      end do
-!      search_species=-1
-!   end function search_species
-end subroutine read_fo_composition!}}}
-
+   call MPI_Bcast( SYM_SPC,   ns*18,        MPI_CHARACTER, 0, MPI_COMM_WORLD, ierr)
+   call MPI_Bcast( SYM_ELM,    ne*2,        MPI_CHARACTER, 0, MPI_COMM_WORLD, ierr)
+end subroutine read_elmspc_to_use!}}}
 subroutine set_therm_data!{{{
    use mod_mpi
-   use const_chem
    use chem
-   use chem_var
    implicit none
    character*18     sname
    character*300    comment
-   character*6      optional_ID_code
-   character*2      name_element(5)
-   double precision num_element(5)
-   integer          phase,num_T_exp
-   double precision Texp(8),H0a
+   character*2      name_elm(5)
+   double precision Nelm(5)
+   integer,external::search_species
 
-   logical to_record
-   integer i,j,k,l
-
-   !set elements name to use
-   SYM_ELM(1)="O "
-   SYM_ELM(2)="N "
-   SYM_ELM(3)="C "
-   SYM_ELM(4)="H "
+   integer i,j,k,l,Nfound
 
    if(myid .eq. 0) then
       open(10,file='thermo.inp',status='old')
@@ -129,128 +39,59 @@ subroutine set_therm_data!{{{
          read(10,'(A)') comment
          if(comment(1:1) .ne. '!') exit
       end do
-      read(10,'()')!ranges
+      read(10,'()')!default ranges
 
-      ns=1
-      do_species1:do
-            read(10,'(A18,A62)') sname, comment
-            if(sname(1:3) .eq. 'END') exit
-
-            read(10,'(I2,1x ,A6,1x ,5(A2,F6.2),1x ,I1,F13.7,F15.3)') &
-               num_sctn(ns), optional_ID_code, (name_element(k), num_element(k), k=1,5),&
-               phase, mw(ns), DH0(ns)
-
-            if(existInReactant(sname)) then
-               outer1:do k=1,5 
-                  if(name_element(k) .eq. "  ") exit
-                  do i=1,ne
-                     if(SYM_ELM(i) .eq. name_element(k)) then
-                        cycle outer1
-                     end if
-                  end do
-               end do outer1
-            end if
-
-            do l=1, num_sctn(ns)*3
+      Nfound=0
+      do
+         !first line --- name, comment
+         read(10,'(A18,A62)') sname, comment
+         j = search_species(sname)
+         if(sname(1:3) .eq. 'END') then
+            exit
+         else if(j<1)then
+            read(10,'(i2)') j
+            do l=1, j*3
                read(10,'()')
             end do
-      end do do_species1
+            cycle
+         end if
+         Nfound = Nfound+1
 
-      close(10)
-      call exit(0)
-      !!! END OF FETCH ATOMS
+         !second line --- other property
+         !read other informations
+         read(10,'(i2,8x,5(a2,f6.2),2x,f13.7)') &
+            num_sctn(j),(name_elm(k), Nelm(k), k=1,5), mw(j)
 
-
-      !!! START RECORD SPECIES
-      open(10,file='thermo.inp',status='old')
-
-      !!! header
-      do
-         read(10,'(A)') comment
-         if(comment(1:1) .ne. '!') exit
-      end do
-      read(10,'()')!ranges
-      !!! end of header
-
-      ns=1
-      to_record = .true.
-      do_species:do
-            !first line --- name, comment
-            read(10,'(A18,A62)') sname, comment
-            if(sname(1:3) .eq. 'END') exit
-            SYM_SPC(ns)=sname
-
-            !second line --- other property
-            !read other informations
-            read(10,'(I2,1x ,A6,1x ,5(A2,F6.2),1x ,I1,F13.7,F15.3)') &
-               num_sctn(ns), optional_ID_code, (name_element(k), num_element(k), k=1,5),&
-               phase, mw(ns), DH0(ns)
-
-            !for condensed phase
-            if(phase .ne. 0) to_record = .false.
-
-            !set number of elements
-            Ac(1:ne,ns)=0d0
-            outer:do k=1,5 
-               if(name_element(k) .eq. "  ") exit
-
-               do i=1,ne
-                  if(SYM_ELM(i) .eq. name_element(k)) then
-                     Ac(i,ns)=num_element(k)
-                     cycle outer
-                  end if
-               end do
-               to_record = .false.
-            end do outer
-
-            !other line ---coefficients of thermodynamical functions
-            do l=1, num_sctn(ns)
-               read(10,'(1x ,F10.3,1x ,F10.3, I1, 8F5.1, 2x ,F15.3)') &
-                  Trange(1:2,l,ns), num_T_exp, Texp(1:8), H0a
-               read(10,'(5D16.9)') co(1:5,l,ns)
-               read(10,'(2D16.8,16x,2D16.8)') co(6:9,l,ns)
-
-               if(num_T_exp .ne. 7) then
-                  print *,"Error: Odd function at species:",SYM_SPC(j)
-                  stop
+         !set number of elements
+         Ac(1:ne,j)=0d0
+         outer:do k=1,5 
+            if(name_elm(k) .eq. "  ") exit
+            do i=1,ne
+               if(SYM_ELM(i) .eq. name_elm(k)) then
+                  Ac(i,j)=Nelm(k)
+                  cycle outer
                end if
             end do
+         end do outer
 
-            if(to_record) ns=ns+1
-            to_record=.true.
-      end do do_species
-      ns=ns-1
-
-      print *,"the number of species to use:",ns
-
+         !other line ---coefficients of thermodynamical functions
+         do l=1, num_sctn(j)
+            read(10,'(2(1x ,f10.3))')    Trange(:,l,j)
+            read(10,'(5D16.9)')            co(1:5,l,j)
+            read(10,'(2D16.8,16x,2D16.8)') co(6:9,l,j)
+         end do
+         if(Nfound==ns) exit
+      end do
       close(10)
+      if(Nfound .ne. ns) stop "Some species have not found in thermo.inp."
    end if
 
-   call MPI_Bcast(      ns,          1,          MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
-   call MPI_Bcast(num_sctn,         ns,          MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
-   call MPI_Bcast(      MW,         ns, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
-   call MPI_Bcast(     DH0,         ns, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
-   call MPI_Bcast(  Trange, max_ns*6*2, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
-   call MPI_Bcast(      co, max_ns*6*9, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
-   call MPI_Bcast(      Ac,  ne*max_ns, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
-   call MPI_Bcast( SYM_SPC,  max_ns*18,        MPI_CHARACTER, 0, MPI_COMM_WORLD, ierr)
-   call MPI_Bcast( SYM_ELM,      ne*18,        MPI_CHARACTER, 0, MPI_COMM_WORLD, ierr)
-contains
-   logical function existInReactant(str)
-      implicit none
-      character(*),intent(in)::str
-      integer i
-      existInReactant = .true.
-      do i=1,numo
-         if(trim(SYM_OXID(i)) .eq. trim(str)) return
-      end do
-      do i=1,numf
-         if(trim(SYM_FUEL(i)) .eq. trim(str)) return
-      end do
-      existInReactant = .false.
-   end function existInReactant
+   call MPI_Bcast(num_sctn,      ns,          MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
+   call MPI_Bcast(      MW,      ns, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
+   call MPI_Bcast(  Trange,  ns*6*2, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
+   call MPI_Bcast(      co,  ns*6*9, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
+   call MPI_Bcast(      Ac,   ne*ns, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
 end subroutine set_therm_data!}}}
-
 subroutine set_trans_data!{{{
    use mod_mpi
    use const_chem
@@ -329,13 +170,159 @@ subroutine set_trans_data!{{{
       close(10)
    end if
 
-   call MPI_Bcast(            nt,          1,          MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
-   call MPI_Bcast(num_sctn_trans,     max_ns,          MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
-   call MPI_Bcast(         trans, 4*3*max_ns, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
-   call MPI_Bcast(  Trange_trans, 2*3*max_ns, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
-   call MPI_Bcast(         tr2th,     max_ns,          MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
+   call MPI_Bcast(            nt,      1,          MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
+   call MPI_Bcast(num_sctn_trans,     ns,          MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
+   call MPI_Bcast(         trans, 4*3*ns, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
+   call MPI_Bcast(  Trange_trans, 2*3*ns, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
+   call MPI_Bcast(         tr2th,     ns,          MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
 end subroutine set_trans_data!}}}
+subroutine read_fo_composition!{{{
+   use mod_mpi
+   use chem_var
+   implicit none
+   character*100    buf
+   double precision amount
+   integer          ind
+   integer,external::search_species
 
+   if(myid .eq. 0) then
+      open(8,file="control_chem.inp")
+      read(8,'()')
+      read(8,'(25x,es15.7)') po
+      read(8,'(25x,es15.7)') To
+      read(8,'()')
+      no = 0d0
+      do
+         read(8,'(a)') buf
+         if(buf(1:3) .eq. 'end') exit
+         buf=adjustl(trim(buf));ind=index(buf,' ')
+         if(ind .eq. 0) stop "Bad format at control_chem.inp while reading Oxygen Compositions"
+         read(buf(ind+1:),*) amount
+         no(search_species(buf(1:ind-1)))=amount
+      end do
+
+      read(8,'(25x,es15.7)') pf
+      read(8,'(25x,es15.7)') Tf
+      read(8,'()')
+      nf = 0d0
+      do
+         read(8,'(a)') buf
+         if(buf(1:3) .eq. 'end') exit
+         buf=adjustl(trim(buf));ind=index(buf,' ')
+         if(ind .eq. 0) stop "Bad format at control_chem.inp while reading Fuel Compositions"
+         read(buf(ind+1:),*) amount
+         nf(search_species(buf(1:ind-1)))=amount
+      end do
+
+      close(8)
+   end if
+
+   !!! MPI COMMUNICATIONS
+   call MPI_Bcast(po,  1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
+   call MPI_Bcast(To,  1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
+   call MPI_Bcast(no, ns, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
+
+   call MPI_Bcast(pf,  1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
+   call MPI_Bcast(Tf,  1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
+   call MPI_Bcast(nf, ns, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
+
+   !!! calculate other properties for oxygen and fuel
+   call set_OF_ratio
+   print *,of,(32d0*2d0)/16d0
+   call calc_ini(po,To, no, Eo)
+   call calc_ini(pf,Tf, nf, Ef)
+   print *,po,To,Eo
+   print *,pf,Tf,Ef
+   !call rho_rel2abs(po,To, vrhoo, rhoo,Eo)
+   !call calc_T(vrhoo,rhoo,Eo, To, kappao,MWo,DHit,vhio,muo)
+
+   !call rho_rel2abs(pf,Tf, vrhof, rhof,Ef)
+   !call calc_T(vrhof,rhof,Ef, Tf, kappaf,MWf,DHit,vhif,muf)
+end subroutine read_fo_composition!}}}
+
+! utilities
+integer function search_species(str)!{{{
+   use chem
+   character(*),intent(in)::str
+   integer i
+
+   do i=1,ns
+      if(trim(SYM_SPC(i)) .eq. trim(str)) then
+         search_species=i
+         return
+      end if
+   end do
+   search_species=-1
+end function search_species!}}}
+integer function search_species_trans(str)!{{{
+   use chem
+   character(*),intent(in)::str
+   integer i
+
+   do i=1,nt
+      if(trim(species_name_trans(i)) .eq. trim(str)) then
+         search_species_trans=i
+         return
+      end if
+   end do
+   search_species_trans=-1
+end function search_species_trans!}}}
+
+!initialization
+subroutine set_OF_ratio!{{{
+   use chem
+   use chem_var
+   implicit none
+   double precision sumo,sumf
+   integer j
+
+   sumo=0d0
+   sumf=0d0
+   do j=1,ns
+      sumo=sumo+MW(j)*no(j)
+      sumf=sumf+MW(j)*nf(j)
+   end do
+   of = sumo/sumf
+end subroutine set_OF_ratio!}}}
+subroutine calc_ini(p,T, n, E)!{{{
+   use chem
+   use func_therm
+   implicit none
+   double precision,intent(in) ::p
+   double precision,intent(in) ::T
+   double precision,intent(inout)::n(ns)
+   double precision,intent(out)::E
+
+   integer j,k,nsc
+   double precision vThrt(9)
+   double precision sn,sm,tmp
+   double precision MWave
+
+   sn=0d0
+   sm=0d0
+   do j=1,ns
+      sn=sn+n(j)
+      sm=sm+n(j)*MW(j)
+   end do
+   MWave=sm/sn
+   n=n/sm*1d3 !mole/kg
+
+   call calc_vThrt(T,log(T),vThrt)
+   do j=1,ns
+      call check_section_number(j,T,nsc)
+      tmp=0d0
+      do k=1,9
+         tmp=tmp+vThrt(k)*co(k,nsc,j)
+      end do
+      print *,j,tmp*Ru*T,n(j)
+      E=tmp*n(j)
+   end do
+   E=E*Ru*T
+
+   n=n+initial_eps
+end subroutine calc_ini!}}}
+
+!main
 subroutine calc_therm(rho,xi,E, T,n, MWave,kappa,mu)!{{{
    use const_chem
    use func_therm
@@ -346,14 +333,14 @@ subroutine calc_therm(rho,xi,E, T,n, MWave,kappa,mu)!{{{
    double precision,intent(in)   ::xi
    double precision,intent(in)   ::E
    double precision,intent(inout)::T
-   double precision,intent(inout)::n(max_ns)
+   double precision,intent(inout)::n(ns)
    double precision,intent(out)  ::MWave
    double precision,intent(out)  ::kappa
    double precision,intent(out)  ::mu
 
    double precision,dimension(ne+1)::b0,b,bd,vpi
-   double precision,dimension(max_ns)::vmurt,vert,Dlogn,logn
-   integer,dimension(max_ns)::sec_num
+   double precision,dimension(ns)::vmurt,vert,Dlogn,logn
+   integer,dimension(ns)::sec_num
    double precision,dimension(ne+1,ne+1)::Ad
    double precision tmp,logT,sn,vmurtn,DlogT,b0max,Dnmax,logrhoRu,tinyn,logtinyn
    double precision,parameter::tinyratio=1d-3
@@ -364,7 +351,7 @@ subroutine calc_therm(rho,xi,E, T,n, MWave,kappa,mu)!{{{
    integer ne_now
 
    integer sect
-   double precision,dimension(max_ns)::muN
+   double precision,dimension(ns)::muN
    double precision phi,denom,MWj,MWi
 
    integer i,j,k,counter
@@ -602,98 +589,6 @@ subroutine calc_therm(rho,xi,E, T,n, MWave,kappa,mu)!{{{
    mu = mu * 1d-7
 end subroutine calc_therm!}}}
 
-!subroutine calc_kappa_s(kappa)!{{{
-!   use const_chem
-!   use func_therm
-!   use chem
-!   implicit none
-!   double precision,intent(out)::kappa
-!
-!   double precision      Ad(ne+2,  ne+2)
-!   double precision Ad_temp(ne+1,ne+1)
-!   double precision bd(ne+1)
-!   double precision dpi(ne+2)
-!   double precision temp 
-!   integer i,j,k
-!
-!   double precision cpr_bar,cvr_bar,dLVdLP,dLVdLT
-!
-!   do j=1,ns
-!      A(ne+1,j)  =1d0
-!      A(ne+2,j)  =hrt(j)
-!   end do
-!
-!   do i=1,ne+2
-!      do j=i,ne+2
-!         temp=0d0
-!         do k=1,ns
-!            temp=temp+A(i,k)*A(j,k)*n(k)
-!         end do
-!         Ad(i,j)=temp
-!         Ad(j,i)=temp
-!      end do
-!   end do
-!
-!   temp=0d0
-!   do k=1,ns
-!      temp=temp+n(k)*cpr(k)
-!   end do
-!   Ad(ne+2,ne+2)=Ad(ne+2,ne+2)+temp
-!
-!
-!   Ad_temp=Ad(1:ne+1,1:ne+1)
-!   Ad_temp(ne+1,ne+1)=0d0
-!   bd=-Ad(ne+2,1:ne+1)
-!   call LU(Ad_temp,bd,dpi(1:ne+1),ne+1)
-!   dLVdLT=1d0+dpi(ne+1)
-!   !print *,"dLVdLT=",dLVdLT
-!
-!   dpi(ne+2)=1d0
-!   cpr_bar=0d0
-!   do k=1,ne+2
-!      cpr_bar=cpr_bar+Ad(ne+2,k)*dpi(k)
-!   end do
-!   !print *,"cp_bar=",cpr_bar*Ru*1d-3
-!
-!   Ad_temp=Ad(1:ne+1,1:ne+1)
-!   Ad_temp(ne+1,ne+1)=0d0
-!   bd=Ad(ne+1,1:ne+1)
-!   call LU(Ad_temp,bd,dpi(1:ne+1),ne+1)
-!   dLVdLP=-1d0+dpi(ne+1)
-!   !print *,"dLVdLP=",dLVdLP
-!
-!   kappa=1d0+sum(n(1:ns),1)*dLVdLT**2/dLVdLP/cpr_bar  !eq. (2.70)  kappa=Cv/Cp
-!   kappa=1d0/kappa/(-dLVdLP)                          !eq. (2.73)
-!end subroutine calc_kappa_s!}}}
-
-integer function search_species(str)!{{{
-   use chem
-   character(*),intent(in)::str
-   integer i
-
-   do i=1,ns
-      if(trim(SYM_ELM(i)) .eq. trim(str)) then
-         search_species=i
-         return
-      end if
-   end do
-   search_species=-1
-end function search_species!}}}
-
-integer function search_species_trans(str)!{{{
-   use chem
-   character(*),intent(in)::str
-   integer i
-
-   do i=1,nt
-      if(trim(species_name_trans(i)) .eq. trim(str)) then
-         search_species_trans=i
-         return
-      end if
-   end do
-   search_species_trans=-1
-end function search_species_trans!}}}
-
 !!for C3H6/O2!!!!!!!!!!!!!!
 !subroutine calc_initial_prop(xi,T, n,E,MWini)!C3H6/O2{{{
 !   use chem
@@ -701,7 +596,7 @@ end function search_species_trans!}}}
 !   implicit none
 !   double precision,intent(in) ::xi
 !   double precision,intent(in) ::T
-!   double precision,intent(out)::n(max_ns)
+!   double precision,intent(out)::n(ns)
 !   double precision,intent(out)::E
 !   double precision,intent(out)::MWini
 !
@@ -802,603 +697,493 @@ end function search_species_trans!}}}
 !end subroutine calc_therm_flame_sheet!}}}
 !!end for C3H6/O2!!!!!!!!!!
 
-!for CH4/Air!!!!!!!!!!!!!!!
-subroutine calc_initial_prop(xi,T, n,E,MWini,b0)!CH4/Air{{{
-   use chem
-   use func_therm
-   implicit none
-   double precision,intent(in) ::xi
-   double precision,intent(in) ::T
-   double precision,intent(out)::n(max_ns)
-   double precision,intent(out)::E
-   double precision,intent(out)::MWini
-   double precision,intent(out)::b0(1:ne)
+!!for CH4/Air!!!!!!!!!!!!!!!
+!subroutine calc_initial_prop(xi,T, n,E,MWini,b0)!CH4/Air{{{
+!   use chem
+!   use func_therm
+!   implicit none
+!   double precision,intent(in) ::xi
+!   double precision,intent(in) ::T
+!   double precision,intent(out)::n(ns)
+!   double precision,intent(out)::E
+!   double precision,intent(out)::MWini
+!   double precision,intent(out)::b0(1:ne)
+!
+!   integer,parameter::iCH4 =7
+!   integer,parameter::iN2  =144
+!   integer,parameter::iO2  =157
+!   double precision,parameter::etaO2=0.215d0
+!   double precision,parameter::etaN2=1d0-etaO2
+!
+!   double precision logT
+!   integer i
+!   integer sCH4,sO2,sN2
+!
+!   !set mass fraction
+!   !g-mol/kg
+!   n=0d0
+!   n(iCH4) =     xi /MW(iCH4)*1d3 !C3H6
+!   n(iO2 ) =(1d0-xi)/(MW(iO2)*etaO2+MW(iN2)*etaN2)*etaO2*1d3 !O2
+!   n(iN2 ) =(1d0-xi)/(MW(iO2)*etaO2+MW(iN2)*etaN2)*etaN2*1d3 !O2
+!
+!   !E
+!   logT=log(T)
+!   call check_section_number(iCH4,T,sCH4)
+!   call check_section_number( iO2,T, sO2)
+!   call check_section_number( iN2,T, sN2)
+!   E=n(iCH4)*ert(iCH4,T,logT,sCH4)&
+!    +n( iO2)*ert( iO2,T,logT, sO2)&
+!    +n( iN2)*ert( iN2,T,logT, sN2)
+!   E=E*Ru*T
+!
+!   !MWini
+!   MWini=1d3/(n(iCH4)+n(iO2)+n(iN2))
+!
+!   !b0
+!   do i=1,ne
+!      b0(i)=Ac(i,iCH4)*n(iCH4)&
+!           +Ac(i, iO2)*n( iO2)&
+!           +Ac(i, iN2)*n( iN2)
+!   end do
+!
+!   !modification for mathematical stability
+!   n=n+initial_eps
+!end subroutine calc_initial_prop!}}}
+!
+!subroutine calc_therm_flame_sheet(xi,E, T, MWave,kappa,mu)!CH4/Air{{{
+!   use chem
+!   use func_therm
+!   double precision,intent(in)::xi
+!   double precision,intent(in)::E
+!   double precision,intent(inout)::T
+!   double precision,intent(out)::MWave
+!   double precision,intent(out)::kappa
+!   double precision,intent(out)::mu
+!
+!   double precision nCH4,nO2,nN2
+!   double precision nCO2 ,nH2O
+!
+!   integer,parameter::iCH4 =7
+!   integer,parameter::iN2  =144
+!   integer,parameter::iO2  =157
+!   integer,parameter::iCO2 =13
+!   integer,parameter::iH2O =132
+!
+!   integer,parameter::itCH4 =2
+!   integer,parameter::itN2  =19
+!   integer,parameter::itO2  =24
+!   integer,parameter::itCO2 =5
+!   integer,parameter::itH2O =14
+!
+!   double precision,parameter::etaO2=0.215d0
+!   double precision,parameter::etaN2=1d0-etaO2
+!
+!   integer,parameter:: ind(5) = (/ iCH4, iN2, iO2, iCO2, iH2O/)
+!   integer,parameter::indt(5) = (/itCH4,itN2,itO2,itCO2,itH2O/)
+!   integer            secN(5)
+!   double precision   molN(5)
+!   double precision    muN(5)
+!
+!   double precision MWf,MWo
+!   double precision xi_st
+!
+!   double precision T_old
+!
+!   integer sect
+!   double precision cprnow,cvrnow,ERTnow,logT,sum_n,phi
+!
+!   integer i,j,k
+!
+!   !set MW
+!   MWf=1d-3* MW(iCH4)
+!   MWo=1d-3*(MW(iO2)*etaO2+MW(iN2)*etaN2)
+!
+!   !set xi_st
+!   xi_st=MWf*etaO2/(MWf*etaO2+2d0*MWo)
+!
+!   !set n
+!   nN2  = (1d0-xi)/MWo*etaN2
+!   if(xi > xi_st) then !fuel rich
+!      nO2  = 0d0
+!      nCH4 = (xi*(2d0*MWo+MWf*etaO2)-MWf*etaO2)/(2d0*MWf*MWo)
+!      nCO2 = 0.5d0*(1d0-xi)/MWo*etaO2
+!   else !oxydizer rich
+!      nO2  = (MWf*etaO2-xi*(2d0*MWo+MWf*etaO2))/(MWf*MWo)
+!      nCH4 = 0d0
+!      nCO2 = xi/MWf
+!   end if
+!   nH2O = 2d0*nCO2
+!
+!   molN(1)=nCH4
+!   molN(2)=nN2
+!   molN(3)=nO2
+!   molN(4)=nCO2
+!   molN(5)=nH2O
+!
+!   !calc T
+!   logT=log(T)
+!
+!   ERTnow=0d0
+!   cvrnow=0d0
+!   do i=1,5
+!      call check_section_number(ind(i),T,secN(i))
+!      ERTnow = ERTnow + ert(ind(i),T,logT,secN(i))*molN(i)
+!      cvrnow = cvrnow + cvr(ind(i),T,     secN(i))*molN(i)
+!   end do
+!
+!   k=0
+!   T_old = T*0.5d0
+!   do while(abs(E/Ru-ERTnow*T)>cvrnow*1d-10 .and. abs(T-T_old)>1d-8 .and. k<100)
+!      T_old =T
+!      T     =T+omega*(E/Ru-ERTnow*T)/cvrnow
+!      logT=log(T)
+!
+!      ERTnow=0d0
+!      cvrnow=0d0
+!      do i=1,5
+!         call check_section_number(ind(i),T,secN(i))
+!         ERTnow = ERTnow + ert(ind(i),T,logT,secN(i))*molN(i)
+!         cvrnow = cvrnow + cvr(ind(i),T,     secN(i))*molN(i)
+!      end do
+!      k=k+1
+!   end do
+!
+!   if(k >= 100) then
+!      print *, "Not Converted at calc_therm_flame_sheet"
+!      !call exit(1)
+!   end if
+!
+!
+!   sum_n=nCH4+nO2+nN2+nCO2+nH2O
+!   MWave=1d3/sum_n
+!
+!   !calc kappa
+!   cprnow= cvrnow+sum_n
+!   kappa=cprnow/cvrnow
+!
+!   !calc mu
+!   do i=1,5
+!      call check_section_number_trans(indt(i),T,sect)
+!      muN(i) = calc_mu(indt(i),T,logT,sect)
+!   end do
+!
+!   mu = 0d0
+!   do i=1,5
+!      denom = 0d0
+!      do j=1,5
+!         phi = 0.25d0 * (1d0+sqrt(muN(i)/muN(j)) * (MW(ind(j)) / MW(ind(i)) )**0.25d0 )**2 &
+!                      * sqrt(2d0 *MW(ind(j))/(MW(ind(i))+MW(ind(j))))
+!         denom = denom + molN(j) * phi
+!      end do
+!      mu = mu + molN(i) * muN(i) / denom
+!   end do
+!   mu = mu * 1d-7
+!end subroutine calc_therm_flame_sheet!}}}
+!
+!subroutine calc_therm_flame_sheet_boundary(xi,T, E,MWave,kappa,mu)!CH4/Air{{{
+!   use chem
+!   use func_therm
+!   double precision,intent(in)::xi
+!   double precision,intent(in)::T
+!   double precision,intent(out)::E
+!   double precision,intent(out)::MWave
+!   double precision,intent(out)::kappa
+!   double precision,intent(out)::mu
+!
+!   double precision nCH4,nO2,nN2
+!   double precision nCO2 ,nH2O
+!
+!   integer,parameter::iCH4 =7
+!   integer,parameter::iN2  =144
+!   integer,parameter::iO2  =157
+!   integer,parameter::iCO2 =13
+!   integer,parameter::iH2O =132
+!
+!   integer,parameter::itCH4 =2
+!   integer,parameter::itN2  =19
+!   integer,parameter::itO2  =24
+!   integer,parameter::itCO2 =5
+!   integer,parameter::itH2O =14
+!
+!   double precision,parameter::etaO2=0.215d0
+!   double precision,parameter::etaN2=1d0-etaO2
+!
+!   integer,parameter:: ind(5) = (/ iCH4, iN2, iO2, iCO2, iH2O/)
+!   integer,parameter::indt(5) = (/itCH4,itN2,itO2,itCO2,itH2O/)
+!   integer            secN(5)
+!   double precision   molN(5)
+!   double precision    muN(5)
+!
+!   double precision MWf,MWo
+!   double precision xi_st
+!
+!   integer sect
+!   double precision cprnow,cvrnow,ERTnow,logT,sum_n,phi
+!
+!   integer i,j
+!
+!   !set MW
+!   MWf=1d-3* MW(iCH4)
+!   MWo=1d-3*(MW(iO2)*etaO2+MW(iN2)*etaN2)
+!
+!   !set xi_st
+!   xi_st=MWf*etaO2/(MWf*etaO2+2d0*MWo)
+!
+!   !set n
+!   nN2  = (1d0-xi)/MWo*etaN2
+!   if(xi > xi_st) then !fuel rich
+!      nO2  = 0d0
+!      nCH4 = (xi*(2d0*MWo+MWf*etaO2)-MWf*etaO2)/(2d0*MWf*MWo)
+!      nCO2 = 0.5d0*(1d0-xi)/MWo*etaO2
+!   else !oxydizer rich
+!      nO2  = (MWf*etaO2-xi*(2d0*MWo+MWf*etaO2))/(MWf*MWo)
+!      nCH4 = 0d0
+!      nCO2 = xi/MWf
+!   end if
+!   nH2O = 2d0*nCO2
+!
+!   molN(1)=nCH4
+!   molN(2)=nN2
+!   molN(3)=nO2
+!   molN(4)=nCO2
+!   molN(5)=nH2O
+!
+!   !calc T
+!   logT=log(T)
+!
+!   ERTnow=0d0
+!   cvrnow=0d0
+!   do i=1,5
+!      call check_section_number(ind(i),T,secN(i))
+!      ERTnow = ERTnow + ert(ind(i),T,logT,secN(i))*molN(i)
+!      cvrnow = cvrnow + cvr(ind(i),T,     secN(i))*molN(i)
+!   end do
+!
+!   sum_n=nCH4+nO2+nN2+nCO2+nH2O
+!   MWave=1d3/sum_n
+!
+!   !calc kappa
+!   cprnow= cvrnow+sum_n
+!   kappa=cprnow/cvrnow
+!   E=ERTnow*Ru*T
+!
+!   !calc mu
+!   do i=1,5
+!      call check_section_number_trans(indt(i),T,sect)
+!      muN(i) = calc_mu(indt(i),T,logT,sect)
+!   end do
+!
+!   mu = 0d0
+!   do i=1,5
+!      denom = 0d0
+!      do j=1,5
+!         phi = 0.25d0 * (1d0+sqrt(muN(i)/muN(j)) * (MW(ind(j)) / MW(ind(i)) )**0.25d0 )**2 &
+!                      * sqrt(2d0 *MW(ind(j))/(MW(ind(i))+MW(ind(j))))
+!         denom = denom + molN(j) * phi
+!      end do
+!      mu = mu + molN(i) * muN(i) / denom
+!   end do
+!   mu = mu * 1d-7
+!end subroutine calc_therm_flame_sheet_boundary!}}}
+!
+!subroutine calc_therm_flame_sheet_inert(xi,E, T, MWave,kappa,mu)!CH4/Air{{{
+!   use chem
+!   use func_therm
+!   double precision,intent(in)::xi
+!   double precision,intent(in)::E
+!   double precision,intent(inout)::T
+!   double precision,intent(out)::MWave
+!   double precision,intent(out)::kappa
+!   double precision,intent(out)::mu
+!
+!   double precision nCH4,nO2,nN2
+!
+!   integer,parameter::iCH4 =7
+!   integer,parameter::iN2  =144
+!   integer,parameter::iO2  =157
+!
+!   integer,parameter::itCH4 =2
+!   integer,parameter::itN2  =19
+!   integer,parameter::itO2  =24
+!
+!   double precision,parameter::etaO2=0.215d0
+!   double precision,parameter::etaN2=1d0-etaO2
+!
+!   integer,parameter:: ind(3) = (/ iCH4, iN2, iO2/)
+!   integer,parameter::indt(3) = (/itCH4,itN2,itO2/)
+!   integer            secN(3)
+!   double precision   molN(3)
+!   double precision    muN(3)
+!
+!   double precision MWf,MWo
+!
+!   double precision T_old
+!
+!   integer sect
+!   double precision cprnow,cvrnow,ERTnow,logT,sum_n,phi
+!
+!   integer,parameter::max_step = 200
+!   integer i,j,k
+!
+!   !set MW
+!   MWf=1d-3* MW(iCH4)
+!   MWo=1d-3*(MW(iO2)*etaO2+MW(iN2)*etaN2)
+!
+!   !set n
+!   nCH4 =      xi /MWf
+!   nO2  = (1d0-xi)/MWo*etaO2
+!   nN2  = (1d0-xi)/MWo*etaN2
+!
+!   molN(1)=nCH4
+!   molN(2)=nN2
+!   molN(3)=nO2
+!
+!   !calc T
+!   logT=log(T)
+!
+!   ERTnow=0d0
+!   cvrnow=0d0
+!   do i=1,3
+!      call check_section_number(ind(i),T,secN(i))
+!      ERTnow = ERTnow + ert(ind(i),T,logT,secN(i))*molN(i)
+!      cvrnow = cvrnow + cvr(ind(i),T,     secN(i))*molN(i)
+!   end do
+!
+!   k=0
+!   T_old = T*0.5d0
+!   do while(abs(E/Ru-ERTnow*T)>cvrnow*1d-10 .and. abs(T-T_old)>1d-8.and. k<max_step)
+!      T_old =T
+!      T     =T+omega*(E/Ru-ERTnow*T)/cvrnow
+!      logT=log(T)
+!
+!      ERTnow=0d0
+!      cvrnow=0d0
+!      do i=1,3
+!         call check_section_number(ind(i),T,secN(i))
+!         ERTnow = ERTnow + ert(ind(i),T,logT,secN(i))*molN(i)
+!         cvrnow = cvrnow + cvr(ind(i),T,     secN(i))*molN(i)
+!      end do
+!      k=k+1
+!   end do
+!
+!   if(k >= max_step) then
+!      print *, "Not Converted at calc_therm_flame_sheet_inert",T
+!      call exit(1)
+!   end if
+!
+!
+!   sum_n=nCH4+nO2+nN2
+!   MWave=1d3/sum_n
+!
+!   !calc kappa
+!   cprnow= cvrnow+sum_n
+!   kappa=cprnow/cvrnow
+!
+!   !calc mu
+!   do i=1,3
+!      call check_section_number_trans(indt(i),T,sect)
+!      muN(i) = calc_mu(indt(i),T,logT,sect)
+!   end do
+!
+!   mu = 0d0
+!   do i=1,3
+!      denom = 0d0
+!      do j=1,3
+!         phi = 0.25d0 * (1d0+sqrt(muN(i)/muN(j)) * (MW(ind(j)) / MW(ind(i)) )**0.25d0 )**2 &
+!                      * sqrt(2d0 *MW(ind(j))/(MW(ind(i))+MW(ind(j))))
+!         denom = denom + molN(j) * phi
+!      end do
+!      mu = mu + molN(i) * muN(i) / denom
+!   end do
+!   mu = mu * 1d-7
+!end subroutine calc_therm_flame_sheet_inert!}}}
+!
+!subroutine calc_therm_flame_sheet_inert_boundary(xi,T, E,MWave,kappa,mu)!CH4/Air{{{
+!   use chem
+!   use func_therm
+!   double precision,intent(in)::xi
+!   double precision,intent(in)::T
+!   double precision,intent(out)::E
+!   double precision,intent(out)::MWave
+!   double precision,intent(out)::kappa
+!   double precision,intent(out)::mu
+!
+!   double precision nCH4,nO2,nN2
+!
+!   integer,parameter::iCH4 =7
+!   integer,parameter::iN2  =144
+!   integer,parameter::iO2  =157
+!
+!   integer,parameter::itCH4 =2
+!   integer,parameter::itN2  =19
+!   integer,parameter::itO2  =24
+!
+!   double precision,parameter::etaO2=0.215d0
+!   double precision,parameter::etaN2=1d0-etaO2
+!
+!   integer,parameter:: ind(3) = (/ iCH4, iN2, iO2/)
+!   integer,parameter::indt(3) = (/itCH4,itN2,itO2/)
+!   integer            secN(3)
+!   double precision   molN(3)
+!   double precision    muN(3)
+!
+!   double precision MWf,MWo
+!   double precision xi_st
+!
+!   integer sect
+!   double precision cprnow,cvrnow,ERTnow,logT,sum_n,phi
+!
+!   integer i,j
+!
+!   !set MW
+!   MWf=1d-3* MW(iCH4)
+!   MWo=1d-3*(MW(iO2)*etaO2+MW(iN2)*etaN2)
+!
+!   !set n
+!   nCH4 =      xi /MWf
+!   nO2  = (1d0-xi)/MWo*etaO2
+!   nN2  = (1d0-xi)/MWo*etaN2
+!
+!   molN(1)=nCH4
+!   molN(2)=nN2
+!   molN(3)=nO2
+!
+!   !calc T
+!   logT=log(T)
+!
+!   ERTnow=0d0
+!   cvrnow=0d0
+!   do i=1,3
+!      call check_section_number(ind(i),T,secN(i))
+!      ERTnow = ERTnow + ert(ind(i),T,logT,secN(i))*molN(i)
+!      cvrnow = cvrnow + cvr(ind(i),T,     secN(i))*molN(i)
+!   end do
+!
+!   sum_n=nCH4+nO2+nN2
+!   MWave=1d3/sum_n
+!
+!   !calc kappa
+!   cprnow= cvrnow+sum_n
+!   kappa=cprnow/cvrnow
+!   E=ERTnow*Ru*T
+!
+!   !calc mu
+!   do i=1,3
+!      call check_section_number_trans(indt(i),T,sect)
+!      muN(i) = calc_mu(indt(i),T,logT,sect)
+!   end do
+!
+!   mu = 0d0
+!   do i=1,3
+!      denom = 0d0
+!      do j=1,3
+!         phi = 0.25d0 * (1d0+sqrt(muN(i)/muN(j)) * (MW(ind(j)) / MW(ind(i)) )**0.25d0 )**2 &
+!                      * sqrt(2d0 *MW(ind(j))/(MW(ind(i))+MW(ind(j))))
+!         denom = denom + molN(j) * phi
+!      end do
+!      mu = mu + molN(i) * muN(i) / denom
+!   end do
+!   mu = mu * 1d-7
+!end subroutine calc_therm_flame_sheet_inert_boundary!}}}
+!!end for CH4/Air!!!!!!!!!!!
 
-   integer,parameter::iCH4 =7
-   integer,parameter::iN2  =144
-   integer,parameter::iO2  =157
-   double precision,parameter::etaO2=0.215d0
-   double precision,parameter::etaN2=1d0-etaO2
-
-   double precision logT
-   integer i
-   integer sCH4,sO2,sN2
-
-   !set mass fraction
-   !g-mol/kg
-   n=0d0
-   n(iCH4) =     xi /MW(iCH4)*1d3 !C3H6
-   n(iO2 ) =(1d0-xi)/(MW(iO2)*etaO2+MW(iN2)*etaN2)*etaO2*1d3 !O2
-   n(iN2 ) =(1d0-xi)/(MW(iO2)*etaO2+MW(iN2)*etaN2)*etaN2*1d3 !O2
-
-   !E
-   logT=log(T)
-   call check_section_number(iCH4,T,sCH4)
-   call check_section_number( iO2,T, sO2)
-   call check_section_number( iN2,T, sN2)
-   E=n(iCH4)*ert(iCH4,T,logT,sCH4)&
-    +n( iO2)*ert( iO2,T,logT, sO2)&
-    +n( iN2)*ert( iN2,T,logT, sN2)
-   E=E*Ru*T
-
-   !MWini
-   MWini=1d3/(n(iCH4)+n(iO2)+n(iN2))
-
-   !b0
-   do i=1,ne
-      b0(i)=Ac(i,iCH4)*n(iCH4)&
-           +Ac(i, iO2)*n( iO2)&
-           +Ac(i, iN2)*n( iN2)
-   end do
-
-   !modification for mathematical stability
-   n=n+initial_eps
-end subroutine calc_initial_prop!}}}
-
-subroutine calc_therm_flame_sheet(xi,E, T, MWave,kappa,mu)!CH4/Air{{{
-   use chem
-   use func_therm
-   double precision,intent(in)::xi
-   double precision,intent(in)::E
-   double precision,intent(inout)::T
-   double precision,intent(out)::MWave
-   double precision,intent(out)::kappa
-   double precision,intent(out)::mu
-
-   double precision nCH4,nO2,nN2
-   double precision nCO2 ,nH2O
-
-   integer,parameter::iCH4 =7
-   integer,parameter::iN2  =144
-   integer,parameter::iO2  =157
-   integer,parameter::iCO2 =13
-   integer,parameter::iH2O =132
-
-   integer,parameter::itCH4 =2
-   integer,parameter::itN2  =19
-   integer,parameter::itO2  =24
-   integer,parameter::itCO2 =5
-   integer,parameter::itH2O =14
-
-   double precision,parameter::etaO2=0.215d0
-   double precision,parameter::etaN2=1d0-etaO2
-
-   integer,parameter:: ind(5) = (/ iCH4, iN2, iO2, iCO2, iH2O/)
-   integer,parameter::indt(5) = (/itCH4,itN2,itO2,itCO2,itH2O/)
-   integer            secN(5)
-   double precision   molN(5)
-   double precision    muN(5)
-
-   double precision MWf,MWo
-   double precision xi_st
-
-   double precision T_old
-
-   integer sect
-   double precision cprnow,cvrnow,ERTnow,logT,sum_n,phi
-
-   integer i,j,k
-
-   !set MW
-   MWf=1d-3* MW(iCH4)
-   MWo=1d-3*(MW(iO2)*etaO2+MW(iN2)*etaN2)
-
-   !set xi_st
-   xi_st=MWf*etaO2/(MWf*etaO2+2d0*MWo)
-
-   !set n
-   nN2  = (1d0-xi)/MWo*etaN2
-   if(xi > xi_st) then !fuel rich
-      nO2  = 0d0
-      nCH4 = (xi*(2d0*MWo+MWf*etaO2)-MWf*etaO2)/(2d0*MWf*MWo)
-      nCO2 = 0.5d0*(1d0-xi)/MWo*etaO2
-   else !oxydizer rich
-      nO2  = (MWf*etaO2-xi*(2d0*MWo+MWf*etaO2))/(MWf*MWo)
-      nCH4 = 0d0
-      nCO2 = xi/MWf
-   end if
-   nH2O = 2d0*nCO2
-
-   molN(1)=nCH4
-   molN(2)=nN2
-   molN(3)=nO2
-   molN(4)=nCO2
-   molN(5)=nH2O
-
-   !calc T
-   logT=log(T)
-
-   ERTnow=0d0
-   cvrnow=0d0
-   do i=1,5
-      call check_section_number(ind(i),T,secN(i))
-      ERTnow = ERTnow + ert(ind(i),T,logT,secN(i))*molN(i)
-      cvrnow = cvrnow + cvr(ind(i),T,     secN(i))*molN(i)
-   end do
-
-   k=0
-   T_old = T*0.5d0
-   do while(abs(E/Ru-ERTnow*T)>cvrnow*1d-10 .and. abs(T-T_old)>1d-8 .and. k<100)
-      T_old =T
-      T     =T+omega*(E/Ru-ERTnow*T)/cvrnow
-      logT=log(T)
-
-      ERTnow=0d0
-      cvrnow=0d0
-      do i=1,5
-         call check_section_number(ind(i),T,secN(i))
-         ERTnow = ERTnow + ert(ind(i),T,logT,secN(i))*molN(i)
-         cvrnow = cvrnow + cvr(ind(i),T,     secN(i))*molN(i)
-      end do
-      k=k+1
-   end do
-
-   if(k >= 100) then
-      print *, "Not Converted at calc_therm_flame_sheet"
-      !call exit(1)
-   end if
-
-
-   sum_n=nCH4+nO2+nN2+nCO2+nH2O
-   MWave=1d3/sum_n
-
-   !calc kappa
-   cprnow= cvrnow+sum_n
-   kappa=cprnow/cvrnow
-
-   !calc mu
-   do i=1,5
-      call check_section_number_trans(indt(i),T,sect)
-      muN(i) = calc_mu(indt(i),T,logT,sect)
-   end do
-
-   mu = 0d0
-   do i=1,5
-      denom = 0d0
-      do j=1,5
-         phi = 0.25d0 * (1d0+sqrt(muN(i)/muN(j)) * (MW(ind(j)) / MW(ind(i)) )**0.25d0 )**2 &
-                      * sqrt(2d0 *MW(ind(j))/(MW(ind(i))+MW(ind(j))))
-         denom = denom + molN(j) * phi
-      end do
-      mu = mu + molN(i) * muN(i) / denom
-   end do
-   mu = mu * 1d-7
-end subroutine calc_therm_flame_sheet!}}}
-
-subroutine calc_therm_flame_sheet_boundary(xi,T, E,MWave,kappa,mu)!CH4/Air{{{
-   use chem
-   use func_therm
-   double precision,intent(in)::xi
-   double precision,intent(in)::T
-   double precision,intent(out)::E
-   double precision,intent(out)::MWave
-   double precision,intent(out)::kappa
-   double precision,intent(out)::mu
-
-   double precision nCH4,nO2,nN2
-   double precision nCO2 ,nH2O
-
-   integer,parameter::iCH4 =7
-   integer,parameter::iN2  =144
-   integer,parameter::iO2  =157
-   integer,parameter::iCO2 =13
-   integer,parameter::iH2O =132
-
-   integer,parameter::itCH4 =2
-   integer,parameter::itN2  =19
-   integer,parameter::itO2  =24
-   integer,parameter::itCO2 =5
-   integer,parameter::itH2O =14
-
-   double precision,parameter::etaO2=0.215d0
-   double precision,parameter::etaN2=1d0-etaO2
-
-   integer,parameter:: ind(5) = (/ iCH4, iN2, iO2, iCO2, iH2O/)
-   integer,parameter::indt(5) = (/itCH4,itN2,itO2,itCO2,itH2O/)
-   integer            secN(5)
-   double precision   molN(5)
-   double precision    muN(5)
-
-   double precision MWf,MWo
-   double precision xi_st
-
-   integer sect
-   double precision cprnow,cvrnow,ERTnow,logT,sum_n,phi
-
-   integer i,j
-
-   !set MW
-   MWf=1d-3* MW(iCH4)
-   MWo=1d-3*(MW(iO2)*etaO2+MW(iN2)*etaN2)
-
-   !set xi_st
-   xi_st=MWf*etaO2/(MWf*etaO2+2d0*MWo)
-
-   !set n
-   nN2  = (1d0-xi)/MWo*etaN2
-   if(xi > xi_st) then !fuel rich
-      nO2  = 0d0
-      nCH4 = (xi*(2d0*MWo+MWf*etaO2)-MWf*etaO2)/(2d0*MWf*MWo)
-      nCO2 = 0.5d0*(1d0-xi)/MWo*etaO2
-   else !oxydizer rich
-      nO2  = (MWf*etaO2-xi*(2d0*MWo+MWf*etaO2))/(MWf*MWo)
-      nCH4 = 0d0
-      nCO2 = xi/MWf
-   end if
-   nH2O = 2d0*nCO2
-
-   molN(1)=nCH4
-   molN(2)=nN2
-   molN(3)=nO2
-   molN(4)=nCO2
-   molN(5)=nH2O
-
-   !calc T
-   logT=log(T)
-
-   ERTnow=0d0
-   cvrnow=0d0
-   do i=1,5
-      call check_section_number(ind(i),T,secN(i))
-      ERTnow = ERTnow + ert(ind(i),T,logT,secN(i))*molN(i)
-      cvrnow = cvrnow + cvr(ind(i),T,     secN(i))*molN(i)
-   end do
-
-   sum_n=nCH4+nO2+nN2+nCO2+nH2O
-   MWave=1d3/sum_n
-
-   !calc kappa
-   cprnow= cvrnow+sum_n
-   kappa=cprnow/cvrnow
-   E=ERTnow*Ru*T
-
-   !calc mu
-   do i=1,5
-      call check_section_number_trans(indt(i),T,sect)
-      muN(i) = calc_mu(indt(i),T,logT,sect)
-   end do
-
-   mu = 0d0
-   do i=1,5
-      denom = 0d0
-      do j=1,5
-         phi = 0.25d0 * (1d0+sqrt(muN(i)/muN(j)) * (MW(ind(j)) / MW(ind(i)) )**0.25d0 )**2 &
-                      * sqrt(2d0 *MW(ind(j))/(MW(ind(i))+MW(ind(j))))
-         denom = denom + molN(j) * phi
-      end do
-      mu = mu + molN(i) * muN(i) / denom
-   end do
-   mu = mu * 1d-7
-end subroutine calc_therm_flame_sheet_boundary!}}}
-
-subroutine calc_therm_flame_sheet_inert(xi,E, T, MWave,kappa,mu)!CH4/Air{{{
-   use chem
-   use func_therm
-   double precision,intent(in)::xi
-   double precision,intent(in)::E
-   double precision,intent(inout)::T
-   double precision,intent(out)::MWave
-   double precision,intent(out)::kappa
-   double precision,intent(out)::mu
-
-   double precision nCH4,nO2,nN2
-
-   integer,parameter::iCH4 =7
-   integer,parameter::iN2  =144
-   integer,parameter::iO2  =157
-
-   integer,parameter::itCH4 =2
-   integer,parameter::itN2  =19
-   integer,parameter::itO2  =24
-
-   double precision,parameter::etaO2=0.215d0
-   double precision,parameter::etaN2=1d0-etaO2
-
-   integer,parameter:: ind(3) = (/ iCH4, iN2, iO2/)
-   integer,parameter::indt(3) = (/itCH4,itN2,itO2/)
-   integer            secN(3)
-   double precision   molN(3)
-   double precision    muN(3)
-
-   double precision MWf,MWo
-
-   double precision T_old
-
-   integer sect
-   double precision cprnow,cvrnow,ERTnow,logT,sum_n,phi
-
-   integer,parameter::max_step = 200
-   integer i,j,k
-
-   !set MW
-   MWf=1d-3* MW(iCH4)
-   MWo=1d-3*(MW(iO2)*etaO2+MW(iN2)*etaN2)
-
-   !set n
-   nCH4 =      xi /MWf
-   nO2  = (1d0-xi)/MWo*etaO2
-   nN2  = (1d0-xi)/MWo*etaN2
-
-   molN(1)=nCH4
-   molN(2)=nN2
-   molN(3)=nO2
-
-   !calc T
-   logT=log(T)
-
-   ERTnow=0d0
-   cvrnow=0d0
-   do i=1,3
-      call check_section_number(ind(i),T,secN(i))
-      ERTnow = ERTnow + ert(ind(i),T,logT,secN(i))*molN(i)
-      cvrnow = cvrnow + cvr(ind(i),T,     secN(i))*molN(i)
-   end do
-
-   k=0
-   T_old = T*0.5d0
-   do while(abs(E/Ru-ERTnow*T)>cvrnow*1d-10 .and. abs(T-T_old)>1d-8.and. k<max_step)
-      T_old =T
-      T     =T+omega*(E/Ru-ERTnow*T)/cvrnow
-      logT=log(T)
-
-      ERTnow=0d0
-      cvrnow=0d0
-      do i=1,3
-         call check_section_number(ind(i),T,secN(i))
-         ERTnow = ERTnow + ert(ind(i),T,logT,secN(i))*molN(i)
-         cvrnow = cvrnow + cvr(ind(i),T,     secN(i))*molN(i)
-      end do
-      k=k+1
-   end do
-
-   if(k >= max_step) then
-      print *, "Not Converted at calc_therm_flame_sheet_inert",T
-      call exit(1)
-   end if
-
-
-   sum_n=nCH4+nO2+nN2
-   MWave=1d3/sum_n
-
-   !calc kappa
-   cprnow= cvrnow+sum_n
-   kappa=cprnow/cvrnow
-
-   !calc mu
-   do i=1,3
-      call check_section_number_trans(indt(i),T,sect)
-      muN(i) = calc_mu(indt(i),T,logT,sect)
-   end do
-
-   mu = 0d0
-   do i=1,3
-      denom = 0d0
-      do j=1,3
-         phi = 0.25d0 * (1d0+sqrt(muN(i)/muN(j)) * (MW(ind(j)) / MW(ind(i)) )**0.25d0 )**2 &
-                      * sqrt(2d0 *MW(ind(j))/(MW(ind(i))+MW(ind(j))))
-         denom = denom + molN(j) * phi
-      end do
-      mu = mu + molN(i) * muN(i) / denom
-   end do
-   mu = mu * 1d-7
-end subroutine calc_therm_flame_sheet_inert!}}}
-
-subroutine calc_therm_flame_sheet_inert_boundary(xi,T, E,MWave,kappa,mu)!CH4/Air{{{
-   use chem
-   use func_therm
-   double precision,intent(in)::xi
-   double precision,intent(in)::T
-   double precision,intent(out)::E
-   double precision,intent(out)::MWave
-   double precision,intent(out)::kappa
-   double precision,intent(out)::mu
-
-   double precision nCH4,nO2,nN2
-
-   integer,parameter::iCH4 =7
-   integer,parameter::iN2  =144
-   integer,parameter::iO2  =157
-
-   integer,parameter::itCH4 =2
-   integer,parameter::itN2  =19
-   integer,parameter::itO2  =24
-
-   double precision,parameter::etaO2=0.215d0
-   double precision,parameter::etaN2=1d0-etaO2
-
-   integer,parameter:: ind(3) = (/ iCH4, iN2, iO2/)
-   integer,parameter::indt(3) = (/itCH4,itN2,itO2/)
-   integer            secN(3)
-   double precision   molN(3)
-   double precision    muN(3)
-
-   double precision MWf,MWo
-   double precision xi_st
-
-   integer sect
-   double precision cprnow,cvrnow,ERTnow,logT,sum_n,phi
-
-   integer i,j
-
-   !set MW
-   MWf=1d-3* MW(iCH4)
-   MWo=1d-3*(MW(iO2)*etaO2+MW(iN2)*etaN2)
-
-   !set n
-   nCH4 =      xi /MWf
-   nO2  = (1d0-xi)/MWo*etaO2
-   nN2  = (1d0-xi)/MWo*etaN2
-
-   molN(1)=nCH4
-   molN(2)=nN2
-   molN(3)=nO2
-
-   !calc T
-   logT=log(T)
-
-   ERTnow=0d0
-   cvrnow=0d0
-   do i=1,3
-      call check_section_number(ind(i),T,secN(i))
-      ERTnow = ERTnow + ert(ind(i),T,logT,secN(i))*molN(i)
-      cvrnow = cvrnow + cvr(ind(i),T,     secN(i))*molN(i)
-   end do
-
-   sum_n=nCH4+nO2+nN2
-   MWave=1d3/sum_n
-
-   !calc kappa
-   cprnow= cvrnow+sum_n
-   kappa=cprnow/cvrnow
-   E=ERTnow*Ru*T
-
-   !calc mu
-   do i=1,3
-      call check_section_number_trans(indt(i),T,sect)
-      muN(i) = calc_mu(indt(i),T,logT,sect)
-   end do
-
-   mu = 0d0
-   do i=1,3
-      denom = 0d0
-      do j=1,3
-         phi = 0.25d0 * (1d0+sqrt(muN(i)/muN(j)) * (MW(ind(j)) / MW(ind(i)) )**0.25d0 )**2 &
-                      * sqrt(2d0 *MW(ind(j))/(MW(ind(i))+MW(ind(j))))
-         denom = denom + molN(j) * phi
-      end do
-      mu = mu + molN(i) * muN(i) / denom
-   end do
-   mu = mu * 1d-7
-end subroutine calc_therm_flame_sheet_inert_boundary!}}}
-!end for CH4/Air!!!!!!!!!!!
-
-!for Air!!!!!!!!!!!!!!!!!!!
-subroutine calc_therm_air(E, T, MWave,kappa,mu)!Air{{{
-   use chem
-   use func_therm
-   double precision,intent(in)::E
-   double precision,intent(inout)::T
-   double precision,intent(out)::MWave
-   double precision,intent(out)::kappa
-   double precision,intent(out)::mu
-
-   double precision nO2,nN2
-
-   integer,parameter::iN2  =144
-   integer,parameter::iO2  =157
-
-   integer,parameter::itN2  =52
-   integer,parameter::itO2  =59
-
-   double precision,parameter::etaO2=0.215d0
-   double precision,parameter::etaN2=1d0-etaO2
-
-   integer,parameter:: ind(2) = (/ iN2, iO2/)
-   integer,parameter::indt(2) = (/itN2,itO2/)
-   integer            secN(2)
-   double precision   molN(2)
-   double precision    muN(2)
-
-   double precision MWo
-
-   double precision T_old
-
-   integer sect
-   double precision cprnow,cvrnow,ERTnow,logT,sum_n,phi
-
-   integer i,j,k
-
-   !set MW
-   MWo=1d-3*(MW(iO2)*etaO2+MW(iN2)*etaN2)
-
-   !set n
-   nN2  = etaN2/MWo
-   nO2  = etaO2/MWo
-
-   molN(1)=nN2
-   molN(2)=nO2
-
-   !calc T
-   logT=log(T)
-
-   ERTnow=0d0
-   cvrnow=0d0
-   do i=1,2
-      call check_section_number(ind(i),T,secN(i))
-      ERTnow = ERTnow + ert(ind(i),T,logT,secN(i))*molN(i)
-      cvrnow = cvrnow + cvr(ind(i),T,     secN(i))*molN(i)
-   end do
-
-   k=0
-   T_old = T*0.5d0
-   do while(abs(E/Ru-ERTnow*T)>cvrnow*1d-10 .and. log(T-T_old)>1d-8.and. k<50)
-      T_old =T
-      T     =T+omega*(E/Ru-ERTnow*T)/cvrnow
-      if(T<0d0) then
-         print *,"Negative Temperature at calc_therm_air. T=",T,"T_old=",T_old
-         call exit(1)
-      end if
-      logT=log(T)
-
-      ERTnow=0d0
-      cvrnow=0d0
-      do i=1,2
-         call check_section_number(ind(i),T,secN(i))
-         ERTnow = ERTnow + ert(ind(i),T,logT,secN(i))*molN(i)
-         cvrnow = cvrnow + cvr(ind(i),T,     secN(i))*molN(i)
-      end do
-      k=k+1
-   end do
-
-   if(k >= 50) then
-      print *, "Not Converted at calc_therm_flame_sheet"
-      call exit(1)
-   end if
-
-
-   sum_n=nO2+nN2
-   MWave=1d3/sum_n
-
-   !calc kappa
-   cprnow= cvrnow+sum_n
-   kappa=cprnow/cvrnow
-
-   !calc mu
-   do i=1,2
-      call check_section_number_trans(indt(i),T,sect)
-      muN(i) = calc_mu(indt(i),T,logT,sect)
-   end do
-
-   mu = 0d0
-   do i=1,2
-      denom = 0d0
-      do j=1,2
-         phi = 0.25d0 * (1d0+sqrt(muN(i)/muN(j)) * (MW(ind(j)) / MW(ind(i)) )**0.25d0 )**2 &
-                      * sqrt(2d0 *MW(ind(j))/(MW(ind(i))+MW(ind(j))))
-         denom = denom + molN(j) * phi
-      end do
-      mu = mu + molN(i) * muN(i) / denom
-   end do
-   mu = mu * 1d-7
-end subroutine calc_therm_air!}}}
-!end for Air!!!!!!!!!!!!!!!
