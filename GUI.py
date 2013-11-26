@@ -32,8 +32,8 @@ def data_set():
 	datOption.append([["specific heat ratio","1.4"],\
 			["gas constant (J/kg/K)","287"],\
 			["coefficient of kinematic viscosity (m^2/s)","1.6e-5"]])
-	datOption.append([["Number of Elements","1"],["Number of Reactions","1"]])
-	datOption.append([["Number of Elements","1"],["Number of Reactions","1"]])
+	datOption.append([])
+	datOption.append([])
 
 	NG.append([[-1],[-1, 0, 4,-1,-1,-1]])
 	NG.append([[-1],[-1, 1, 5,-1,-1,-1]])
