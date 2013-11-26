@@ -6,7 +6,8 @@ module variable
    double precision    w(1:dimw,-1:nimax+2,-1:njmax+2,Nplane)
 
    double precision      DHi(nY, 1:nimax,   1:njmax  ,Nplane)
-   double precision      vhi(nY,-1:nimax+2,-1:njmax+2,Nplane)
+   double precision       Yv(nV,-1:nimax+2,-1:njmax+2,Nplane)
+   double precision      vhi(nV,-1:nimax+2,-1:njmax+2,Nplane)
 
    double precision wHli(1:dimw,   0:nimax,   1:njmax,Nplane)
    double precision wHri(1:dimw,   0:nimax,   1:njmax,Nplane)

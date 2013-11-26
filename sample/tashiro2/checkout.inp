@@ -1,5 +1,4 @@
 grid file name    : type1_vis_otsu.x #Grid file name (*.x)
-nY                : 1  #The number of gas types
 NumOfProcessors   : 30 #The Maximum Number of Processors @ M-System[Super Computer] / 0 @ Personal Computer
 dimension         : 1  #two dimension(0) / axi-symmetry(1)
 time step         : 1  #global(0)/local(1)

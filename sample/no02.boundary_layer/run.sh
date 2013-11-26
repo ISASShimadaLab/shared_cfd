@@ -4,11 +4,11 @@ origin="sample/no02.boundary_layer"
 
 # move input file and checkout
 cp $origin/checkout.inp .
+cp $origin/chem.inp .
 cp $origin/*.x .
 ./checkout.py
 
 # move necessary input files
-cp $origin/chem.inp checkout/
 
 cp $origin/control_chem.inp checkout/
 rm checkout/control_chem.raw.inp

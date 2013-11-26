@@ -2,11 +2,12 @@ module const_chem
    implicit none
    integer,parameter::ne=3 !the number of elements
    integer,parameter::ns=4 !the number of species
+   integer,parameter::nv=3 !the number for enthalpy diffusion
 
    double precision,parameter::Ru         = 8.3144621d0 !universal gas constant
    double precision,parameter::pst        = 1d5         !standard state pressure
-   double precision,parameter::omega      = 0.1d0       !relaxation factor
-   double precision,parameter::eps        = 1d-6        !epsilon for convergence
+   double precision,parameter::omega      = 0.5d0       !relaxation factor
+   double precision,parameter::eps        = 1d-8        !epsilon for convergence
    double precision,parameter::n_eps      = 1d-20       !epsilon for mol/kg
    double precision,parameter::initial_eps= 1d-5        !epsilon for initial mole/mass fraction
    double precision,parameter::TSIZE      = 1d-11
@@ -47,6 +48,7 @@ module chem_var
    double precision b0o(1:ne)
    double precision no(1:ns)
 
+   !for flame sheet model
    double precision np(1:ns)
    double precision of
 end module chem_var

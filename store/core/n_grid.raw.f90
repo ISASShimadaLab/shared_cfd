@@ -7,6 +7,7 @@ module grbl_prmtr
    integer,parameter::nimax=NIMAX
    integer,parameter::njmax=NJMAX
    integer,parameter::nY=NumY
+   integer,parameter::nV=NV
    character*100,parameter::file_coordinate="grid/GridFileName"
    !!!! ABOVE ARE USER DEFINISIONS !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 

@@ -105,9 +105,8 @@ fcontrol  = open("checkout/control.raw.inp","w")
 ### CORE PARTS ###
 engage("core")
 
-# process n_grid.f90
+# read grid file
 filename = read_control_next(fp)
-
 fgrid = open(filename,'r')
 Nplane = int(fgrid.readline().strip().split().pop())
 nijk=[]
@@ -127,16 +126,7 @@ for i in range(Nplane):
 	nijk.append(nijk_mono)
 fgrid.close()
 os.system("cp "+filename+" checkout/grid/")
-nY  = read_control_next(fp)
-fromto = [\
-	["NPLANE",str(Nplane)],\
-	["NumI",nijk_str[0][1:]],\
-	["NumJ",nijk_str[1][1:]],\
-	["NIMAX",str(nijk_max[0])],\
-	["NJMAX",str(nijk_max[1])],\
-	["NumY",nY],\
-	["GridFileName",os.path.basename(filename)]]
-raw2pro("checkout/n_grid.raw.f90","checkout/n_grid.f90",fromto)
+
 ####################################################################################
 print "***architecture***"
 val = read_control_next_int(fp)
@@ -177,7 +167,7 @@ else:
 
 print "***generation of condition.raw.f90***"
 import checkout.gen_cond
-checkout.gen_cond.gen_cond(os.path.basename(filename))
+checkout.gen_cond.gen_cond(filename)
 print "\tDone."
 
 ####################################################################################
@@ -272,15 +262,13 @@ else:
 
 ####################################################################################
 print "***viscosity***"
-val = read_control_next_int(fp)
-if(val == 0):
+val_vis = read_control_next_int(fp)
+if(val_vis == 0):
 	print "\tnon-viscous flow is selected."
-	engage("viscosity/non-viscous")
-elif(val == 1):
+elif(val_vis == 1):
 	print "\tviscous flow is selected."
-	engage("viscosity/viscous/"+DIMENSION)
 else:
-	print "\tOdd Input at viscosity! value is ",val
+	print "\tOdd Input at viscosity! value is ",val_vis
 	sys.exit(1)
 
 ####################################################################################
@@ -297,6 +285,9 @@ if(val == 0):
 		["RGAS"  ,val[1]],\
 		["NU"    ,val[2]]]
 	raw2pro("checkout/thermal_model.raw.f90","checkout/thermal_model.f90",fromto)
+	ABOUTNV="no-nV"
+	nV  = 1
+	nY  = 1
 elif(val == 1 or val == 2):
 	if(val == 1) :
 		print "\tCold Flow using chemical kinetics database is selected."
@@ -311,16 +302,28 @@ elif(val == 1 or val == 2):
 
 
 	# process mod_chem.f90
-	val = read_control_next_split(fp,2,"thermal model")
+	os.system("cp chem.inp checkout/")
+	import checkout.ckinterp
+	val = checkout.ckinterp.ckinterp()
+	val = map(str,val)
+	val[2]=max(val[2],1)
 	fromto = [ \
 		["NumOfElements " ,val[0]],\
-		["NumOfSpecies  " ,nY],\
-		["NumOfReactions" ,val[1]]]
+		["NumOfSpecies  " ,val[1]],\
+		["NumOfReactions" ,val[2]]]
 	raw2pro("checkout/mod_chem.raw.f90","checkout/mod_chem.f90",fromto)
+	nY  = val[1]
+	nV  = val[1]
+	ABOUTNV="no-nV"
 else:
 	print "\tOdd Input at thermal model! value is ",val
 	sys.exit(1)
 
+#viscosity selection
+if(val_vis == 0):
+	engage("viscosity/non-viscous")
+elif(val_vis == 1):
+	engage("viscosity/viscous/"+ABOUTNV+"/"+DIMENSION)
 
 ####################################################################################
 # close checkout.inp
@@ -328,6 +331,18 @@ fp.close()
 
 # close control.raw.inp
 fcontrol.close()
+
+# generate n_grid.f90
+fromto = [\
+	["NPLANE",str(Nplane)],\
+	["NumI",nijk_str[0][1:]],\
+	["NumJ",nijk_str[1][1:]],\
+	["NIMAX",str(nijk_max[0])],\
+	["NJMAX",str(nijk_max[1])],\
+	["NumY",str(nY)],\
+	["NV",  str(nV)],\
+	["GridFileName",os.path.basename(filename)]]
+raw2pro("checkout/n_grid.raw.f90","checkout/n_grid.f90",fromto)
 
 # generate Makefile
 fMakefile = open("checkout/Makefile","w")

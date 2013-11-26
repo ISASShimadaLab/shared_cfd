@@ -9,11 +9,6 @@ def data_set():
 
 	[datTC,datRA,datOption]=[[],[],[]]
 
-	datTC.append([	"The number of gas types",\
-			"",\
-			"1",\
-			"nY                : ",\
-			"  #The number of gas types"])
 	datTC.append([	"Maximum Number of Processors",\
 			"0 @ Personal Computer",\
 			"0",\
@@ -40,12 +35,12 @@ def data_set():
 	datOption.append([["Number of Elements","1"],["Number of Reactions","1"]])
 	datOption.append([["Number of Elements","1"],["Number of Reactions","1"]])
 
-	NG.append([[-1,-1],[-1, 0, 4,-1,-1,-1]])
-	NG.append([[-1,-1],[-1, 1, 5,-1,-1,-1]])
-	NG.append([[-1,-1],[ 1,-1, 5,-1,-1,-1]])
-	NG.append([[-1,-1],[-1, 0, 6,-1,-1,-1]])
-	NG.append([[ 1,-1],[-1,-1,-1,-1,-1, 0]])
-	NG.append([[-1,-1],[-1, 1,-1,-1,-1, 2]])
+	NG.append([[-1],[-1, 0, 4,-1,-1,-1]])
+	NG.append([[-1],[-1, 1, 5,-1,-1,-1]])
+	NG.append([[-1],[ 1,-1, 5,-1,-1,-1]])
+	NG.append([[-1],[-1, 0, 6,-1,-1,-1]])
+	NG.append([[-1],[-1,-1,-1,-1,-1, 0]])
+	NG.append([[-1],[-1, 1,-1,-1,-1, 2]])
 
 class OptionPanel:
 	inphead = "ParametersForAbove: "
