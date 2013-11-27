@@ -17,7 +17,6 @@ subroutine check_section_number(T,sec)!{{{
       end if
    end do
 end subroutine check_section_number!}}}
-
 subroutine set_coeff_less(T,logT,chrt,ccpr)!{{{
    use const_chem
    use chem
@@ -48,7 +47,6 @@ subroutine set_coeff_less(T,logT,chrt,ccpr)!{{{
    ccpr( 5)=T4
    ccpr( 6)=0d0
 end subroutine set_coeff_less!}}}
-
 subroutine set_coeff(T,logT,cmurt,chrt,ccpr)!{{{
    use const_chem
    use chem
@@ -90,7 +88,6 @@ subroutine set_coeff(T,logT,cmurt,chrt,ccpr)!{{{
    ccpr( 6)=0d0
    ccpr( 7)=0d0
 end subroutine set_coeff!}}}
-
 subroutine set_coeff_more(T,logT,cmurt,chrt,ccpr,cdmurt,cdcpr)!{{{
    use const_chem
    use chem
@@ -151,7 +148,6 @@ subroutine set_coeff_more(T,logT,cmurt,chrt,ccpr,cdmurt,cdcpr)!{{{
    cdcpr( 6)=0d0
    cdcpr( 7)=0d0
 end subroutine set_coeff_more!}}}
-
 subroutine check_section_number_trans(T,sec)!{{{
    use const_chem
    use chem
@@ -175,7 +171,6 @@ subroutine check_section_number_trans(T,sec)!{{{
       if(sec(i) .eq. -1) sec(i)=num_sctn_trans(i)
    end do
 end subroutine check_section_number_trans!}}}
-
 subroutine set_coeff_mu(T,logT,cmu)!{{{
    implicit none
    double precision,intent(in)::T
@@ -191,7 +186,6 @@ subroutine set_coeff_mu(T,logT,cmu)!{{{
    cmu(4)=1d0
 end subroutine set_coeff_mu!}}}
 end module func_therm
-
 
 ! data_read routines
 subroutine set_reac_and_therm_data!{{{
@@ -1275,6 +1269,412 @@ subroutine Jex(neq_outer, tt, n, ML, MU, dndn, nrpd, rpar, ipar)!{{{
    !   end do
    !end do
 end subroutine Jex!}}}
+
+!read control.inp
+subroutine read_chemkin_parameter!{{{
+   use chem
+   use mod_mpi
+   use chem_var
+   implicit none
+
+   if(myid .eq. 0) then
+      open(8,file="control_chem.inp")
+      read(8,'()')
+      read(8,'(25x,i10)')    ns_tocalc
+      close(8)
+
+      !!! adjust data !!!
+      select case(ns_tocalc)
+         case(:-1)
+            ns_tocalc = ns
+         case(0,ns+1:)
+            print *,"Odd Number to calculation at flame sheet. : value = ",ns_tocalc
+            stop
+      end select
+   end if
+
+   !print *,"ns_tocalc = ",ns_tocalc
+
+   !!! MPI COMMUNICATIONS
+   call MPI_Bcast(ns_tocalc,1,          MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
+end subroutine read_chemkin_parameter!}}}
+subroutine read_fo_composition!{{{
+   use chem
+   use mod_mpi
+   use chem_var
+   implicit none
+   character*100 buf,buf2
+   double precision amount
+   integer ind
+
+   double precision DHit(nY)
+   integer i
+
+   if(myid .eq. 0) then
+      vrhoo =1d-20
+      vrhof =1d-20
+
+      open(8,file="control_chem.inp")
+      read(8,'()')
+      read(8,'()')
+      read(8,'(25x,es15.7)') po
+      read(8,'(25x,es15.7)') To
+      read(8,'()')
+      do
+         read(8,'(a)') buf
+         if(buf(1:3) .eq. 'end') exit
+         buf=adjustl(trim(buf)) !delete front and back spaces
+         ind=index(buf,' ')
+         if(ind .eq. 0) stop "Bad format at control_chem.inp while reading Oxygen Compositions"
+         read(buf(ind+1:),*) amount
+         vrhoo(search_species(buf(1:ind-1))) = amount
+      end do
+      read(8,'(25x,es15.7)') pf
+      read(8,'(25x,es15.7)') Tf
+      read(8,'()')
+      do
+         read(8,'(a)') buf
+         if(buf(1:3) .eq. 'end') exit
+         buf=adjustl(trim(buf)) !delete front and back spaces
+         ind=index(buf,' ')
+         if(ind .eq. 0) stop "Bad format at control_chem.inp while reading Fuel Compositions"
+         read(buf(ind+1:),*) amount
+         vrhof(search_species(buf(1:ind-1))) = amount
+      end do
+      close(8)
+   end if
+
+   !print *,"ns_tocalc = ",ns_tocalc
+
+   !!! MPI COMMUNICATIONS
+   call MPI_Bcast(po,       1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
+   call MPI_Bcast(To,       1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
+   call MPI_Bcast(vrhoo,   ns, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
+
+   call MPI_Bcast(pf,       1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
+   call MPI_Bcast(Tf,       1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
+   call MPI_Bcast(vrhof,   ns, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
+
+
+   !!! calculate other properties for oxygen and fuel
+   call rho_rel2abs(po,To, vrhoo, rhoo,Eo)
+   call calc_T(vrhoo,rhoo,Eo, To, kappao,MWo,DHit,vhio,muo)
+   vwo(1:nY) = vrhoo(1:nY)/rhoo
+
+   call rho_rel2abs(pf,Tf, vrhof, rhof,Ef)
+   call calc_T(vrhof,rhof,Ef, Tf, kappaf,MWf,DHit,vhif,muf)
+   vwf(1:nY) = vrhof(1:nY)/rhof
+contains
+   integer function search_species(str)
+      use chem
+      character(*),intent(in)::str
+      integer i
+   
+      do i=1,ns_tocalc
+         if(trim(SYM_SPC(i)) .eq. trim(str)) then
+            search_species=i
+            return
+         end if
+      end do
+      search_species=-1
+   end function search_species
+end subroutine read_fo_composition!}}}
+
+! flame sheet model
+subroutine calc_T(vrho,rho,E, T, kappa,MWave,DHi,vhi,mu)!{{{
+   use const_chem
+   use chem
+   use func_therm
+   implicit none
+   double precision,intent(in)::vrho(ns_tocalc)
+   double precision,intent(in)::rho
+   double precision,intent(in)::E
+   double precision,intent(inout)::T
+   double precision,intent(out)::kappa
+   double precision,intent(out)::MWave
+   double precision,intent(out)::DHi(ns)
+   double precision,intent(out)::vhi(ns)
+   double precision,intent(out)::mu
+
+   double precision n(ns_tocalc)
+
+   double precision Eobj,Enow,cvnow,de,dcv,dh,dT
+   double precision sn,tmp
+   double precision,dimension(6)::chrt,ccpr
+   double precision,dimension(4)::cmu
+   integer sec(ns)
+
+   double precision muN(nt),denom,phi
+   integer it,jt
+
+   integer,parameter::max_T_loop=1000
+   double precision,parameter::omega=1d-2
+
+   integer i,j,k
+
+   !vrho to n
+   tmp = rho * 1d-11
+   do j=1,ns_tocalc
+      if(vrho(j)>tmp) then
+         n(j)=vrho(j)*invMW(j)*1d-3
+      else
+         n(j)=0d0
+      end if
+   end do
+
+   !temperature determination iteration
+   Eobj = E*1d1*rho/Ru
+   k=1
+   do
+      call check_section_number(T,sec)
+      call set_coeff_less(T,log(T),chrt,ccpr)
+      Enow  = 0d0
+      cvnow = 0d0
+      do j=1,ns_tocalc
+         if(n(j)>0d0) then
+            de  = -1d0
+            dcv = -1d0
+            do i=1,6
+               de =de +coeff(i,sec(j),j)*chrt(i)
+               dcv=dcv+coeff(i,sec(j),j)*ccpr(i)
+            end do
+            Enow =Enow +de *n(j)
+            cvnow=cvnow+dcv*n(j)
+         end if
+      end do
+      dT=(Eobj-Enow*T)/cvnow
+      if(abs(dT)<1d-8 .or. (abs(dT)<1d-4 .and. abs(T-1d3) < 1d-4) .or. k>max_T_loop) exit
+      T=max(100d0,T+dT)
+      k=k+1
+   end do
+
+   !error detection of temperature determination iteration
+   if(k>max_T_loop) then
+      print '(a)',"Error: Exceed max_T_loop at temperature determination iteration"
+      print '(a,es15.7)',"T=",T
+      call exit(1)
+   end if
+
+   !specific heat ratio calculation
+   sn=0d0
+   do j=1,ns_tocalc
+      sn=sn+n(j)
+   end do
+   kappa=1d0+sn/cvnow
+
+   !calc molecular weight
+   MWave=rho/sn*1d-3
+
+   !calc DH
+   tmp=Ru*1d-4*T
+   do j=1,ns
+      dh= 0d0
+      do i=1,6
+         dh =dh +coeff(i,sec(j),j)*chrt(i)
+      end do
+      DHi(j)=tmp*invMW(j)*(kappa-(kappa-1d0)*dh)
+      vhi(j)=tmp*invMW(j)*dh
+   end do
+
+   !calc mu
+   call check_section_number_trans(T,sec)
+   call set_coeff_mu(T,log(T),cmu)
+   do i=1,nt
+      if(n(tr2th(i))>0d0) then
+         tmp=0d0
+         do j=1,4
+            tmp=tmp+cmu(j)*trans(j,sec(i),i)
+         end do
+         muN(i) = exp(tmp)
+      else
+         muN(i) = 0d0
+      end if
+   end do
+
+   mu = 0d0
+   do i=1,nt
+      if(muN(i)>0d0) then
+         it=tr2th(i)
+         denom = 0d0
+         do j=1,nt
+            if(muN(j)>0d0) then
+               jt=tr2th(j)
+               phi = 0.25d0 * (1d0+sqrt(muN(i)/muN(j)) * (MWs(jt) / MWs(it) )**0.25d0 )**2 &
+                            * sqrt(2d0 *MWs(jt)/(MWs(it)+MWs(jt)))
+               denom = denom + n(jt) * phi
+            end if
+         end do
+         mu = mu + n(it) * muN(i) / denom
+      end if
+   end do
+   mu = mu * 1d-7
+
+   !debug print
+   !print '(a10, i15)',  "N itr=",k
+   !print '(a10, f15.7)',"T=",T
+   !print '(a10,es15.7)',"kappa=",kappa
+   !print '(a10, f15.7)',"MWave=",MWave
+   !print '(a10,es15.7)',"DH N2=",DHi(2)
+   !print '(a10,es15.7)',"DH O2=",DHi(3)
+   !print '(a10, f15.7)',"mu(mP)=",mu*1d4
+   !print '(a10, f15.7)',"mu N2(mP)=",muN(10)*1d-3
+   !print '(a10, f15.7)',"mu O2(mP)=",muN(13)*1d-3
+end subroutine calc_T!}}}
+
+! reaction
+subroutine reaction(T,vrho,tout)!{{{
+   use const_chem
+   use chem
+   implicit none
+   double precision,intent(in)::T
+   double precision,intent(inout)::vrho(ns)
+   double precision,intent(in)::tout
+
+   double precision n(ns+1)
+   double precision tt
+
+   integer istate
+   double precision,save::RWORK(LRW)
+   integer         ,save::IWORK(LIW)
+   !$omp threadprivate(RWORK,IWORK)
+   integer          neq
+   double precision rtol,atol
+   integer          ipar(1)
+   double precision rpar(1)
+   external Fex,Jex
+
+   integer,parameter::itol   =1  ! scalar atol
+   integer,parameter::itask  =1  ! normal output
+   integer,parameter::iopt   =0  ! optional input off
+   integer,parameter::mf     =21 ! full matrix and direct jac.
+   !integer,parameter::mf     =22 ! full matrix and non-direct jac.
+
+   integer num_recalc,j
+
+   !vrho to n
+   do j=1,ns
+      n(j)=vrho(j)*invMW(j)*1d-3
+      n(j) = max(n(j),1d-20)
+   end do
+
+   if(T < 0d0) then
+      print *,"negative temperature=",T
+      call exit(0)
+   end if
+
+   if(tout < 0d0) then
+      print *,"negative dt=",tout
+      call exit(0)
+   end if
+
+   !set parameters
+   n(ns+1)= T
+   tt          = 0d0
+   istate      = 1
+   neq         = ns+1
+   rtol        = 1d-10
+   atol        = 0d0
+   num_recalc  = 0
+
+   do
+      call dvode (Fex, neq, n(1:ns+1), tt, tout, itol, rtol, atol, itask,  &
+                  istate, iopt, rwork, lrw, iwork, liw, jex, mf,&
+                  rpar, ipar)
+
+      if(istate > 0) then
+         exit
+      else if(istate < 0) then
+         istate = 1
+         atol=1d-12
+         num_recalc = num_recalc+1
+         if(num_recalc>max_recalc) then
+            print *,"Exceed max_recalc=",max_recalc," istate = ",istate
+            call exit(1)
+         end if
+      else
+         print *,"istate number =",istate
+         call exit(1)
+      end if
+   end do
+
+   !!set T
+   !T=n(ns+1)
+
+   !n to vrho
+   do j=1,ns
+      n(j) = max(n(j),1d-20)
+      vrho(j)=n(j)*MWs(j)*1d3
+   end do
+end subroutine reaction!}}}
+
+!initial condition
+subroutine calc_vrho(p,T,deg, rho,vrho,E)!{{{
+   use const_chem
+   use chem
+   use chem_var
+   use func_therm
+   implicit none
+   double precision,intent(in)::p
+   double precision,intent(in)::T
+   double precision,intent(in)::deg
+   double precision,intent(out)::rho
+   double precision,intent(out)::vrho(ns)
+   double precision,intent(out)::E
+
+   vrho = rhof * deg + rhoo*(1d0-deg)
+
+   call rho_rel2abs(p,T, vrho, rho,E)
+end subroutine calc_vrho!}}}
+subroutine rho_rel2abs(p,T, vrho, rho,E)!{{{
+   use const_chem
+   use chem
+   use func_therm
+   implicit none
+   double precision,intent(in)::p
+   double precision,intent(in)::T
+   double precision,intent(inout)::vrho(ns)
+   double precision,intent(out)::rho
+   double precision,intent(out)::E
+
+   double precision n(ns)
+   double precision,dimension(7)::cmurt,chrt,ccpr
+ 
+   double precision dh,tmp
+   integer i,j
+   integer sec(ns)
+
+   !vrho to n
+   do j=1,ns
+      n(j)=vrho(j)*invMW(j)
+   end do
+
+   !calc n
+   tmp=sum(n,1)*Ru*T
+   tmp=p*1d1/tmp
+   n  =n*tmp
+
+   !calc rho
+   rho=dot_product(n,MWs(1:ns))
+   !convert unit from g/cm^3 to kg/m^3
+   rho=rho*1d3
+
+   !calc vrho
+   do j=1,ns
+      vrho(j)=n(j)*MWs(j)*1d3
+   end do
+
+   call check_section_number(T,sec)
+   call set_coeff(T,log(T),cmurt,chrt,ccpr)
+   E = 0d0
+   do j=1,ns
+      dh= 0d0
+      do i=1,7
+         dh=dh+coeff(i,sec(j),j)*chrt(i)
+      end do
+      E=E+(dh-1d0)*n(j)
+   end do
+   E=E*Ru*T/rho/1d1
+end subroutine rho_rel2abs!}}}
 
 !!for post process
 !calculate dTdt

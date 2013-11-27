@@ -1,5 +1,7 @@
 #!/usr/bin/python
 import sys
+DIR = "checkout_chem/"
+#DIR = ""
 
 ######################## CLASSES ##################################################
 class SPCelm:
@@ -48,7 +50,7 @@ class CONTROL:
 	
 ######################## FUNCTIONS ################################################
 def read_thermo():
-	fp = open("thermo.inp")
+	fp = open(DIR+"thermo.inp")
 	while True:
 		if fp.readline()[:1] != '!': break
 	fp.readline()
@@ -73,34 +75,50 @@ def read_thermo():
 	fp.close()
 	return SPClist
 
-def read_control_chem():
-	fp = open("control_chem.inp")
+def read_control_chem(var,fp):
+	fo = open(DIR+"control_chem.raw.inp","w")
 
-	for i in range(4): fp.readline()
+	fo.write("#Control parameters for chemistry\n")
+
+	fo.write("Oxygen Pressure(Pa)     : 1.e5\n")
+	fo.write("Oxygen Temperature(K)   : 300.\n")
+	line  = fp.readline()
+	fo.write(line)
 	fuel = {}
 	while True:
-		line = fp.readline().strip()
+		line  = fp.readline()
+		fo.write(line)
+		line = line.strip()
 		if(line == 'end'):break
 		[key,val] = line.split()
 		fuel[key] = float(val)
 
-	for i in range(3): fp.readline()
+	fo.write("Fuel Pressure(Pa)       : 1.e5\n")
+	fo.write("Fuel Temperature(K)     : 300.\n")
+	line  = fp.readline()
+	fo.write(line)
 	oxid = {}
 	while True:
-		line = fp.readline().strip()
+		line  = fp.readline()
+		fo.write(line)
+		line = line.strip()
 		if(line == 'end'):break
 		[key,val] = line.split()
 		oxid[key] = float(val)
 
-	fp.readline()
 	prod = {}
-	while True:
-		line = fp.readline().strip()
-		if(line == 'end'):break
-		[key,val] = line.split()
-		prod[key] = float(val)
+	if var==0:
+		line  = fp.readline()
+		fo.write(line)
+		while True:
+			line  = fp.readline()
+			fo.write(line)
+			line = line.strip()
+			if(line == 'end'):break
+			[key,val] = line.split()
+			prod[key] = float(val)
 
-	fp.close()
+	fo.close()
 	return CONTROL(fuel,oxid,prod)
 
 def fetch_elm_info(SPClist,control):
@@ -123,26 +141,42 @@ def trimSPC(SPClist,elements):
 		if flag: trimed.append(SPC.name)
 	return trimed
 
-def out_arr(filename,arr):
-	fp = open(filename,"w")
-	for var in arr:fp.write(var+"\n")
-	fp.close()
-	return len(arr)
+def out_chem(ELM,SPC):
+	fp = open(DIR+"chem.inp","w")
 
+	fp.write("elements\n")
+	line=""
+	for i,var in enumerate(ELM):
+		line += " "+var.strip()
+		if len(line)>50 or i+1 == len(ELM):
+			fp.write(line+"\n")
+			line=""
+	fp.write("end\n")
+
+	fp.write("species\n")
+	line=""
+	for i,var in enumerate(SPC):
+		line += " "+var.strip()
+		if len(line)>50 or i+1 == len(SPC):
+			fp.write(line+"\n")
+			line=""
+	fp.write("end\n")
+
+	fp.write("thermo\n")
+	fp.write("end\n")
+	fp.write("reactions cal/mole  moles\n")
+	fp.write("end\n")
+
+	fp.close()
 ######################## MAIN ################################################
-def preCEA(var):
+def preCEA(var,fp):
 	SPClist = read_thermo()
-	control = read_control_chem()
+	control = read_control_chem(var,fp)
 	control = fetch_elm_info(SPClist,control)
 	if var ==0:
 		control.check_consistency()
 		trimedSPC = control.species
 	else:
 		trimedSPC = trimSPC(SPClist,control.elements)
-	numelm = out_arr("elements_to_use.inp",control.elements)
-	numspc = out_arr("species_to_use.inp", trimedSPC)
-	return [numelm,numspc]
-
-if __name__ == "__main__":
-	var = 0 #0:flamesheet, 1: CEA
-	print preCEA(var)
+	numelm = out_chem(control.elements,trimedSPC)
+	return [len(control.elements),len(trimedSPC)]

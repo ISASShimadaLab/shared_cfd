@@ -24,14 +24,18 @@ def data_set():
 	datRA.append(["high order scheme",("Up Wind","MUSCL"),"high order scheme : ","  #Up Wind(0)/MUSCL(1)"])
 	datRA.append(["viscosity",("non-viscous flow","viscous flow"),"viscosity         : ",\
 			"  #non-viscous flow(0)/viscous flow(1)"])
-	datRA.append(["thermal model",("Ideal Gas",\
-			"Cold Flow by chemical kinetics D.B.",\
-			"Chemical Kinetics Model"),"thermal model     : ",\
-			"  #Ideal Gas(0)/Cold flow using chemical kinetics database(1) / Chemical Kinetics Model(2)"])
+	datRA.append(["thermal model",(
+				"Ideal Gas",\
+				"Cold Flow by chemical kinetics D.B.",\
+				"Chemical Kinetics Model",\
+				"Flame Sheet Model"),\
+			"thermal model     : ",\
+			"  #Ideal Gas(0)/Cold flow using chemical kinetics database(1) / Chemical Kinetics Model(2) / Flame Sheet Model(3)"])
 
 	datOption.append([["specific heat ratio","1.4"],\
 			["gas constant (J/kg/K)","287"],\
 			["coefficient of kinematic viscosity (m^2/s)","1.6e-5"]])
+	datOption.append([])
 	datOption.append([])
 	datOption.append([])
 

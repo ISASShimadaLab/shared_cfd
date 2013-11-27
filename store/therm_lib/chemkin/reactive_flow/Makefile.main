@@ -1,0 +1,2 @@
+thermal_model.o:  thermal_model.f90 sub_chem.o prmtr.o variable.o $(arc)
+	$(compiler) -c $<
