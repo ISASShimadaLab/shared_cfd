@@ -14,4 +14,5 @@ remove:
 tar:
 	tar cvf  result.tar result/*.bin geometry.bin RMS.dat
 	gzip -f result.tar
-
+pack:
+	tar czvf pack.tar.gz *

@@ -1,8 +1,8 @@
 #Control parameters for chemistry
 NumToCalcAtFlameSheet   : -1
-Oxygen Pressure(Pa)     : 1.e5
-Oxygen Temperature(K)   : 300.
-Oxygen Composition(mass ratio):
+Oxidizer Pressure(Pa)     : 1.e5
+Oxidizer Temperature(K)   : 300.
+Oxidizer Composition(mass ratio):
 O2 1
 N2 1
 end

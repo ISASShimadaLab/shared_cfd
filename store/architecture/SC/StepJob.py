@@ -10,7 +10,7 @@ else:
 
 for var in range(num):
 	os.system("""
-./mpirun.sh <<'''
+sh mpirun.sh <<'''
 
 '''
 """)

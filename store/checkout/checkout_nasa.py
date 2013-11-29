@@ -21,6 +21,7 @@ def checkout_nasa():
 	
 	### CORE PARTS ###
 	engage("chem_drive","checkout_chem",arr_engage)
+	os.system("cp store/core/n_grid.raw.f90 checkout_chem/")
 	
 	####################################################################################
 	print "***architecture***"
@@ -33,7 +34,7 @@ def checkout_nasa():
 	if(val == 0):
 		print "\tflame sheet model is selected."
 		engage("therm_lib/NASA/core","checkout_chem",arr_engage)
-		engage("therm_lib/NASA/flame_sheet","checkout_chem",arr_engage)
+		engage("therm_lib/NASA/driver","checkout_chem",arr_engage)
 	
 		# process mod_chem.f90
 		import preCEA
@@ -42,7 +43,7 @@ def checkout_nasa():
 		fromto = [ \
 			["NE",val[0]],\
 			["NS",val[1]]]
-		raw2pro("checkout/mod_chem.raw.f90","checkout/mod_chem.f90",fromto)
+		raw2pro("checkout_chem/mod_chem.raw.f90","checkout_chem/mod_chem.f90",fromto)
 		nY  = 2
 		nV  = 3
 		ABOUTNV="with-nV"

@@ -1,26 +1,71 @@
 ! read data files
-subroutine read_elmspc_to_use!{{{
+subroutine read_cheminp!{{{
    use mod_mpi
    use chem
    implicit none
+   character*200 bufnext,line
    integer i
 
    if(myid .eq. 0) then
-      open(22,file='elements_to_use.inp')
-      do i=1,ne
-         read(22,'(a2)') SYM_ELM(i)
-      end do
-      close(22)
+      open(22,file="chem.inp")
+      bufnext="" !initialize bufnext
 
-      open(22,file='species_to_use.inp')
-      do i=1,ns
-         read(22,'(a18)') SYM_SPC(i)
+      !elements
+      line=next_line()
+      i=0
+      do
+         line=next_word()
+         if(trim(line) .eq. "end") exit
+         i=i+1
+         SYM_ELM(i)=trim(line)
       end do
+
+      !species
+      line=next_line()
+      ns=0
+      do
+         line=next_word()
+         if(trim(line) .eq. "end") exit
+         ns=ns+1
+         SYM_SPC(ns)=trim(line)
+      end do
+
       close(22)
    end if
+   call MPI_Bcast(      ns,       1,          MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
    call MPI_Bcast( SYM_SPC,   ns*18,        MPI_CHARACTER, 0, MPI_COMM_WORLD, ierr)
    call MPI_Bcast( SYM_ELM,    ne*2,        MPI_CHARACTER, 0, MPI_COMM_WORLD, ierr)
-end subroutine read_elmspc_to_use!}}}
+contains
+character*200 function next_word()
+   implicit none
+   integer ind
+   if(bufnext .eq. "") bufnext=next_line()
+   ind = index(bufnext,' ')
+   if(ind == 0) then
+      next_word=bufnext
+      bufnext=""
+   else
+      next_word=bufnext(:ind-1)
+      bufnext=trim(adjustl(bufnext(ind:)))
+   end if
+end function next_word
+character*200 function next_line()
+   implicit none
+   integer ind
+   do while(bufnext .eq. "")
+      read(22,'(a)') bufnext
+      bufnext=trim(adjustl(bufnext))
+      ind = index(bufnext,'!')
+      if(ind == 1) then
+         bufnext=""
+      else if(ind > 1) then
+         bufnext=bufnext(:ind-1)
+      end if
+   end do
+   next_line=bufnext
+   bufnext=""
+end function next_line
+end subroutine read_cheminp!}}}
 subroutine set_therm_data!{{{
    use mod_mpi
    use chem
@@ -196,7 +241,7 @@ subroutine read_fo_composition!{{{
          read(8,'(a)') buf
          if(buf(1:3) .eq. 'end') exit
          buf=adjustl(trim(buf));ind=index(buf,' ')
-         if(ind .eq. 0) stop "Bad format at control_chem.inp while reading Oxygen Compositions"
+         if(ind .eq. 0) stop "Bad format at control_chem.inp while reading Oxidizer Compositions"
          read(buf(ind+1:),*) amount
          no(search_species(buf(1:ind-1)))=amount
       end do
@@ -291,11 +336,21 @@ integer function search_species_trans(str)!{{{
 end function search_species_trans!}}}
 
 !flame sheet
+subroutine init_pack_flame_sheet!{{{
+   call read_cheminp
+   call set_therm_data
+   call set_trans_data
+   call read_fo_composition
+   call read_p_composition
+
+   call initialize_flame_sheet
+end subroutine init_pack_flame_sheet!}}}
 subroutine initialize_flame_sheet!{{{
    use chem
    use chem_var
    implicit none
    double precision sumo,sumf,sm
+   double precision Y(2),DHi(2)
    integer j
 
    !set o/f ratio
@@ -308,8 +363,17 @@ subroutine initialize_flame_sheet!{{{
    of = sumo/sumf
 
    !calc n,E
-   call calc_ini(po,To, no, Eo)
+   Y(1)=1d0;Y(2)=0d0
    call calc_ini(pf,Tf, nf, Ef)
+   call flame_sheet(Y,Ef,Tf, MWf,kappaf,muf,DHi,Yvf,vhif)
+   rhof=pf/(Ru*1d3/MWf*Tf)
+   call set_static_qw(pf,rhof,Tf,Ef,kappaf,muf,Y,qf,wf)
+
+   Y(1)=0d0;Y(2)=1d0
+   call calc_ini(po,To, no, Eo)
+   call flame_sheet(Y,Eo,To, MWo,kappao,muo,DHi,Yvo,vhio)
+   rhoo=po/(Ru*1d3/MWo*To)
+   call set_static_qw(po,rhoo,To,Eo,kappao,muo,Y,qo,wo)
  
    sm=0d0
    do j=1,ns
@@ -350,6 +414,35 @@ contains
       end do
       E=E*Ru*T
    end subroutine calc_ini
+   subroutine set_static_qw(p,rho,T,E,kappa,mu,Y,q_local,w_local)
+      implicit none
+      double precision,intent(in)::p
+      double precision,intent(in)::rho
+      double precision,intent(in)::T
+      double precision,intent(in)::E
+      double precision,intent(in)::kappa
+      double precision,intent(in)::mu
+      double precision,intent(in)::Y(nY)
+      double precision,intent(out)::q_local(dimq)
+      double precision,intent(out)::w_local(dimw)
+      integer i
+      do i=1,nY
+         q_local(i)   = Y(i)*rho
+         w_local(i+4) = Y(i)
+      end do
+      q_local(nY+1)=0d0
+      q_local(nY+2)=0d0
+      q_local(nY+3)=rho*E
+
+      w_local(1)=rho
+      w_local(2)=0d0
+      w_local(3)=0d0
+      w_local(4)=p
+      w_local(indxg )=kappa
+      w_local(indxht)=E+p/rho
+      w_local(indxR )=p/(rho*T)
+      w_local(indxMu)=mu
+   end subroutine set_static_qw
 end subroutine initialize_flame_sheet!}}}
 subroutine flame_sheet(Y,E, T, MWave,kappa,mu,DHi,Yv,vhi)!{{{
    use chem
@@ -864,7 +957,7 @@ end subroutine calc_therm!}}}
 !      nO2  = 0d0
 !      nCH4 = (xi*(2d0*MWo+MWf*etaO2)-MWf*etaO2)/(2d0*MWf*MWo)
 !      nCO2 = 0.5d0*(1d0-xi)/MWo*etaO2
-!   else !oxydizer rich
+!   else !oxidizer rich
 !      nO2  = (MWf*etaO2-xi*(2d0*MWo+MWf*etaO2))/(MWf*MWo)
 !      nCH4 = 0d0
 !      nCO2 = xi/MWf

@@ -60,7 +60,7 @@ subroutine set_TGv!{{{
    implicit none
    double precision mu,k_heat
    double precision,dimension(dimq)::Ev,Fv
-   double precision,dimension(dimw)::dwdxi,dwdeta
+   double precision,dimension(dimw)::dwdxi,dwdeta,dwdx,dwdr
    double precision,dimension(nV)::dYvdxi,dYvdeta
    double precision,dimension(0:nimax+1,0:njmax+1)::Tdeg
    double precision dudxi,dudeta

@@ -2,7 +2,7 @@
 import os
 from mod_cond import *
 
-def out_cond(toSetManually,MaxMPIcomm):
+def out_cond(toSetManually,MaxMPIcomm,ABOUTNV):
 	os.system("cat checkout/condition.head.f90 >  checkout/condition.raw.f90")
 	fp = open("checkout/condition.raw.f90",'a')
 	
@@ -34,11 +34,16 @@ def out_cond(toSetManually,MaxMPIcomm):
 	         fp.write("""
             do j=max(%5i,nys(plane)),min(nye(plane),%5i)
                !w(:,   0,j,plane) =
-               !vhi(:, 0,j,plane) =
+               !vhi(:, 0,j,plane) =""" % tuple(arr))
+		 if ABOUTNV == "with-nV": fp.write("""
+               !Yv(:,  0,j,plane) =""")
+		 fp.write("""
                !w(:,  -1,j,plane) =
-               !vhi(:,-1,j,plane) =
-            end do""" % tuple(arr))
-	      fp.write("""
+               !vhi(:,-1,j,plane) =""")
+		 if ABOUTNV == "with-nV": fp.write("""
+               !Yv(:, -1,j,plane) =""")
+	         fp.write("""
+            end do
          end if\n""")
 	   # i=ni/2
 	   b_list=tsmp.pop(0)
@@ -50,11 +55,16 @@ def out_cond(toSetManually,MaxMPIcomm):
 	         fp.write("""
             do j=max(%5i,nys(plane)),min(nye(plane),%5i)
                !w(:,  ni(plane)+1,j,plane) =
-               !vhi(:,ni(plane)+1,j,plane) =
+               !vhi(:,ni(plane)+1,j,plane) =""" % tuple(arr))
+		 if ABOUTNV == "with-nV": fp.write("""
+               !Yv(:, ni(plane)+1,j,plane) =""")
+		 fp.write("""
                !w(:,  ni(plane)+2,j,plane) =
-               !vhi(:,ni(plane)+2,j,plane) =
-            end do""" % tuple(arr))
-	      fp.write("""
+               !vhi(:,ni(plane)+2,j,plane) =""")
+		 if ABOUTNV == "with-nV": fp.write("""
+               !Yv(:, ni(plane)+2,j,plane) =""")
+	         fp.write("""
+            end do
          end if""")
 	fp.write("""
       end select
@@ -85,11 +95,16 @@ def out_cond(toSetManually,MaxMPIcomm):
 	         fp.write("""
             do i=max(%5i,nxs(plane)),min(nxe(plane),%5i)
                !w(:,  i, 0,plane) =
-               !vhi(:,i, 0,plane) =
+               !vhi(:,i, 0,plane) =""" % tuple(arr))
+		 if ABOUTNV == "with-nV": fp.write("""
+               !Yv(:, i, 0,plane) =""")
+	         fp.write("""
                !w(:,  i,-1,plane) =
-               !vhi(:,i,-1,plane) =
-            end do""" % tuple(arr))
-	      fp.write("""
+               !vhi(:,i,-1,plane) =""")
+		 if ABOUTNV == "with-nV": fp.write("""
+               !Yv(:, i,-1,plane) =""")
+	         fp.write("""
+            end do
          end if\n""")
 	   # i=ni/2
 	   b_list=tsmp.pop(0)
@@ -101,11 +116,16 @@ def out_cond(toSetManually,MaxMPIcomm):
 	         fp.write("""
             do i=max(%5i,nxs(plane)),min(nxe(plane),%5i)
                !w(:,  i,nj(plane)+1,plane) =
-               !vhi(:,i,nj(plane)+1,plane) =
+               !vhi(:,i,nj(plane)+1,plane) =""" % tuple(arr))
+		 if ABOUTNV == "with-nV": fp.write("""
+               !Yv(:, i,nj(plane)+1,plane) =""")
+	         fp.write("""
                !w(:,  i,nj(plane)+2,plane) =
-               !vhi(:,i,nj(plane)+2,plane) =
-            end do""" % tuple(arr))
-	      fp.write("""
+               !vhi(:,i,nj(plane)+2,plane) =""")
+		 if ABOUTNV == "with-nV": fp.write("""
+               !Yv(:, i,nj(plane)+2,plane) =""")
+	         fp.write("""
+            end do
          end if""")
 	fp.write("""
       end select

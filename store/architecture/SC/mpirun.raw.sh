@@ -6,7 +6,7 @@ qsub <<!QSUB
 #@\$-r share_code
 #@\$-lP Nproc
 #@\$-lm 5gb
-#@\$-cp 300
+#@\$-cp 600
 #@\$-x
 #@\$-mb -me
 #@\$

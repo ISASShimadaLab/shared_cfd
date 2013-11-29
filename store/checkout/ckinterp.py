@@ -1,6 +1,11 @@
 #!/usr/bin/python
 import sys
+import os
 def ckinterp(): 
+	if not os.path.exists("chem.inp"):
+		print "Can't find 'chem.inp'. Please try again."
+		sys.exit(1)
+
 	fp = open("chem.inp")
 	#element
 	ELM=[]

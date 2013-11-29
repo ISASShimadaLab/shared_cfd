@@ -1,0 +1,6 @@
+driver : driver.f90 $(core) $(arc) $(thermalmodel)
+	$(compiler) -o $@ $^
+
+clean:
+	rm -rf driver *.mod *.o *.dat *.eps *.vtk *.bin temp.* result/*.*
+

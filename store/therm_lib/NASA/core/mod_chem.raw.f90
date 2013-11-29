@@ -38,17 +38,21 @@ module chem_var
    use grbl_prmtr
    use const_chem
    implicit none
-   double precision n_save(1:max_ns,1:ni,1:nj)
+   double precision n_save(max_ns,nimax,njmax,Nplane)
 
+   double precision qf(dimq),wf(dimw)
    double precision rhof,pf,Tf,Ef,MWf,kappaf,muf
-   double precision b0f(1:ne)
-   double precision nf(1:max_ns)
+   double precision Yvf(nV),vhif(nV)
+   double precision b0f(ne)
+   double precision nf(max_ns)
 
+   double precision qo(dimq),wo(dimw)
    double precision rhoo,po,To,Eo,MWo,kappao,muo
-   double precision b0o(1:ne)
-   double precision no(1:max_ns)
+   double precision Yvo(nV),vhio(nV)
+   double precision b0o(ne)
+   double precision no(max_ns)
 
    !for flame sheet model
-   double precision np(1:max_ns)
+   double precision np(max_ns)
    double precision of
 end module chem_var

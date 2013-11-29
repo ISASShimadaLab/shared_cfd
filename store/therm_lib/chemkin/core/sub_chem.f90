@@ -1325,7 +1325,7 @@ subroutine read_fo_composition!{{{
          if(buf(1:3) .eq. 'end') exit
          buf=adjustl(trim(buf)) !delete front and back spaces
          ind=index(buf,' ')
-         if(ind .eq. 0) stop "Bad format at control_chem.inp while reading Oxygen Compositions"
+         if(ind .eq. 0) stop "Bad format at control_chem.inp while reading Oxidizer Compositions"
          read(buf(ind+1:),*) amount
          vrhoo(search_species(buf(1:ind-1))) = amount
       end do
@@ -1356,7 +1356,7 @@ subroutine read_fo_composition!{{{
    call MPI_Bcast(vrhof,   ns, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
 
 
-   !!! calculate other properties for oxygen and fuel
+   !!! calculate other properties for oxidizer and fuel
    call rho_rel2abs(po,To, vrhoo, rhoo,Eo)
    call calc_T(vrhoo,rhoo,Eo, To, kappao,MWo,DHit,vhio,muo)
    vwo(1:nY) = vrhoo(1:nY)/rhoo

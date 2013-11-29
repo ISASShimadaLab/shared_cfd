@@ -99,12 +99,6 @@ def checkout_flow():
 	else:
 		print "\tOdd Input at architecture! value is ",val
 		sys.exit(1)
-	
-	print "***generation of condition.raw.f90***"
-	import checkout.gen_cond
-	checkout.gen_cond.gen_cond(filename)
-	print "\tDone."
-	
 	####################################################################################
 	print "***dimension***"
 	val = read_control_next_int(fp)
@@ -234,7 +228,11 @@ def checkout_flow():
 				print "Error : Chemical Kinetics Model cannot be used at local time step."
 				sys.exit(1)
 			engage("therm_lib/chemkin/reactive_flow","checkout",arr_engage)
+
 		# process mod_chem.f90
+		if not os.path.exists("chem.inp"):
+			print "ERROR:Can't find 'chem.inp'. Please try again."
+			sys.exit(1)
 		os.system("cp chem.inp checkout/")
 		import store.checkout.ckinterp
 		val = store.checkout.ckinterp.ckinterp()
@@ -255,9 +253,12 @@ def checkout_flow():
 		engage("therm_lib/NASA/flame_sheet","checkout",arr_engage)
 	
 		# process mod_chem.f90
-		os.system("cp control_chem.inp checkout/")
-		import checkout.preCEA
-		val = checkout.preCEA.preCEA(0)
+		if not os.path.exists("chem.inp"):
+			print "ERROR:Can't find 'chem.inp'. Please try again."
+			sys.exit(1)
+		os.system("cp chem.inp checkout/")
+		import store.checkout.ckinterp
+		val = store.checkout.ckinterp.ckinterp()
 		val = map(str,val)
 		fromto = [ \
 			["NE",val[0]],\
@@ -279,6 +280,14 @@ def checkout_flow():
 	elif(val_vis == 1):
 		engage("viscosity/viscous/"+ABOUTNV+"/"+DIMENSION,"checkout",arr_engage)
 	
+	# generation of condition.raw.f90
+	print "***generation of condition.raw.f90***"
+	engage("cond/core","checkout",arr_engage)
+	engage("cond/"+ABOUTNV,"checkout",arr_engage)
+	import checkout.gen_cond
+	checkout.gen_cond.gen_cond(filename,ABOUTNV)
+	print "\tDone."
+
 	#expand variables
 	part_control         = arr_engage[0][1]
 	part_Makefile_main   = arr_engage[1][1]

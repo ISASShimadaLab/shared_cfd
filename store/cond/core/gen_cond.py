@@ -6,7 +6,7 @@ from fetchMPI import *
 from out_cond import *
 import os
 
-def gen_cond(filename):
+def gen_cond(filename,ABOUTNV):
 	[Nplane,nijk,BD] = read_plot3d(filename)
 	
 	touch = set_touch(BD)
@@ -18,6 +18,6 @@ def gen_cond(filename):
 	MaxMPIcomm = out_MPI(MPIcomm,nijk,Nproc)
 	out_cut(touch,nijk,Nproc)
 	
-	out_cond(toSetManually,MaxMPIcomm)
+	out_cond(toSetManually,MaxMPIcomm,ABOUTNV)
 	os.system('rm -f checkout/condition.head.f90 checkout/condition.tail.f90 checkout/fetchMPI.py checkout/mod_cond.py checkout/out_cond.py checkout/read_plot3d.py checkout/set_cond_var.py')
 

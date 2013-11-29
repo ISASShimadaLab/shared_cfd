@@ -1,6 +1,8 @@
+all: driver
+
 #dummy
-n_grid_dummy.o: n_grid_dummy.f90
+n_grid.o: n_grid.f90
 	$(compiler) -c $<
-mod_mpi_dummy.o: mod_mpi_dummy.f90 n_grid_dummy.o
+mod_mpi_dummy.o: mod_mpi_dummy.f90 n_grid.o
 	$(compiler) -c $<
 
