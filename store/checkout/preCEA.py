@@ -80,8 +80,8 @@ def read_control_chem(var,fp):
 
 	fo.write("#Control parameters for chemistry\n")
 
-	fo.write("Oxidizer Pressure(Pa)     : 1.e5\n")
-	fo.write("Oxidizer Temperature(K)   : 300.\n")
+	fo.write("Oxidizer Pressure(Pa)   : 1.e5\n")
+	fo.write("Oxidizer Temperature(K) : 300.\n")
 	line  = fp.readline()
 	fo.write(line)
 	fuel = {}

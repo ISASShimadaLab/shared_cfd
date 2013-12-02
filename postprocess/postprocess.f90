@@ -13,10 +13,11 @@ program main
    use to_vis
    implicit none
    double precision,dimension(     0:nimax+1,0:njmax+1,     Nplane)::xh,rh
-   double precision,dimension(dimq,0:nimax+1,0:njmax+1,     Nplane)::q,qh
+   double precision,dimension(dimq,0:nimax+1,0:njmax+1,     Nplane)::q
    double precision,dimension(     0:nimax+1,0:njmax+1,     Nplane)::rho_mat,T_mat,u_mat,v_mat,p_mat
    double precision,dimension(     0:nimax+1,0:njmax+1,     Nplane)::M_mat,R_gas,gmma,w_res,ei_mat,MW_mat
    double precision,dimension(     0:nimax+1,0:njmax+1,dimq,Nplane)::w_mat
+   !double precision,dimension(     0:nimax+1,0:njmax+1,   2,Nplane)::debug
    double precision rho,u,v,T
    integer nx_bin,ny_bin,step_bin
    integer i,j,k,plane
@@ -55,28 +56,21 @@ program main
       read(55) ((((q(i,j,k,plane),i=1,dimq),R_gas(j,k,plane),gmma(j,k,plane),p_mat(j,k,plane),j=0,ni(plane)+1),k=0,nj(plane)+1),plane=1,Nplane)
       close(55)
 
-      !calc qh
-      do plane=1,Nplane
-         do j=0,nj(plane)
-            do i=0,ni(plane)
-               qh(:,i,j,plane)=1d0/4d0*(q(:,i  ,j  ,plane)&
-                                       +q(:,i  ,j+1,plane)&
-                                       +q(:,i+1,j  ,plane)&
-                                       +q(:,i+1,j+1,plane))
-            end do
-         end do
-      end do
+      !!read q binary
+      !open(55,file=trim(dirname)//trim(filename)//".debug.bin",form="unformatted")
+      !read(55) ((((debug(j,k,i,plane),i=1,2),j=0,ni(plane)+1),k=0,nj(plane)+1),plane=1,Nplane)
+      !close(55)
 
       !Process data
       do plane=1,Nplane
-         do j=0,nj(plane)
-            do i=0,ni(plane)
+         do j=0,nj(plane)+1
+            do i=0,ni(plane)+1
                rho=0d0
                do k=1,nY
-                  rho=rho+qh(k,i,j,plane)
+                  rho=rho+q(k,i,j,plane)
                end do
-               u  =qh(nY+1,i,j,plane)/rho
-               v  =qh(nY+2,i,j,plane)/rho
+               u  =q(nY+1,i,j,plane)/rho
+               v  =q(nY+2,i,j,plane)/rho
                T  =p_mat( i,j,plane)/rho/R_gas(i,j,plane)
 
                rho_mat(i,j,plane)=rho
@@ -84,18 +78,38 @@ program main
                  u_mat(i,j,plane)=u
                  v_mat(i,j,plane)=v
                  M_mat(i,j,plane)=sqrt((u**2+v**2) / (gmma(i,j,plane)*p_mat(i,j,plane)/rho))
-                ei_mat(i,j,plane)=qh(nY+3,i,j,plane)/rho -0.5d0*(u**2+v**2)
+                ei_mat(i,j,plane)=q(nY+3,i,j,plane)/rho -0.5d0*(u**2+v**2)
                 MW_mat(i,j,plane)=R_uni/R_gas(i,j,plane)
 
                w_res(i,j,plane)=0d0
                do k=1,nY
-                  w_mat(i,j,k,plane)=qh(k,i,j,plane)/rho
+                  w_mat(i,j,k,plane)=q(k,i,j,plane)/rho
                   if(k>3) then
                      w_res(i,j,plane)=w_res(i,j,plane)+w_mat(i,j,k,plane)
                   end if
                end do
             end do
          end do
+      end do
+
+      !calc half values
+      do plane=1,Nplane
+         call center_to_grid(plane,rho_mat(:,:,plane))
+         call center_to_grid(plane,u_mat(:,:,plane))
+         call center_to_grid(plane,v_mat(:,:,plane))
+         call center_to_grid(plane,p_mat(:,:,plane))
+         call center_to_grid(plane,gmma(:,:,plane))
+         call center_to_grid(plane,u_mat(:,:,plane))
+         call center_to_grid(plane,v_mat(:,:,plane))
+         call center_to_grid(plane,T_mat(:,:,plane))
+         call center_to_grid(plane,MW_mat(:,:,plane))
+         call center_to_grid(plane,ei_mat(:,:,plane))
+
+         call center_to_grid(plane,M_mat(:,:,plane))
+         do k=1,nY
+            call center_to_grid(plane,w_mat(:,:,k,plane))
+         end do
+         call center_to_grid(plane,w_res(:,:,plane))
       end do
 
       do plane = 1,Nplane
@@ -123,6 +137,8 @@ program main
          end do
 
          call vtk_scalar("phi_res")
+         !call vtk_scalar("debug1")
+         !call vtk_scalar("debug2")
 
          !binary
          call vtk_header_bin(plane,xh(:,:,plane),rh(:,:,plane))
@@ -144,6 +160,9 @@ program main
          end do
 
          call vtk_scalar_bin(plane,w_res(:,:,plane))
+
+         !call vtk_scalar_bin(plane,debug(:,:,1,plane))
+         !call vtk_scalar_bin(plane,debug(:,:,2,plane))
 
          !output file close
          call vtk_footer_bin
@@ -339,4 +358,20 @@ contains
          if(nye_vis(i) < 1) nye_vis(i) = nj(i)
       end do
    end subroutine read_control!}}}
+subroutine center_to_grid(plane,arr)!{{{
+      implicit none
+      integer,intent(in)::plane
+      double precision,dimension(0:nimax+1,0:njmax+1),intent(inout)::arr
+
+      integer i,j
+
+      do j=0,nj(plane)
+         do i=0,ni(plane)
+            arr(i,j)=1d0/4d0*(arr(i  ,j  )&
+                             +arr(i  ,j+1)&
+                             +arr(i+1,j  )&
+                             +arr(i+1,j+1))
+         end do
+      end do
+end subroutine center_to_grid!}}}
 end program main
