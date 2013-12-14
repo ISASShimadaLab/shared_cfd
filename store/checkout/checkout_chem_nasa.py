@@ -3,7 +3,7 @@ import os
 import sys
 from checkout_utility import *
 
-def checkout_nasa():
+def checkout_chem_nasa():
 	if(os.path.exists("checkout_chem")):
 		os.system("rm -r checkout_chem")
 	
@@ -35,10 +35,14 @@ def checkout_nasa():
 		print "\tflame sheet model is selected."
 		engage("therm_lib/NASA/core","checkout_chem",arr_engage)
 		engage("therm_lib/NASA/driver","checkout_chem",arr_engage)
-	
+		
 		# process mod_chem.f90
-		import preCEA
-		val = preCEA.preCEA(0,fp)
+		if not os.path.exists("chem.inp"):
+			print "ERROR:Can't find 'chem.inp'. Please try again."
+			sys.exit(1)
+		os.system("cp chem.inp checkout/")
+		import store.checkout.ckinterp
+		val = store.checkout.ckinterp.ckinterp()
 		val = map(str,val)
 		fromto = [ \
 			["NE",val[0]],\

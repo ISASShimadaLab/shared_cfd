@@ -1,7 +1,7 @@
 #Input File for PostProcessing
-File Read Freq.         : 10000
+File Read Freq.         : 500
 From Where              : -1
-Database Place          :
+Database Place          : ../checkout/
 OverWrite? Yes(1)/No(0) : 0
 1st Plane i start index : 0
 1st Plane i end   index : -1

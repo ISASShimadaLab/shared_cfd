@@ -1,14 +1,34 @@
 #!/usr/bin/python
+#########################################################
+#########################################################
+#######     preCEA                                 ######
+#######     IN:  checkout_model.inp,thermo.inp     ######
+#######     OUT: control_chem.inp, chem.inp        ######
+#########################################################
+#########################################################
 import sys
-DIR = "checkout_chem/"
-#DIR = ""
+DIR = "" #DIR to output
 
 ######################## CLASSES ##################################################
 class SPCelm:
+	# name:species name
+	# elm_dic : dictionary of number of elements
+	#	key->element name
+	#	val->number of elements
 	def __init__(self,name,elm_dic):
 		self.name    = name
 		self.elm_dic = elm_dic
 class CONTROL:
+	# fuel, oxid, prod : dictionary
+	#	key->species name
+	#	val->species amount(mole)
+	# species : list of species name used
+	# elements list of elements name used
+	# dis_species: dictionary
+	#	key->species name
+	#	val->dictionary
+	#		key->element name
+	#		key->number of elements
 	def __init__(self,fuel,oxid,prod):
 		self.fuel = fuel
 		self.oxid = oxid
@@ -20,11 +40,13 @@ class CONTROL:
 		arr.extend(self.prod.keys())
 		self.species = list(set(arr))
 	def set_species(self,dic_species):
+		# set dic_species and elements from dictionary.
 		self.dic_species = dic_species
 		arr =[]
 		for var in self.dic_species.values(): arr.extend(var.keys())
 		self.elements = list(set(arr))
 	def check_consistency(self):
+		#check whether the amounts of elements of reactants and products are same.
 		reac_sum={}
 		for key in self.elements:reac_sum[key]=0
 		for spc,amount in self.fuel.items():
@@ -50,7 +72,8 @@ class CONTROL:
 	
 ######################## FUNCTIONS ################################################
 def read_thermo():
-	fp = open(DIR+"thermo.inp")
+	#read thermo.inp to gather species name
+	fp = open("store/therm_lib/NASA/core/thermo.inp")
 	while True:
 		if fp.readline()[:1] != '!': break
 	fp.readline()
@@ -75,13 +98,14 @@ def read_thermo():
 	fp.close()
 	return SPClist
 
-def read_control_chem(var,fp):
+def read_checkout_chem(var,fp):
+	#read checkout_chem.inp and write control_chem.raw.inp
 	fo = open(DIR+"control_chem.raw.inp","w")
 
 	fo.write("#Control parameters for chemistry\n")
 
-	fo.write("Oxidizer Pressure(Pa)     : 1.e5\n")
-	fo.write("Oxidizer Temperature(K)   : 300.\n")
+	fo.write("Oxidizer Pressure(Pa)   : 1.e5\n")
+	fo.write("Oxidizer Temperature(K) : 300.\n")
 	line  = fp.readline()
 	fo.write(line)
 	fuel = {}
@@ -122,6 +146,7 @@ def read_control_chem(var,fp):
 	return CONTROL(fuel,oxid,prod)
 
 def fetch_elm_info(SPClist,control):
+	#species -> elements in species
 	controlSPC = control.species
 	dic = {}
 	for SPCmono in SPClist:
@@ -133,6 +158,7 @@ def fetch_elm_info(SPClist,control):
 	return control
 
 def trimSPC(SPClist,elements):
+	# gather species existable
 	trimed = []
 	for SPC in SPClist:
 		flag = True
@@ -142,6 +168,7 @@ def trimSPC(SPClist,elements):
 	return trimed
 
 def out_chem(ELM,SPC):
+	#write out chem.inp
 	fp = open(DIR+"chem.inp","w")
 
 	fp.write("elements\n")
@@ -170,13 +197,20 @@ def out_chem(ELM,SPC):
 	fp.close()
 ######################## MAIN ################################################
 def preCEA(var,fp):
+	# var =0 : flame sheet
+	# var =1 : cea
+	# fp :file pointer of checkout_chem.inp
+	
+	# SPClist: list of SPCelm
+	# control: instance of CONTROL
+	# trimedSPC: list of species name the combustion model uses.
+	
 	SPClist = read_thermo()
-	control = read_control_chem(var,fp)
+	control = read_checkout_chem(var,fp)
 	control = fetch_elm_info(SPClist,control)
 	if var ==0:
 		control.check_consistency()
 		trimedSPC = control.species
 	else:
 		trimedSPC = trimSPC(SPClist,control.elements)
-	numelm = out_chem(control.elements,trimedSPC)
-	return [len(control.elements),len(trimedSPC)]
+	out_chem(control.elements,trimedSPC)

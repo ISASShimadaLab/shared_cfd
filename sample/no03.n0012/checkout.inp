@@ -6,4 +6,3 @@ time scheme       : 2  #Euler(0)/Runge-Kutta 2nd-order(1)/LU-SGS(2)/Newton-Raphs
 high order scheme : 1  #Up Wind(0)/MUSCL(1)
 viscosity         : 0  #non-viscous flow(0)/viscous flow(1)
 thermal model     : 0  #Ideal Gas(0)/Cold Flow using chemical kinetics database(1) / Chemical Kinetics Model(2)
-ParametersForAbove: 1.4 287 1.6e-5 #depends on the model. see text.

@@ -1,0 +1,5 @@
+thermal model: 0 #flame sheet of nasa(0) / NASA CEA(1) / chemkin(2)
+task number  : 0
+# task number
+# thermal model=flame sheet of nasa
+#	0 : plot parameters such as temperature and specific heat ratio against different mixture ratio

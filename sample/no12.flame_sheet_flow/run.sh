@@ -1,27 +1,22 @@
 #origin=`pwd`
 #cd ../../
-origin="sample/no12.flame_sheet_chem"
+origin="sample/no12.flame_sheet_flow"
 
-#rm
+#checkout model
 rm checkout.inp
-cp $origin/checkout_chem.inp .
+rm checkout_chem.inp
+cp $origin/checkout_model.inp .
 ./checkout.py
 
-mv checkout_chem/control_chem.raw.inp checkout_chem/control_chem.inp
-mv checkout_chem/control.raw.inp      checkout_chem/control.inp
-cd checkout_chem
-make
-./driver
-cd ..
-
-# move input file and checkout
-cp checkout_chem/chem.inp .
+#checkout flow
+rm checkout_model.inp
 cp $origin/checkout.inp .
 cp $origin/*.x .
 ./checkout.py
 
 # move necessary input files
-cp checkout_chem/control_chem.inp checkout/
+mv control_chem.raw.inp checkout/control_chem.inp
+mv chem.inp             checkout/
 
 cp $origin/control.inp checkout/control.inp
 rm checkout/control.raw.inp

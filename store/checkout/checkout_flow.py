@@ -211,11 +211,10 @@ def checkout_flow():
 		nY  = 1
 	
 		# process thermal_model.f90
-		val = read_control_next_split(fp,3,"thermal model")
 		fromto = [ \
-			["KAPPA" ,val[0]],\
-			["RGAS"  ,val[1]],\
-			["NU"    ,val[2]]]
+			["KAPPA" ,"1.4d0"],\
+			["RGAS"  ,"287d0"],\
+			["NU"    ,"1.6d-5"]]
 		raw2pro("checkout/thermal_model.raw.f90","checkout/thermal_model.f90",fromto)
 	elif(val == 1 or val == 2):
 		engage("therm_lib/chemkin/core","checkout",arr_engage)
