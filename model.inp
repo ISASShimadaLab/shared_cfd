@@ -1,0 +1,7 @@
+------------------------ Radio Box --------------------------------
+thermal model
+flame sheet of nasa,NASA CEA
+thermal model: 
+ #flame sheet of nasa(0) / NASA CEA(1)
+
+------------------------ END --------------------------------------

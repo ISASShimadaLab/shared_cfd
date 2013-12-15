@@ -1,0 +1,45 @@
+------------------------ TextControl ------------------------------
+Maximum Number of Processors
+0 @ Personal Computer
+0
+NumOfProcessors   : 
+  #The Maximum Number of Processors @ M-System[Super Computer] / 0 @ Personal Computer
+
+------------------------ Radio Box --------------------------------
+dimension
+two dimension,axi-symmetry
+dimension         : 
+  #two dimension(0) / axi-symmetry(1)
+
+time scale
+global,local
+time step         : 
+  #global(0)/local(1)
+
+time scheme
+Euler,two-step Runge-Kutta,LU-SGS,Newton-Raphson,Pre-Conditioner,Dual Time Step,Pre-conditioner with LU-SGS
+time scheme       : 
+  #Euler(0)/Runge-Kutta two-step(1)/LU-SGS(2)/Newton-Raphson(3)/Pre-Conditioner(4)/Dual Time Step(5)/Pre-conditioner with LU-SGS(6)
+
+high order scheme
+Up Wind,MUSCL
+high order scheme : 
+  #Up Wind(0)/MUSCL(1)
+
+viscosity
+non-viscous flow,viscous flow
+viscosity         : 
+  #non-viscous flow(0)/viscous flow(1)
+
+thermal model
+Ideal Gas,Cold Flow by chemical kinetics D.B.,Chemical Kinetics Model,Flame Sheet Model
+thermal model     : 
+  #Ideal Gas(0)/Cold flow using chemical kinetics database(1) / Chemical Kinetics Model(2) / Flame Sheet Model(3)
+
+------------------------ NG list ----------------------------------
+-1,-1, 0, 4,-1,-1,-1
+-1,-1, 1, 5,-1,-1,-1
+-1, 1,-1, 5,-1,-1,-1
+-1,-1, 0, 6,-1,-1,-1
+-1,-1,-1,-1,-1,-1, 0
+-1,-1, 1,-1,-1,-1, 2

@@ -214,3 +214,5 @@ def preCEA(var,fp):
 	else:
 		trimedSPC = trimSPC(SPClist,control.elements)
 	out_chem(control.elements,trimedSPC)
+def SPCcandidates():
+	return read_thermo()
