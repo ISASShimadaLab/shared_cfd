@@ -7,9 +7,10 @@ module const_chem
    double precision,parameter::pst        = 1d5         !standard state pressure
    double precision,parameter::omega      = 0.1d0       !relaxation factor
    double precision,parameter::eps        = 1d-8        !epsilon for convergence
-   double precision,parameter::n_eps      = 1d-20       !epsilon for mol/kg
-   double precision,parameter::initial_eps= 1d-5        !epsilon for initial mole/mass fraction
-   double precision,parameter::TSIZE      = 1d-11
+   double precision,parameter::initial_eps= 1d-5        !epsilon to stabilize calculation
+   double precision,parameter::Y_eps      = 1d-6        !epsilon for reduction determination
+   double precision,parameter::TSIZE      = 1d-11       !epsilon for calc E
+   double precision,parameter::TTSIZE     = 1d-14       !epsilon for calc n
    integer          ns
    integer          nt
 end module const_chem

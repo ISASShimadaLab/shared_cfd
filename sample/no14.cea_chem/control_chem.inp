@@ -2,6 +2,7 @@
 Oxidizer Pressure(Pa)   : 1.e5
 Oxidizer Temperature(K) : 300.
 Oxygen Composition(mole ratio):
+N2 8
 O2 2
 end
 Fuel Pressure(Pa)       : 1.e5

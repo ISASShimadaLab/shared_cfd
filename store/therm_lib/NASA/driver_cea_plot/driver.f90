@@ -16,7 +16,7 @@ program driver
    Y(2)=1d0-Y(1)
    E  =  Ef*Y(1)+  Eo*Y(2)
    rho=rhof*Y(1)+rhoo*Y(2)
-   n  =  nf*Y(1)+  no*Y(2)+initial_eps
+   n  = n_save(:,1,1,1)
    T=300d0
    call cea(rho,Y,E, T,n, MWave,kappa,mu,Yv,vhi)
    !print '(a,  f15.7)',"Y of f    ",Y(1)

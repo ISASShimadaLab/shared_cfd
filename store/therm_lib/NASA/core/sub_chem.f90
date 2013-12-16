@@ -676,6 +676,9 @@ subroutine initialize_cea!{{{
    rhoo=po/(Ru*1d3/MWo*To)
    call flame_sheet(Y,Eo,To, MWo,kappao,muo,DHi,Yvo,vhio)
    call set_static_qw(po,rhoo,To,Eo,kappao,muo,Y,qo,wo)
+
+   sm=sum(no(1:ns)+nf(1:ns),1)/ns
+   n_save=sm
 contains
    subroutine calc_ini(p,T, n, E,MWave)
       use func_therm
@@ -761,9 +764,7 @@ subroutine cea(rho,Y,E, T,n, MWave,kappa,mu,Yv,vhi)!{{{
    double precision,dimension(ns)::vmurt,vert,Dlogn,logn
    integer,dimension(ns)::sec_num
    double precision,dimension(ne+1,ne+1)::Ad
-   double precision tmp,logT,sn,vmurtn,DlogT,b0max,Dnmax,logrhoRu,tinyn,logtinyn
-   double precision,parameter::tinyratio=1d-3
-   double precision,parameter::logtinyratio=-2.3026d0*3d0 !log(tinyratio)
+   double precision tmp,logT,sn,vmurtn,DlogT,b0max,Dnmax,logrhoRu,tinyn,tinytinyn,logtinyn,logtinytinyn
 
    double precision dh
 
@@ -785,12 +786,12 @@ subroutine cea(rho,Y,E, T,n, MWave,kappa,mu,Yv,vhi)!{{{
    b0= Y(1)*b0f + Y(2)*b0o
    b0max = maxval(b0(1:ne),1)
 
-   if(Y(1)<1d-6) then
+   if(Y(1)<Y_eps) then
       REDUCEflag=.true.
       nen=neo
       elist =elisto
       nelist=nelisto
-   else if(Y(2)<1d-6) then
+   else if(Y(2)<Y_eps) then
       REDUCEflag=.true.
       nen=nef
       elist =elistf
@@ -800,8 +801,10 @@ subroutine cea(rho,Y,E, T,n, MWave,kappa,mu,Yv,vhi)!{{{
    end if
 
    sn=sum(n(1:ns),1)
-   tinyn =TSIZE*sn
-   logtinyn = log(tinyn)
+   tinyn        = TSIZE*sn
+   logtinyn     = log(tinyn)
+   tinytinyn    = TTSIZE*sn
+   logtinytinyn = log(tinytinyn)
 
    !set vert
    logT=log(T)
@@ -824,9 +827,9 @@ subroutine cea(rho,Y,E, T,n, MWave,kappa,mu,Yv,vhi)!{{{
    !check convergence
    flag = .true.
    do i=1,ne
-      if(b0(i) > 1d-6 .and. abs(b0(i)-b(i))>b0max*1d-6) flag = .false.
+      if(b0(i) > eps .and. abs(b0(i)-b(i))>b0max*eps) flag = .false.
    end do
-   if(abs(E-b(ne+1)*Ru*T)/abs(E) >eps) flag = .false.
+   if(abs(E-b(ne+1)*Ru*T) >eps*abs(E)) flag = .false.
 
    if(.not. flag) then
       counter=1
@@ -892,10 +895,10 @@ subroutine cea(rho,Y,E, T,n, MWave,kappa,mu,Yv,vhi)!{{{
             !set new n
             b(ne+1)=0d0
             Dnmax = 0d0
-            logn(1:ns) = logtinyn + logtinyratio
+            logn(1:ns) = logtinytinyn
             do j=1,ns
-               if(n(j)<tinyn*tinyratio) then
-                   n(j)    = tinyn*tinyratio
+               if(n(j)<tinytinyn) then
+                   n(j)    = tinytinyn
                else
                    logn(j) = log(n(j))
                end if
@@ -930,13 +933,13 @@ subroutine cea(rho,Y,E, T,n, MWave,kappa,mu,Yv,vhi)!{{{
          !set new n
          b(ne+1)=0d0
          Dnmax = 0d0
-         logn(1:ns) = logtinyn + logtinyratio
+         logn(1:ns) = logtinytinyn
          call calc_vThrt(T,logT,vThrt)
          do j=1,ns
             !set vert
             n(j)=n(j)*(1d0+omega*Dlogn(j))
-            if(n(j)<tinyn*tinyratio) then
-                n(j)    = tinyn*tinyratio
+            if(n(j)<tinytinyn) then
+                n(j)    = tinytinyn
             else
                 logn(j) = log(n(j))
             end if
@@ -952,11 +955,11 @@ subroutine cea(rho,Y,E, T,n, MWave,kappa,mu,Yv,vhi)!{{{
 
          !check convergence
          flag = .true.
-         if(abs(Dnmax)>1d-5*sn) flag = .false.
+         if(abs(Dnmax)>eps*sn) flag = .false.
          do i=1,ne
-            if(b0(i) > 1d-6 .and. abs(b0(i)-b(i))>b0max*1d-6)      flag = .false.
+            if(b0(i) > eps .and. abs(b0(i)-b(i))>b0max*eps)       flag = .false.
          end do
-         if(abs(DlogT)>1d-5 .and. abs(E-b(ne+1)*Ru*T)/abs(E) >eps) flag = .false.
+         if(abs(DlogT)>eps .and. abs(E-b(ne+1)*Ru*T) >eps*abs(E)) flag = .false.
          if(counter>500) flag = .true.
          if(flag) exit
 
