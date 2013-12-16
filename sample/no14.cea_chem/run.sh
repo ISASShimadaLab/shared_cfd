@@ -1,6 +1,6 @@
 #origin=`pwd`
 #cd ../../
-origin="sample/no13.flame_sheet_chem"
+origin="sample/no14.cea_chem"
 
 #checkout model
 rm checkout.inp

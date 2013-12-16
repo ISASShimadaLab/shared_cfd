@@ -491,7 +491,7 @@ subroutine flame_sheet(Y,E, T, MWave,kappa,mu,DHi,Yv,vhi)!{{{
    double precision denom
    double precision cprnow,cvrnow,ERTnow,logT,sn,phi
    double precision,dimension(9)::vThrt,vTcpr
-   double precision,dimension(4)::vTmurt
+   double precision,dimension(4)::vTmu
    double precision MWi,MWj
    double precision,dimension(ns)::vhi_s,DHi_s
 
@@ -584,10 +584,10 @@ subroutine flame_sheet(Y,E, T, MWave,kappa,mu,DHi,Yv,vhi)!{{{
    vhi(3)=dot_product(np,vhi_s)*tmp
 
    !calc mu
-   call calc_vTmurt(T,logT,vTmurt)
+   call calc_vTmu(T,logT,vTmu)
    do i=1,nt
       call check_section_number_trans(i,T,sect)
-      muN(i)=exp(dot_product(trans(:,sect,i),vTmurt))
+      muN(i)=exp(dot_product(trans(:,sect,i),vTmu))
    end do
 
    mu = 0d0
@@ -621,6 +621,17 @@ subroutine initialize_cea!{{{
    double precision sumo,sumf,sm
    double precision Y(2),DHi(2)
    integer i,j
+   integer nshifto,nshiftf
+
+   !set o/f ratio
+   sumo=0d0
+   sumf=0d0
+   do j=1,ns
+      sumo=sumo+MW(j)*no(j)
+      sumf=sumf+MW(j)*nf(j)
+   end do
+   of = sumo/sumf
+
    !calc ini
    call calc_ini(pf,Tf, nf, Ef,MWf)
    call calc_ini(po,To, no, Eo,MWo)
@@ -632,6 +643,27 @@ subroutine initialize_cea!{{{
          b0o(i)=b0o(i)+Ac(i,j)*no(j)
       end do
    end do
+
+   nshiftf=0
+   nshifto=0
+   do i=1,ne
+      if(b0f(i) .eq. 0d0) then
+         nshiftf=nshiftf+1
+         nelistf(nshiftf)=i
+      else
+         elistf(i-nshiftf)=i
+      end if
+      if(b0o(i) .eq. 0d0) then
+         nshifto=nshifto+1
+         nelisto(nshifto)=i
+      else
+         elisto(i-nshifto)=i
+      end if
+   end do
+   elisto(ne+1-nshifto)=ne+1
+   neo=ne+1-nshifto
+   elistf(ne+1-nshiftf)=ne+1
+   nef=ne+1-nshiftf
 
    !calc n,E
    Y(1)=1d0;Y(2)=0d0
@@ -707,7 +739,7 @@ contains
       w_local(indxMu)=mu
    end subroutine set_static_qw
 end subroutine initialize_cea!}}}
-subroutine calc_cea(rho,Y,E, T,n, MWave,kappa,mu,Yv)!{{{
+subroutine cea(rho,Y,E, T,n, MWave,kappa,mu)!{{{
    use const_chem
    use func_therm
    use chem
@@ -721,7 +753,6 @@ subroutine calc_cea(rho,Y,E, T,n, MWave,kappa,mu,Yv)!{{{
    double precision,intent(out)  ::MWave
    double precision,intent(out)  ::kappa
    double precision,intent(out)  ::mu
-   double precision,intent(out)  ::Yv(ns)
 
    double precision,dimension(ne+1)::b0,b,bd,vpi
    double precision,dimension(ns)::vmurt,vert,Dlogn,logn
@@ -731,27 +762,37 @@ subroutine calc_cea(rho,Y,E, T,n, MWave,kappa,mu,Yv)!{{{
    double precision,parameter::tinyratio=1d-3
    double precision,parameter::logtinyratio=-2.3026d0*3d0 !log(tinyratio)
 
-   integer ne_now
-
    integer sect
    double precision,dimension(ns)::muN
    double precision phi,denom,MWj,MWi
 
    integer i,j,k,counter
-   logical flag,LUflag
+   logical flag,LUflag,REDUCEflag
+   integer nen,elist(ne+1),nelist(ne+1)
 
    double precision,dimension(9)::vTmurt,vTcpr,vThrt
+   double precision,dimension(4)::vTmu
 
 
-   ne_now = 4
-
-   logrhoRu = log(rho*Ru *1d-5)
+   logrhoRu = log(rho*Ru/pst)
 
    !calc b0 of elements
-   do i=1,ne_now
-      b0(i)= Y(1)*b0f(i) + Y(2)*b0o(i)
-   end do
-   b0max = maxval(b0(1:ne_now),1)
+   b0= Y(1)*b0f + Y(2)*b0o
+   b0max = maxval(b0(1:ne),1)
+
+   if(Y(1)<1d-6) then
+      REDUCEflag=.true.
+      nen=neo
+      elist =elisto
+      nelist=nelisto
+   else if(Y(2)<1d-6) then
+      REDUCEflag=.true.
+      nen=nef
+      elist =elistf
+      nelist=nelistf
+   else
+      REDUCEflag=.false.
+   end if
 
    sn=sum(n(1:ns),1)
    tinyn =TSIZE*sn
@@ -768,31 +809,31 @@ subroutine calc_cea(rho,Y,E, T,n, MWave,kappa,mu,Yv)!{{{
       if(n(j)>tinyn) then
          vert(j)  = dot_product(co(:,sec_num(j),j),vThrt)-1d0
          logn(j)  = log(n(j))
-         do i=1,ne_now
+         do i=1,ne
             b(i) = b(i) + Ac(i,j)*n(j)
          end do
-         b(ne_now+1)=b(ne_now+1)+vert(j)*n(j)
+         b(ne+1)=b(ne+1)+vert(j)*n(j)
       end if
    end do
 
    !check convergence
    flag = .true.
-   do i=1,ne_now
+   do i=1,ne
       if(b0(i) > 1d-6 .and. abs(b0(i)-b(i))>b0max*1d-6) flag = .false.
    end do
-   if(abs(E-b(ne_now+1)*Ru*T)/abs(E) >eps) flag = .false.
+   if(abs(E-b(ne+1)*Ru*T)/abs(E) >eps) flag = .false.
 
    if(.not. flag) then
       counter=1
       do
          !set b0(ne+1)
-         b0(ne_now+1)=E/(Ru*T)
+         b0(ne+1)=E/(Ru*T)
 
          !set Ad, b and vmurtn
-         b(1:ne_now)=0d0
+         b(1:ne)=0d0
          bd=b0
-         bd(ne_now+1)=bd(ne_now+1)-b(ne_now+1)
-         Ad(1:ne_now+1,1:ne_now+1)=0d0
+         bd(ne+1)=bd(ne+1)-b(ne+1)
+         Ad(1:ne+1,1:ne+1)=0d0
          call calc_vTmurt(T,logT,vTmurt)
          call calc_vTcpr(T,vTcpr)
          do k=1,ns
@@ -800,34 +841,51 @@ subroutine calc_cea(rho,Y,E, T,n, MWave,kappa,mu,Yv)!{{{
 
             if(n(k)>tinyn) then
                vmurtn=vmurt(k)*n(k)
-               do i=1,ne_now
-                  do j=i,ne_now
+               do i=1,ne
+                  do j=i,ne
                      Ad(i,j)=Ad(i,j)+Ac(i,k)*Ac(j,k)*n(k)
                   end do
-                  Ad(i,ne_now+1)=Ad(i,ne_now+1)+Ac(i,k)*vert(k)*n(k)
+                  Ad(i,ne+1)=Ad(i,ne+1)+Ac(i,k)*vert(k)*n(k)
                   b(i)  = b(i)  + Ac(i,k)* n(k)
                   bd(i) = bd(i) + Ac(i,k)*(vmurtn-n(k))
                end do
 
-               Ad(ne_now+1,ne_now+1)= Ad(ne_now+1,ne_now+1)+ n(k) *(vert(k)**2+dot_product(co(:,sec_num(k),k),vTcpr)-1d0)
-               bd(ne_now+1)     = bd(ne_now+1)     + vmurtn*vert(k)
+               Ad(ne+1,ne+1)= Ad(ne+1,ne+1)+ n(k) *(vert(k)**2+dot_product(co(:,sec_num(k),k),vTcpr)-1d0)
+               bd(ne+1)     = bd(ne+1)     + vmurtn*vert(k)
             end if
          end do
 
-         do i=1,ne_now+1
-            do j=i,ne_now+1
+         do i=1,ne+1
+            do j=i,ne+1
                Ad(j,i)=Ad(i,j)
             end do
          end do
 
          !calc vpi
-         call LU(Ad,bd,vpi,ne_now+1,LUflag)
+         if(REDUCEflag) then
+            do i=1,nen
+               do j=1,nen
+                  Ad(i,j)=Ad(elist(i),elist(j))
+               end do
+               bd(i)=bd(elist(i))
+            end do
+            call LU(Ad,bd,vpi,nen,LUflag)
+            do i=nen,1,-1
+               vpi(elist(i))=vpi(i)
+            end do
+            do i=1,ne+1-nen
+               vpi(nelist(i))=-1d300
+            end do
+         else
+            call LU(Ad,bd,vpi,ne+1,LUflag)
+         end if
+
          if(LUflag) then
             !set new n
             n=n+initial_eps
 
             !set new n
-            b(ne_now+1)=0d0
+            b(ne+1)=0d0
             Dnmax = 0d0
             logn(1:ns) = logtinyn + logtinyratio
             do j=1,ns
@@ -839,7 +897,7 @@ subroutine calc_cea(rho,Y,E, T,n, MWave,kappa,mu,Yv)!{{{
 
                if(n(j)>tinyn) then
                    vert(j)  = dot_product(co(:,sec_num(j),j),vThrt)-1d0
-                   b(ne_now+1) = b(ne_now+1)+vert(j)*n(j)
+                   b(ne+1) = b(ne+1)+vert(j)*n(j)
                end if
             end do
             sn = sum(n(1:ns),1)
@@ -847,8 +905,7 @@ subroutine calc_cea(rho,Y,E, T,n, MWave,kappa,mu,Yv)!{{{
          end if
 
          !calc Delta
-         DlogT=vpi(ne_now+1)
-         vpi(ne_now+1:ne)= -1d300
+         DlogT=vpi(ne+1)
          do j=1,ns
             tmp=0d0
             do i=1,ne
@@ -866,7 +923,7 @@ subroutine calc_cea(rho,Y,E, T,n, MWave,kappa,mu,Yv)!{{{
          end do
 
          !set new n
-         b(ne_now+1)=0d0
+         b(ne+1)=0d0
          Dnmax = 0d0
          logn(1:ns) = logtinyn + logtinyratio
          call calc_vThrt(T,logT,vThrt)
@@ -881,7 +938,7 @@ subroutine calc_cea(rho,Y,E, T,n, MWave,kappa,mu,Yv)!{{{
 
             if(n(j)>tinyn) then
                 vert(j)  = dot_product(co(:,sec_num(j),j),vThrt)-1d0
-                b(ne_now+1) = b(ne_now+1)+vert(j)*n(j)
+                b(ne+1) = b(ne+1)+vert(j)*n(j)
                 tmp = abs(Dlogn(j))*n(j)
                 if(Dnmax < tmp) Dnmax = tmp
             end if
@@ -891,10 +948,10 @@ subroutine calc_cea(rho,Y,E, T,n, MWave,kappa,mu,Yv)!{{{
          !check convergence
          flag = .true.
          if(abs(Dnmax)>1d-5*sn) flag = .false.
-         do i=1,ne_now
+         do i=1,ne
             if(b0(i) > 1d-6 .and. abs(b0(i)-b(i))>b0max*1d-6)      flag = .false.
          end do
-         if(abs(DlogT)>1d-5 .and. abs(E-b(ne_now+1)*Ru*T)/abs(E) >eps) flag = .false.
+         if(abs(DlogT)>1d-5 .and. abs(E-b(ne+1)*Ru*T)/abs(E) >eps) flag = .false.
          if(counter>500) flag = .true.
          if(flag) exit
 
@@ -917,9 +974,10 @@ subroutine calc_cea(rho,Y,E, T,n, MWave,kappa,mu,Yv)!{{{
    kappa=kappa/(kappa-sn)
 
    !calc mu
+   call calc_vTmu(T,logT,vTmu)
    do i=1,nt
       call check_section_number_trans(i,T,sect)
-      muN(i) = calc_mu(i,T,logT,sect)
+      muN(i)=exp(dot_product(trans(:,sect,i),vTmu))
    end do
 
    mu = 0d0
@@ -928,16 +986,14 @@ subroutine calc_cea(rho,Y,E, T,n, MWave,kappa,mu,Yv)!{{{
       MWi=MW(tr2th(i))
       do j=1,nt
          MWj=MW(tr2th(j))
-         phi = 0.25d0 * (1d0+sqrt(muN(i)/muN(j)) * (MWj / MWi)**0.25d0 )**2 &
-                      * sqrt(2d0 *MWj/(MWi+MWj))
+         phi = 0.25d0*(1d0+sqrt(muN(i)/muN(j))*(MWj/MWi)**0.25d0 )**2 &
+                     *sqrt(2d0*MWj/(MWi+MWj))
          denom = denom + n(tr2th(j)) * phi
       end do
       mu = mu + n(tr2th(i)) * muN(i) / denom
    end do
    mu = mu * 1d-7
-
-   Yv=0d0
-end subroutine calc_cea!}}}
+end subroutine cea!}}}
 
 !!for CH4/Air!!!!!!!!!!!!!!!
 !subroutine calc_initial_prop(xi,T, n,E,MWini,b0)!CH4/Air{{{

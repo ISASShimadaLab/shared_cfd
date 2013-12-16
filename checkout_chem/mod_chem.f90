@@ -1,7 +1,7 @@
 module const_chem
    implicit none
-   integer,parameter::ne     = NE !the number of elements
-   integer,parameter::max_ns = NS !the maximum number of species
+   integer,parameter::ne     = 4 !the number of elements
+   integer,parameter::max_ns = 158 !the maximum number of species
 
    double precision,parameter::Ru         = 8.3144621d0 !universal gas constant
    double precision,parameter::pst        = 1d5         !standard state pressure
@@ -45,12 +45,18 @@ module chem_var
    double precision Yvf(nV),vhif(nV)
    double precision b0f(ne+1)
    double precision nf(max_ns)
+   integer          nef
+   integer          elistf(ne+1)
+   integer          nelistf(ne+1)
 
    double precision qo(dimq),wo(dimw)
    double precision rhoo,po,To,Eo,MWo,kappao,muo
    double precision Yvo(nV),vhio(nV)
    double precision b0o(ne+1)
    double precision no(max_ns)
+   integer          neo
+   integer          elisto(ne+1)
+   integer          nelisto(ne+1)
 
    !for flame sheet model
    double precision np(max_ns)
