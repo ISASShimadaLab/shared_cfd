@@ -29,6 +29,7 @@ subroutine read_cheminp!{{{
          ns=ns+1
          SYM_SPC(ns)=trim(line)
       end do
+      print *,"the number of species of chem.inp:",ns
 
       close(22)
    end if
@@ -471,15 +472,15 @@ subroutine flame_sheet(Y,E, T, MWave,kappa,mu,DHi,Yv,vhi)!{{{
    use chem_var
    use func_therm
    implicit none
-   double precision,intent(in)::Y(2)
-   double precision,intent(in)::E
+   double precision,intent(in)   ::Y(2)
+   double precision,intent(in)   ::E
    double precision,intent(inout)::T
-   double precision,intent(out)::MWave
-   double precision,intent(out)::kappa
-   double precision,intent(out)::mu
-   double precision,intent(out)::DHi(2)
-   double precision,intent(out)::Yv(3)
-   double precision,intent(out)::vhi(3)
+   double precision,intent(out)  ::MWave
+   double precision,intent(out)  ::kappa
+   double precision,intent(out)  ::mu
+   double precision,intent(out)  ::DHi(2)
+   double precision,intent(out)  ::Yv(3)
+   double precision,intent(out)  ::vhi(3)
 
    double precision Yf,Yo,Yp
    double precision n(  ns)
@@ -739,7 +740,7 @@ contains
       w_local(indxMu)=mu
    end subroutine set_static_qw
 end subroutine initialize_cea!}}}
-subroutine cea(rho,Y,E, T,n, MWave,kappa,mu)!{{{
+subroutine cea(rho,Y,E, T,n, MWave,kappa,mu,Yv,vhi)!{{{
    use const_chem
    use func_therm
    use chem
@@ -753,6 +754,8 @@ subroutine cea(rho,Y,E, T,n, MWave,kappa,mu)!{{{
    double precision,intent(out)  ::MWave
    double precision,intent(out)  ::kappa
    double precision,intent(out)  ::mu
+   double precision,intent(out)  ::Yv(ns)
+   double precision,intent(out)  ::vhi(ns)
 
    double precision,dimension(ne+1)::b0,b,bd,vpi
    double precision,dimension(ns)::vmurt,vert,Dlogn,logn
@@ -761,6 +764,8 @@ subroutine cea(rho,Y,E, T,n, MWave,kappa,mu)!{{{
    double precision tmp,logT,sn,vmurtn,DlogT,b0max,Dnmax,logrhoRu,tinyn,logtinyn
    double precision,parameter::tinyratio=1d-3
    double precision,parameter::logtinyratio=-2.3026d0*3d0 !log(tinyratio)
+
+   double precision dh
 
    integer sect
    double precision,dimension(ns)::muN
@@ -972,6 +977,20 @@ subroutine cea(rho,Y,E, T,n, MWave,kappa,mu)!{{{
       end if
    end do
    kappa=kappa/(kappa-sn)
+
+   !calc vhi
+   tmp=Ru*1d3*T
+   do i=1,ns
+      dh= 0d0
+      do j=1,9
+         dh =dh +co(j,sec_num(i),i)*vThrt(j)
+      end do
+      vhi(i)=tmp/MW(i)*dh
+   end do
+   tmp=Ru*T
+
+   !calc Yv
+   Yv=n*MW*1d-3
 
    !calc mu
    call calc_vTmu(T,logT,vTmu)

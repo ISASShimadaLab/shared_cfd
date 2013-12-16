@@ -2,6 +2,7 @@
 import wx
 import gui_flow
 import gui_model
+import gui_chem
 
 class PageOne(wx.Panel):
     def __init__(self, parent):
@@ -16,8 +17,9 @@ class notepanel(wx.Panel):
 		notebook = wx.Notebook(self,wx.ID_ANY,style=wx.NB_TOP)
 		notebook.SetBackgroundColour('#FFFFFF')
 
-		notebook.InsertPage(0,gui_model.set_panel(frame,notebook),"chemical model")
+		notebook.InsertPage(0,gui_chem. set_panel(frame,notebook),"chemical calculation")
 		notebook.InsertPage(1,gui_flow. set_panel(frame,notebook),"flow")
+		notebook.InsertPage(2,gui_model.set_panel(frame,notebook),"chemical model")
 
         	sizer = wx.BoxSizer()
         	sizer.Add(notebook, 2, wx.EXPAND)
