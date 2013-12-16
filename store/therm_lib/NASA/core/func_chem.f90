@@ -118,6 +118,32 @@ subroutine calc_vTmurt(T,logT,vT)!{{{
    implicit none
    double precision,intent(in)::T
    double precision,intent(in)::logT
+   double precision,intent(out)::vT(9)
+
+   double precision TT
+
+   TT = 1d0/T**2
+
+   vT(1) = -TT/2d0
+   TT=TT*T
+   vT(2) =  TT*(1d0+logT)
+   vT(8) =  TT
+   TT=TT*T
+   vT(3) =  TT*(1d0-logT)
+   vT(9) = -TT
+   TT=TT*T
+   vT(4) = -TT/2d0
+   TT=TT*T
+   vT(5) = -TT/6d0
+   TT=TT*T
+   vT(6) = -TT/12d0
+   TT=TT*T
+   vT(7) = -TT/20d0
+end subroutine calc_vTmurt!}}}
+subroutine calc_vTmu(T,logT,vT)!{{{
+   implicit none
+   double precision,intent(in)::T
+   double precision,intent(in)::logT
    double precision,intent(out)::vT(4)
 
    double precision TT
@@ -128,7 +154,7 @@ subroutine calc_vTmurt(T,logT,vT)!{{{
    vT(2) =  TT*T
    vT(3) =  TT
    vT(4) =  1d0
-end subroutine calc_vTmurt!}}}
+end subroutine calc_vTmu!}}}
 
 double precision function calc_mu(species,T,logT,num_section)!{{{
    implicit none

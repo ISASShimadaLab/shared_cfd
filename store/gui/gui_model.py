@@ -3,7 +3,7 @@
 import wx
 import os
 import wx.lib.mixins.listctrl  as  listmix
-import store.checkout.preCEA as  preCEA
+from ..checkout import preCEA
 from control_buttons import *
 from subprocess import Popen,PIPE
  
@@ -121,7 +121,7 @@ class LBplane(wx.Panel):
 ###############################################################
 def data_set():
 	datRA=[]
-	fp = open("model.inp")
+	fp = open("store/gui/model.inp")
 
 	fp.readline()
 	while True:

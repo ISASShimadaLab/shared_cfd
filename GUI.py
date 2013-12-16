@@ -1,7 +1,8 @@
 #!/usr/bin/python
+import os
 import wx
-import leftpanel
-import notepanel
+import store.gui.leftpanel
+import store.gui.notepanel
 if __name__ == "__main__":
 	app = wx.App()
 	frame = wx.Frame(None,wx.ID_ANY,"Shimada Lab. CODE")
@@ -9,10 +10,10 @@ if __name__ == "__main__":
 	layout = wx.BoxSizer(wx.HORIZONTAL)
 
 	#leftpanel
-	layout.Add(leftpanel.leftpanel(frame))
+	layout.Add(store.gui.leftpanel.leftpanel(frame))
 
 	#rightpanel
-	layout.Add(notepanel.notepanel(frame),flag=wx.ALL,border=5)
+	layout.Add(store.gui.notepanel.notepanel(frame),flag=wx.ALL,border=5)
 
 	# show panel
 	frame.SetSizer(layout)
@@ -20,3 +21,5 @@ if __name__ == "__main__":
 	layout.Fit(frame)
 	frame.Show()
 	app.MainLoop()
+
+	os.system("rm -f store/*.pyc store/checkout/*.pyc store/gui/*.pyc")

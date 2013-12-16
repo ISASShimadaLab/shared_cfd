@@ -106,7 +106,7 @@ class FileName:
 ###############################################################
 def data_set_flow():
 	[datTC,datRA,NG]=[[],[],[]]
-	fp = open("flow.inp")
+	fp = open("store/gui/flow.inp")
 
 	fp.readline()
 	while True:

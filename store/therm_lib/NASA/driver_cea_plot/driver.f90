@@ -11,25 +11,17 @@ program driver
    !read files
    call init_pack_cea
 
-   print *,SYM_ELM
-   print *,"--------"
-   print *,b0f(1:ne)
-   print *,"--------"
-   print *,Ef
-   print *,"--------"
-   print *,nf(1:ns),1d3/14d0,1d3/32d0
-   print *,no(1:ns)
-   call exit(1)
-
    !calc stoichiometry
-   Y(1)=1d0
+   !Y(1)=1d0/(1d0+of)
+   Y(1)=1.0d0
    Y(2)=1d0-Y(1)
    E  =  Ef*Y(1)+  Eo*Y(2)
-   rho=rhof*Y(1)+rhoo*Y(2)
-   !n  =sum(nf*Y(1)+no*Y(2),1)/ns
+   !rho=rhof*Y(1)+rhoo*Y(2)
+   rho=1d1
    n  =nf*Y(1)+no*Y(2)+initial_eps
-   T=400d0
+   T=300d0
    call cea(rho,Y,E, T,n, MWave,kappa,mu)
+   print '(a,  f15.7)',"Y of f    ",Y(1)
    print '(a,  f15.7)',"MWave     ",MWave
    print '(a,  f15.7)',"kappa     ",kappa
    print '(a,  f15.7)',"T         ",T
