@@ -19,9 +19,6 @@ class SPCelm:
 		self.name    = name
 		self.elm_dic = elm_dic
 class CONTROL:
-	# fuel, oxid, prod : dictionary
-	#	key->species name
-	#	val->species amount(mole)
 	# species : list of species name used
 	# elements list of elements name used
 	# dis_species: dictionary
@@ -29,46 +26,14 @@ class CONTROL:
 	#	val->dictionary
 	#		key->element name
 	#		key->number of elements
-	def __init__(self,fuel,oxid,prod):
-		self.fuel = fuel
-		self.oxid = oxid
-		self.prod = prod
-
-		arr = []
-		arr.extend(self.fuel.keys())
-		arr.extend(self.oxid.keys())
-		arr.extend(self.prod.keys())
-		self.species = list(set(arr))
+	def __init__(self,species):
+		self.species = list(set(species))
 	def set_species(self,dic_species):
 		# set dic_species and elements from dictionary.
 		self.dic_species = dic_species
 		arr =[]
 		for var in self.dic_species.values(): arr.extend(var.keys())
 		self.elements = list(set(arr))
-	def check_consistency(self):
-		#check whether the amounts of elements of reactants and products are same.
-		reac_sum={}
-		for key in self.elements:reac_sum[key]=0
-		for spc,amount in self.fuel.items():
-			for key,var in self.dic_species[spc].items():
-				reac_sum[key]+=var*amount
-		for spc,amount in self.oxid.items():
-			for key,var in self.dic_species[spc].items():
-				reac_sum[key]+=var*amount
-
-		prod_sum={}
-		for key in self.elements:prod_sum[key]=0
-		for spc,amount in self.prod.items():
-			for key,var in self.dic_species[spc].items():
-				prod_sum[key]+=var*amount
-
-		for key in self.elements:
-			if abs(2*(reac_sum[key]-prod_sum[key])/(reac_sum[key]+prod_sum[key]))>0.01:
-			 	print "Consistency check failed!"
-			 	print "Please check the compositions of reactants and products again."
-			 	sys.exit(1)
-		print "Consistency check succeeded!"
-
 	
 ######################## FUNCTIONS ################################################
 def read_thermo():
@@ -98,52 +63,36 @@ def read_thermo():
 	fp.close()
 	return SPClist
 
-def read_checkout_chem(var,fp):
+def read_checkout_chem(ntype,fp):
 	#read checkout_chem.inp and write control_chem.raw.inp
+
+	species=[]
+	line  = fp.readline()
+	while True:
+		line = fp.readline().strip()
+		if(line == 'end'):break
+		species.append(line)
+	fp.close()
+
 	fo = open(DIR+"control_chem.raw.inp","w")
-
 	fo.write("#Control parameters for chemistry\n")
-
 	fo.write("Oxidizer Pressure(Pa)   : 1.e5\n")
 	fo.write("Oxidizer Temperature(K) : 300.\n")
-	line  = fp.readline()
-	fo.write(line)
-	fuel = {}
-	while True:
-		line  = fp.readline()
-		fo.write(line)
-		line = line.strip()
-		if(line == 'end'):break
-		[key,val] = line.split()
-		fuel[key] = float(val)
-
+	fo.write("Oxygen Composition(mole ratio):\n")
+	for var in species:fo.write(var+" 1\n")
+	fo.write("end\n")
 	fo.write("Fuel Pressure(Pa)       : 1.e5\n")
 	fo.write("Fuel Temperature(K)     : 300.\n")
-	line  = fp.readline()
-	fo.write(line)
-	oxid = {}
-	while True:
-		line  = fp.readline()
-		fo.write(line)
-		line = line.strip()
-		if(line == 'end'):break
-		[key,val] = line.split()
-		oxid[key] = float(val)
-
-	prod = {}
-	if var==0:
-		line  = fp.readline()
-		fo.write(line)
-		while True:
-			line  = fp.readline()
-			fo.write(line)
-			line = line.strip()
-			if(line == 'end'):break
-			[key,val] = line.split()
-			prod[key] = float(val)
-
+	fo.write("Fuel Composition(mole ratio):\n")
+	for var in species:fo.write(var+" 1\n")
+	fo.write("end\n")
+	if ntype==0:
+		fo.write("Products Composition(mole ratio):\n")
+		for var in species:fo.write(var+" 2\n")
+		fo.write("end\n")
 	fo.close()
-	return CONTROL(fuel,oxid,prod)
+
+	return CONTROL(species)
 
 def fetch_elm_info(SPClist,control):
 	#species -> elements in species
@@ -209,7 +158,6 @@ def preCEA(var,fp):
 	control = read_checkout_chem(var,fp)
 	control = fetch_elm_info(SPClist,control)
 	if var ==0:
-		control.check_consistency()
 		trimedSPC = control.species
 	else:
 		trimedSPC = trimSPC(SPClist,control.elements)

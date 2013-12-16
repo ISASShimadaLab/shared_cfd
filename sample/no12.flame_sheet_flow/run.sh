@@ -15,8 +15,8 @@ cp $origin/*.x .
 ./checkout.py
 
 # move necessary input files
-mv control_chem.raw.inp checkout/control_chem.inp
-mv chem.inp             checkout/
+cp $origin/control_chem.inp checkout/
+rm control_chem.raw.inp
 
 cp $origin/control.inp checkout/control.inp
 rm checkout/control.raw.inp

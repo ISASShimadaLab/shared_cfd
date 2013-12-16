@@ -28,7 +28,10 @@ def raw2pro(name_raw,name_pro,fromto):
 
 def read_control_next(fp):
 	string = fp.readline()
-	string = string[string.index(':')+1:string.index('#')-1].strip()
+	if '#' in string:
+		string = string[string.index(':')+1:string.index('#')-1].strip()
+	else:
+		string = string[string.index(':')+1:].strip()
 	return string
 
 def read_control_next_int(fp):
