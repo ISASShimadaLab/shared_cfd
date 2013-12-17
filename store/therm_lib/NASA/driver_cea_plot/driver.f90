@@ -9,7 +9,7 @@ program driver
    integer i,Ntic
 
    !read files
-   call init_pack_cea
+   call init_pack_cea('uv')
 
    !calc stoichiometry
    Y(1)=1d0/(1d0+of)

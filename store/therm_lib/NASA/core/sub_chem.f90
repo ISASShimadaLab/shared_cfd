@@ -615,10 +615,11 @@ subroutine init_pack_cea!{{{
 
    call initialize_cea
 end subroutine init_pack_cea!}}}
-subroutine initialize_cea!{{{
+subroutine initialize_cea(flag)!{{{
    use chem
    use chem_var
    implicit none
+   character*2,intent(in)::flag
    double precision sumo,sumf,sm
    double precision Y(2),DHi(2)
    integer i,j
@@ -688,14 +689,32 @@ subroutine initialize_cea!{{{
    !calc n,E
    Y(1)=1d0;Y(2)=0d0
    rhof=pf/(Ru*1d3/MWf*Tf)
-   call flame_sheet(Y,Ef,Tf, MWf,kappaf,muf,DHi,Yvf,vhif)
-   Hf=Ef+pf/rhof
+   nf=nf+initial_eps
+   if(flag .eq. 'uv') then
+      call cea(rhof,Y,Ef, Tf,nf, MWf,kappaf,muf,Yvf,vhif)
+      pf=rhof*Ru*1d3/MWf*Tf
+      Hf=Ef+pf/rhof
+   else
+      Hf=Ef+pf/rhof
+      call cea_hp(pf,Y,Hf, Tf,nf, MWf,kappaf,muf,Yvf,vhif)
+      rhof=pf/(Ru*1d3/MWf*Tf)
+      Ef=Hf-pf/rhof
+   end if
    call set_static_qw(pf,rhof,Tf,Ef,kappaf,muf,Y,qf,wf)
 
    Y(1)=0d0;Y(2)=1d0
    rhoo=po/(Ru*1d3/MWo*To)
-   call flame_sheet(Y,Eo,To, MWo,kappao,muo,DHi,Yvo,vhio)
-   Ho=Eo+po/rhoo
+   no=no+initial_eps
+   if(flag .eq. 'uv') then
+      call cea(rhoo,Y,Eo, To,no, MWo,kappao,muo,Yvo,vhio)
+      po=rhoo*Ru*1d3/MWo*To
+      Ho=Eo+po/rhoo
+   else
+      Ho=Eo+po/rhoo
+      call cea_hp(po,Y,Ho, To,no, MWo,kappao,muo,Yvo,vhio)
+      rhoo=po/(Ru*1d3/MWo*To)
+      Eo=Ho-po/rhoo
+   end if
    call set_static_qw(po,rhoo,To,Eo,kappao,muo,Y,qo,wo)
 
    sm=sum(no(1:ns)+nf(1:ns),1)/ns
