@@ -1,9 +1,9 @@
 subroutine LU(A, b, x, n,flag)
    use const_chem
    implicit none
-   double precision,intent(inout)::A(ne+1, ne+1)
-   double precision,intent(inout)::b(ne+1)
-   double precision,intent(out)::x(ne+1)
+   double precision,intent(inout)::A(ne+2, ne+2)
+   double precision,intent(inout)::b(ne+2)
+   double precision,intent(out)::x(ne+2)
    integer,intent(in)::n
    logical,intent(out)::flag
    

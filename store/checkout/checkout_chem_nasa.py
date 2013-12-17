@@ -30,7 +30,7 @@ def checkout_chem_nasa():
 
 	####################################################################################
 	print "***thermal model***"
-	val = read_control_next_int(fp)
+	val_model = read_control_next_int(fp)
 	if(True):
 		print "\tNASA database is selected."
 		engage("therm_lib/NASA/core","checkout_chem",arr_engage)
@@ -49,14 +49,17 @@ def checkout_chem_nasa():
 		raw2pro("checkout_chem/mod_chem.raw.f90","checkout_chem/mod_chem.f90",fromto)
 		ABOUTNV="with-nV"
 		nY  = 2
-		if(val == 0):
+		if(val_model == 0):
 			print "\tflame sheet model is selected."
 			engage("therm_lib/NASA/driver_flame_sheet","checkout_chem",arr_engage)
 			nV  = 3
 		else:
 			print "\tperfect equilibrium model is selected."
 			nV  = val[1]
-			engage("therm_lib/NASA/driver_cea_plot","checkout_chem",arr_engage)
+			if val_model == 1:
+				engage("therm_lib/NASA/driver_cea_plot","checkout_chem",arr_engage)
+			else:
+				engage("therm_lib/NASA/driver_cea_plot_hp","checkout_chem",arr_engage)
 	else:
 		print "\tOdd Input at thermal model! value is ",val
 		sys.exit(1)
