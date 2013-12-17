@@ -7,5 +7,5 @@ end
 Fuel Pressure(Pa)       : 1.e5
 Fuel Temperature(K)     : 300.
 Fuel Composition(mole ratio):
-CH4 1
+C4H6,butadiene 1
 end

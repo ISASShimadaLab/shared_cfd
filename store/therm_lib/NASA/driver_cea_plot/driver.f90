@@ -70,12 +70,12 @@ program driver
                         "Temperature(K)","Energy(J/kg)","MW (g/mol)",&
                         "kappa","vis(Pa*s)"
 
+   T=To
    do i=0,Ntic
       Y(1)=dble(i)/dble(Ntic)
       Y(2)=1d0-Y(1)
       E  =  Ef*Y(1)+  Eo*Y(2)
       rho=rhof*Y(1)+rhoo*Y(2)
-      T=To
       call cea(rho,Y,E, T,n, MWave,kappa,mu,Yv,vhi)
       write(55,'(100es15.7)') Y,T,E,MWave,kappa,mu
    end do

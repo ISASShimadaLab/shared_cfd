@@ -645,6 +645,7 @@ subroutine initialize_cea!{{{
       end do
    end do
 
+   !set shift and mask
    nshiftf=0
    nshifto=0
    do i=1,ne
@@ -667,6 +668,22 @@ subroutine initialize_cea!{{{
    elistf(ne+1-nshiftf)=ne+1
    elistf(ne+2-nshiftf)=ne+2
    nef=ne+1-nshiftf
+   do j=1,ns
+      masko(j)=1d0
+      maskf(j)=1d0
+      do i=1,nshifto
+         if(Ac(nelisto(i),j) .ne. 0d0) then
+            masko(j)=0d0
+         end if
+      end do
+      do i=1,nshiftf
+         if(Ac(nelistf(i),j) .ne. 0d0) then
+            maskf(j)=0d0
+         end if
+      end do
+      if(masko(j) .ne. 1d0) masko(j)=1d-100
+      if(maskf(j) .ne. 1d0) maskf(j)=1d-100
+   end do
 
    !calc n,E
    Y(1)=1d0;Y(2)=0d0
@@ -780,6 +797,8 @@ subroutine cea(rho,Y,E, T,n, MWave,kappa,mu,Yv,vhi)!{{{
    logical flag,LUflag,REDUCEflag
    integer nen,elist(ne+2),nelist(ne+2)
 
+   double precision lambda1,lambda2,omega_var,logsn
+
    double precision,dimension(9)::vTmurt,vTcpr,vThrt
    double precision,dimension(4)::vTmu
 
@@ -795,11 +814,13 @@ subroutine cea(rho,Y,E, T,n, MWave,kappa,mu,Yv,vhi)!{{{
       nen=neo
       elist =elisto
       nelist=nelisto
+      n     =n*masko
    else if(Y(2)<Y_eps) then
       REDUCEflag=.true.
       nen=nef
       elist =elistf
       nelist=nelistf
+      n     =n*maskf
    else
       REDUCEflag=.false.
    end if
@@ -925,9 +946,22 @@ subroutine cea(rho,Y,E, T,n, MWave,kappa,mu,Yv,vhi)!{{{
             Dlogn(j)= -vmurt(j)+tmp+vert(j)*DlogT
          end do
 
+         !calc omega_var
+         lambda1=0d0
+         lambda2=1d300
+         logsn  =log(sn)
+         do j=1,ns
+            if(logn(j)-logsn>-18.420681d0) then
+               lambda1=max(lambda1,abs(Dlogn(j)))
+            else if(Dlogn(j)>0d0) then
+               lambda2=min(lambda2,abs((-logn(j)+logsn-9.2103404d0)/Dlogn(j)))
+            end if
+         end do
+         lambda1=2d0/max(5d0*abs(DlogT),abs(lambda1))
+         omega_var=min(1d0,min(lambda1,lambda2))
+
          !set new T
-         T=T*(1d0+omega*DlogT)
-         if(T < 0d0) stop "Negative Temperature."
+         T=T*exp(omega_var*DlogT)
          logT=log(T)
          do j=1,ns
             call check_section_number(j,T,sec_num(j))
@@ -940,7 +974,7 @@ subroutine cea(rho,Y,E, T,n, MWave,kappa,mu,Yv,vhi)!{{{
          call calc_vThrt(T,logT,vThrt)
          do j=1,ns
             !set vert
-            n(j)=n(j)*(1d0+omega*Dlogn(j))
+            n(j)=n(j)*exp(omega_var*Dlogn(j))
             if(n(j)<tinytinyn) then
                 n(j)    = tinytinyn
             else
@@ -1040,7 +1074,7 @@ subroutine cea_hp(p,Y,H, T,n, MWave,kappa,mu,Yv,vhi)!{{{
    double precision,dimension(ns)::vmurt,vhrt,Dlogn,logn
    integer,dimension(ns)::sec_num
    double precision,dimension(ne+2,ne+2)::Ad
-   double precision logP,tmp,logT,sn,Dlogsn,vmurtn,DlogT,b0max,Dnmax,logrhoRu,tinyn,tinytinyn,logtinyn,logtinytinyn
+   double precision logP,tmp,logT,sn,logsn,Dlogsn,vmurtn,DlogT,b0max,Dnmax,logrhoRu,tinyn,tinytinyn,logtinyn,logtinytinyn
 
    double precision dh
 
@@ -1051,6 +1085,8 @@ subroutine cea_hp(p,Y,H, T,n, MWave,kappa,mu,Yv,vhi)!{{{
    integer i,j,k,counter
    logical flag,LUflag,REDUCEflag
    integer nen,elist(ne+2),nelist(ne+2)
+
+   double precision lambda1,lambda2,omega_var
 
    double precision,dimension(9)::vTmurt,vTcpr,vThrt
    double precision,dimension(4)::vTmu
@@ -1069,11 +1105,13 @@ subroutine cea_hp(p,Y,H, T,n, MWave,kappa,mu,Yv,vhi)!{{{
       nen=neo+1
       elist =elisto
       nelist=nelisto
+      n     =n*masko
    else if(Y(2)<Y_eps) then
       REDUCEflag=.true.
       nen=nef+1
       elist =elistf
       nelist=nelistf
+      n     =n*maskf
    else
       REDUCEflag=.false.
    end if
@@ -1138,6 +1176,7 @@ subroutine cea_hp(p,Y,H, T,n, MWave,kappa,mu,Yv,vhi)!{{{
                   bd(i)     = bd(i)     + Ac(i,k)*(vmurtn-n(k))
                end do
 
+               Ad(ne+1,ne+2)= Ad(ne+1,ne+2)+ n(k) * vhrt(k)
                Ad(ne+2,ne+2)= Ad(ne+2,ne+2)+ n(k) *(vhrt(k)**2+dot_product(co(:,sec_num(k),k),vTcpr))
                bd(ne+1)     = bd(ne+1)     + vmurtn
                bd(ne+2)     = bd(ne+2)     + vmurtn*vhrt(k)
@@ -1207,13 +1246,25 @@ subroutine cea_hp(p,Y,H, T,n, MWave,kappa,mu,Yv,vhi)!{{{
             Dlogn(j)= -vmurt(j)+tmp+Dlogsn+vhrt(j)*DlogT
          end do
 
+         !calc omega_var
+         lambda1=0d0
+         lambda2=1d300
+         logsn  =log(b0(ne+1))
+         do j=1,ns
+            if(logn(j)-logsn>-18.420681d0) then
+               lambda1=max(lambda1,abs(Dlogn(j)))
+            else if(Dlogn(j)>0d0) then
+               lambda2=min(lambda2,abs((-logn(j)+logsn-9.2103404d0)/(Dlogn(j)-Dlogsn)))
+            end if
+         end do
+         lambda1=2d0/max(5d0*abs(DlogT),5d0*abs(Dlogsn),abs(lambda1))
+         omega_var=min(1d0,min(lambda1,lambda2))
+
          !set new sn
-         b0(ne+1)=b0(ne+1)*(1d0+omega*Dlogsn)
-         if(b0(ne+1) < 0d0) stop "Negative Total Mole."
+         b0(ne+1)=b0(ne+1)*exp(omega_var*Dlogsn)
 
          !set new T
-         T=T*(1d0+omega*DlogT)
-         if(T < 0d0) stop "Negative Temperature."
+         T=T*exp(omega_var*DlogT)
          logT=log(T)
          do j=1,ns
             call check_section_number(j,T,sec_num(j))
@@ -1227,7 +1278,7 @@ subroutine cea_hp(p,Y,H, T,n, MWave,kappa,mu,Yv,vhi)!{{{
          call calc_vThrt(T,logT,vThrt)
          do j=1,ns
             !set vhrt
-            n(j)=n(j)*(1d0+omega*Dlogn(j))
+            n(j)=n(j)*exp(omega_var*Dlogn(j))
             if(n(j)<tinytinyn) then
                 n(j)    = tinytinyn
             else
@@ -1248,7 +1299,7 @@ subroutine cea_hp(p,Y,H, T,n, MWave,kappa,mu,Yv,vhi)!{{{
          flag = .true.
          if(abs(Dnmax)>eps*sn) flag = .false.
          do i=1,ne
-            if(b0(i) > eps .and. abs(b0(i)-b(i))>b0max*eps)       flag = .false.
+            if(b0(i) > eps .and. abs(b0(i)-b(i))>b0max*eps)               flag = .false.
          end do
          if(abs(Dlogsn)>eps .or. abs(b0(ne+1)-b(ne+1))      >eps*abs(sn)) flag = .false.
          if(abs(DlogT) >eps .or. abs(H       -b(ne+2)*Ru*T) >eps*abs(H) ) flag = .false.

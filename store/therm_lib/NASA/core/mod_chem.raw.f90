@@ -5,8 +5,8 @@ module const_chem
 
    double precision,parameter::Ru         = 8.3144621d0 !universal gas constant
    double precision,parameter::pst        = 1d5         !standard state pressure
-   double precision,parameter::omega      = 0.06d0      !relaxation factor
-   double precision,parameter::eps        = 1d-8        !epsilon for convergence
+   double precision,parameter::omega      = 0.1d0       !relaxation factor
+   double precision,parameter::eps        = 1d-9        !epsilon for convergence
    double precision,parameter::initial_eps= 1d-5        !epsilon to stabilize calculation
    double precision,parameter::Y_eps      = 1d-6        !epsilon for reduction determination
    double precision,parameter::TSIZE      = 1d-11       !epsilon for calc E or H
@@ -49,6 +49,7 @@ module chem_var
    integer          nef
    integer          elistf(ne+2)
    integer          nelistf(ne+2)
+   double precision maskf(max_ns)
 
    double precision qo(dimq),wo(dimw)
    double precision rhoo,po,To,Eo,Ho,MWo,kappao,muo
@@ -58,6 +59,7 @@ module chem_var
    integer          neo
    integer          elisto(ne+2)
    integer          nelisto(ne+2)
+   double precision masko(max_ns)
 
    !for flame sheet model
    double precision np(max_ns)
