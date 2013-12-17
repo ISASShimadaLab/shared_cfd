@@ -637,6 +637,8 @@ subroutine initialize_cea(flag)!{{{
    !calc ini
    call calc_ini(pf,Tf, nf, Ef,MWf)
    call calc_ini(po,To, no, Eo,MWo)
+   nfini=nf
+   noini=no
  
    ! calc the amount of each element
    do j=1,ns
@@ -1378,4 +1380,26 @@ subroutine cea_hp(p,Y,H, T,n, MWave,kappa,mu,Yv,vhi)!{{{
    end do
    mu = mu * 1d-7
 end subroutine cea_hp!}}}
+subroutine calcH(T,Y,H)!{{{
+   use const_chem
+   use func_therm
+   use chem
+   use chem_var
+   implicit none
+   double precision,intent(in) ::T
+   double precision,intent(in) ::Y(2)
+   double precision,intent(out)::H
 
+   double precision,dimension(max_ns)::n
+   double precision,dimension(9)::vThrt
+   integer sec_num,j
+
+   n= Y(1)*nfini + Y(2)*noini
+   call calc_vThrt(T,log(T),vThrt)
+   H=0d0
+   do j=1,ns
+      call check_section_number(j,T,sec_num)
+      H=H+dot_product(co(:,sec_num,j),vThrt)*n(j)
+   end do
+   H=H*Ru*T
+end subroutine calcH!}}}

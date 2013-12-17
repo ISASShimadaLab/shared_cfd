@@ -58,8 +58,10 @@ def checkout_chem_nasa():
 			nV  = val[1]
 			if val_model == 1:
 				engage("therm_lib/NASA/driver_cea_plot","checkout_chem",arr_engage)
-			else:
+			elif val_model == 2:
 				engage("therm_lib/NASA/driver_cea_plot_hp","checkout_chem",arr_engage)
+			else:
+				engage("therm_lib/NASA/cea_reduction_hp","checkout_chem",arr_engage)
 	else:
 		print "\tOdd Input at thermal model! value is ",val
 		sys.exit(1)

@@ -46,6 +46,7 @@ module chem_var
    double precision Yvf(nV),vhif(nV)
    double precision b0f(ne+2)
    double precision nf(max_ns)
+   double precision nfini(max_ns)
    integer          nef
    integer          elistf(ne+2)
    integer          nelistf(ne+2)
@@ -56,6 +57,7 @@ module chem_var
    double precision Yvo(nV),vhio(nV)
    double precision b0o(ne+2)
    double precision no(max_ns)
+   double precision noini(max_ns)
    integer          neo
    integer          elisto(ne+2)
    integer          nelisto(ne+2)

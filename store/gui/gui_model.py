@@ -220,5 +220,4 @@ def output_and_run():
 			+printedout\
 			+"**************************\n"\
 			+"exit value: "+str(value),"Message")
-	if value==0:frame.Close()
 
