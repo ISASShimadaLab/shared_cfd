@@ -7,6 +7,7 @@ program driver
    double precision Y(2)
    double precision,dimension(max_ns)::n,vhi,Yv
    integer i,Ntic
+   logical flag_cea
 
    !read files
    call init_pack_cea('hp')
@@ -18,7 +19,7 @@ program driver
    p  = pf*Y(1)+po*Y(2)
    n  = n_save(:,1,1,1)
    T=300d0
-   call cea_hp(p,Y,H, T,n, MWave,kappa,mu,Yv,vhi)
+   call cea_hp(p,Y,H, T,n, MWave,kappa,mu,Yv,vhi,flag_cea)
    !print '(a,  f15.7)',"Y of f    ",Y(1)
    !print '(a,  f15.7)',"MWave     ",MWave
    !print '(a,  f15.7)',"kappa     ",kappa
@@ -76,7 +77,7 @@ program driver
       Y(2)=1d0-Y(1)
       H = Hf*Y(1)+Ho*Y(2)
       p = pf*Y(1)+po*Y(2)
-      call cea_hp(p,Y,H, T,n, MWave,kappa,mu,Yv,vhi)
+      call cea_hp(p,Y,H, T,n, MWave,kappa,mu,Yv,vhi,flag_cea)
       write(55,'(100es15.7)') Y,T,H,MWave,kappa,mu
    end do
    close(55)

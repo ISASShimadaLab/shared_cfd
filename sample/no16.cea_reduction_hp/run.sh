@@ -15,7 +15,7 @@ cp $origin/checkout_chem.inp .
 cp $origin/control_chem.inp checkout_chem/
 rm control_chem.raw.inp
 cp $origin/control.reduction.inp checkout_chem/control.inp
-rm control.raw.inp
+rm checkout_chem/control.raw.inp
 cd checkout_chem
 make
 ./driver

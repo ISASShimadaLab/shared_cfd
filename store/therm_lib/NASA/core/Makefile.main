@@ -1,7 +1,7 @@
 #chemlib
 LU.o: LU.f90
 	$(compiler) -c $<
-mod_chem.o:       mod_chem.f90
+mod_chem.o:       mod_chem.f90 $(core)
 	$(compiler) -c $<
 func_chem.o:      func_chem.f90 mod_chem.o
 	$(compiler) -c $<

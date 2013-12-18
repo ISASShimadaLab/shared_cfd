@@ -607,13 +607,14 @@ subroutine flame_sheet(Y,E, T, MWave,kappa,mu,DHi,Yv,vhi)!{{{
 end subroutine flame_sheet!}}}
 
 !cea
-subroutine init_pack_cea!{{{
+subroutine init_pack_cea(flag)!{{{
+   character*2,intent(in)::flag
    call read_cheminp
    call set_therm_data
    call set_trans_data
    call read_fo_composition
 
-   call initialize_cea
+   call initialize_cea(flag)
 end subroutine init_pack_cea!}}}
 subroutine initialize_cea(flag)!{{{
    use chem
@@ -624,6 +625,7 @@ subroutine initialize_cea(flag)!{{{
    double precision Y(2),DHi(2)
    integer i,j
    integer nshifto,nshiftf
+   logical flag_cea
 
    !set o/f ratio
    sumo=0d0
@@ -693,12 +695,12 @@ subroutine initialize_cea(flag)!{{{
    rhof=pf/(Ru*1d3/MWf*Tf)
    nf=nf+initial_eps
    if(flag .eq. 'uv') then
-      call cea(rhof,Y,Ef, Tf,nf, MWf,kappaf,muf,Yvf,vhif)
+      call cea(rhof,Y,Ef, Tf,nf, MWf,kappaf,muf,Yvf,vhif,flag)
       pf=rhof*Ru*1d3/MWf*Tf
       Hf=Ef+pf/rhof
    else
       Hf=Ef+pf/rhof
-      call cea_hp(pf,Y,Hf, Tf,nf, MWf,kappaf,muf,Yvf,vhif)
+      call cea_hp(pf,Y,Hf, Tf,nf, MWf,kappaf,muf,Yvf,vhif,flag_cea)
       rhof=pf/(Ru*1d3/MWf*Tf)
       Ef=Hf-pf/rhof
    end if
@@ -713,7 +715,7 @@ subroutine initialize_cea(flag)!{{{
       Ho=Eo+po/rhoo
    else
       Ho=Eo+po/rhoo
-      call cea_hp(po,Y,Ho, To,no, MWo,kappao,muo,Yvo,vhio)
+      call cea_hp(po,Y,Ho, To,no, MWo,kappao,muo,Yvo,vhio,flag_cea)
       rhoo=po/(Ru*1d3/MWo*To)
       Eo=Ho-po/rhoo
    end if
@@ -1074,7 +1076,7 @@ subroutine cea(rho,Y,E, T,n, MWave,kappa,mu,Yv,vhi)!{{{
    end do
    mu = mu * 1d-7
 end subroutine cea!}}}
-subroutine cea_hp(p,Y,H, T,n, MWave,kappa,mu,Yv,vhi)!{{{
+subroutine cea_hp(p,Y,H, T,n, MWave,kappa,mu,Yv,vhi,flag_outer)!{{{
    use const_chem
    use func_therm
    use chem
@@ -1084,23 +1086,24 @@ subroutine cea_hp(p,Y,H, T,n, MWave,kappa,mu,Yv,vhi)!{{{
    double precision,intent(in)   ::Y(2)
    double precision,intent(in)   ::H
    double precision,intent(inout)::T
-   double precision,intent(inout)::n(ns)
+   double precision,intent(inout)::n(max_ns)
    double precision,intent(out)  ::MWave
    double precision,intent(out)  ::kappa
    double precision,intent(out)  ::mu
-   double precision,intent(out)  ::Yv(ns)
-   double precision,intent(out)  ::vhi(ns)
+   double precision,intent(out)  ::Yv(max_ns)
+   double precision,intent(out)  ::vhi(max_ns)
+   logical         ,intent(out)  ::flag_outer
 
    double precision,dimension(ne+2)::b0,b,bd,vpi
-   double precision,dimension(ns)::vmurt,vhrt,Dlogn,logn
-   integer,dimension(ns)::sec_num
+   double precision,dimension(max_ns)::vmurt,vhrt,Dlogn,logn
+   integer,dimension(max_ns)::sec_num
    double precision,dimension(ne+2,ne+2)::Ad
    double precision logP,tmp,logT,sn,logsn,Dlogsn,vmurtn,DlogT,b0max,Dnmax,logrhoRu,tinyn,tinytinyn,logtinyn,logtinytinyn
 
    double precision dh
 
    integer sect
-   double precision,dimension(ns)::muN
+   double precision,dimension(max_ns)::muN
    double precision phi,denom,MWj,MWi
 
    integer i,j,k,counter
@@ -1113,6 +1116,7 @@ subroutine cea_hp(p,Y,H, T,n, MWave,kappa,mu,Yv,vhi)!{{{
    double precision,dimension(4)::vTmu
 
 
+   flag_outer=.true.
    logP = log(p/pst)
 
    !calc b0 of elements
@@ -1330,7 +1334,10 @@ subroutine cea_hp(p,Y,H, T,n, MWave,kappa,mu,Yv,vhi)!{{{
          counter=counter+1
       end do
 
-      if(counter>500) print *,"not converted. at cea_hp"
+      if(counter>500) then
+         print *,"not converted. at cea_hp"
+         flag_outer=.false.
+      end if
    end if
 
    MWave=1d3/sn
