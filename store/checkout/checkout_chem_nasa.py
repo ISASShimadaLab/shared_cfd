@@ -30,41 +30,69 @@ def checkout_chem_nasa():
 
 	####################################################################################
 	print "***thermal model***"
+	print "\tNASA database is selected."
+	engage("therm_lib/NASA/core","checkout_chem",arr_engage)
+	
+	# process mod_chem.f90
+	if not os.path.exists("chem.inp"):
+		print "ERROR:Can't find 'chem.inp'. Please try again."
+		sys.exit(1)
+	os.system("cp chem.inp checkout_chem/")
+	import store.checkout.ckinterp
+	val = store.checkout.ckinterp.ckinterp()
+	val = map(str,val)
+	fromto = [ \
+		["NE",val[0]],\
+		["NS",val[1]]]
+	raw2pro("checkout_chem/mod_chem.raw.f90","checkout_chem/mod_chem.f90",fromto)
+	ABOUTNV="with-nV"
+	nY  = 2
+
 	val_model = read_control_next_int(fp)
-	if(True):
-		print "\tNASA database is selected."
-		engage("therm_lib/NASA/core","checkout_chem",arr_engage)
-		
-		# process mod_chem.f90
-		if not os.path.exists("chem.inp"):
-			print "ERROR:Can't find 'chem.inp'. Please try again."
-			sys.exit(1)
-		os.system("cp chem.inp checkout_chem/")
-		import store.checkout.ckinterp
-		val = store.checkout.ckinterp.ckinterp()
-		val = map(str,val)
-		fromto = [ \
-			["NE",val[0]],\
-			["NS",val[1]]]
-		raw2pro("checkout_chem/mod_chem.raw.f90","checkout_chem/mod_chem.f90",fromto)
-		ABOUTNV="with-nV"
-		nY  = 2
-		if(val_model == 0):
-			print "\tflame sheet model is selected."
-			engage("therm_lib/NASA/driver_flame_sheet","checkout_chem",arr_engage)
-			nV  = 3
-		else:
-			print "\tperfect equilibrium model is selected."
-			nV  = val[1]
-			if val_model == 1:
-				engage("therm_lib/NASA/driver_cea_plot","checkout_chem",arr_engage)
-			elif val_model == 2:
-				engage("therm_lib/NASA/driver_cea_plot_hp","checkout_chem",arr_engage)
-			else:
-				engage("therm_lib/NASA/cea_reduction_hp","checkout_chem",arr_engage)
+	if   val_model == 0:
+		print "\tflame sheet model is selected."
+		nV  = 3
+		string_model="flame_sheet_"
+	elif val_model == 1:
+		print "\tperfect equilibrium model is selected."
+		nV  = val[1]
+		string_model="cea_"
 	else:
 		print "\tOdd Input at thermal model! value is ",val
 		sys.exit(1)
+
+	####################################################################################
+	print "***calculation model***"
+	val_calc  = read_control_next_int(fp)
+	if   val_calc == 0:
+		print "\tmono selected"
+		string_calc="mono_"
+	elif val_calc == 1:
+		print "\tplot selected"
+		string_calc="plot_"
+	elif val_calc == 2:
+		print "\treduction selected"
+		string_calc="reduction_"
+	else:
+		print "\tOdd Input at calculation model! value is ",val
+		sys.exit(1)
+
+	####################################################################################
+	print "***constants***"
+	val_hpuv  = read_control_next_int(fp)
+	if   val_hpuv == 0:
+		print "\tconstant volume and energy selected"
+		string_hpuv="uv"
+	elif val_hpuv == 1:
+		print "\tconstant pressure and enthalpy selected"
+		string_hpuv="hp"
+	else:
+		print "\tOdd Input at constants selection! value is ",val
+		sys.exit(1)
+
+	####################################################################################
+	engage("therm_lib/NASA/"+string_model+string_calc+string_hpuv,"checkout_chem",arr_engage)
+
 	####################################################################################
 	# close checkout.inp
 	fp.close()

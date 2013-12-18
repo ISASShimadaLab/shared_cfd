@@ -1,0 +1,4 @@
+Pressure (Pa)         range and Ntics : 1.e5 1.e6  7
+Temperature (K)       range and Ntics : 300. 300.  1
+mass fraction of fuel range and Ntics :   0.   1. 11
+variable for x axis                   : P # P or T or Yf. Yf is mass fraction of fuel

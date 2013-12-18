@@ -1,6 +1,6 @@
 #origin=`pwd`
 #cd ../../
-origin="sample/no15.cea_chem_hp"
+origin="sample/no13.flame_sheet_mono_uv"
 
 #checkout model
 rm checkout.inp
@@ -14,7 +14,6 @@ cp $origin/checkout_chem.inp .
 ./checkout.py
 cp $origin/control_chem.inp checkout_chem/
 rm control_chem.raw.inp
-mv checkout_chem/control.raw.inp checkout_chem/control.inp
 cd checkout_chem
 make
 ./driver

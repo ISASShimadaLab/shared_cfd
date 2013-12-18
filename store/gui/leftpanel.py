@@ -2,7 +2,7 @@
 import wx
 from PIL import Image
 def leftpanel(frame):
-	height = 530 #image height
+	height = 580 #image height
 
 	LeftPanel = wx.Panel(frame,wx.ID_ANY)
 	LeftPanel.SetBackgroundColour('#FFFFFF')
