@@ -1410,3 +1410,29 @@ subroutine calcH(T,Y,H)!{{{
    end do
    H=H*Ru*T
 end subroutine calcH!}}}
+subroutine calcE_from_p(p,T,Y,rho,E)!{{{
+   use const_chem
+   use func_therm
+   use chem
+   use chem_var
+   implicit none
+   double precision,intent(in) ::p
+   double precision,intent(in) ::T
+   double precision,intent(in) ::Y(2)
+   double precision,intent(out)::rho
+   double precision,intent(out)::E
+
+   double precision,dimension(max_ns)::n
+   double precision,dimension(9)::vThrt
+   integer sec_num,j
+
+   n= Y(1)*nfini + Y(2)*noini
+   rho=p/(sum(n(1:ns),1)*Ru*T)
+   call calc_vThrt(T,log(T),vThrt)
+   E=0d0
+   do j=1,ns
+      call check_section_number(j,T,sec_num)
+      E=E+(dot_product(co(:,sec_num,j),vThrt)-1d0)*n(j)
+   end do
+   E=E*Ru*T
+end subroutine calcE_from_p!}}}

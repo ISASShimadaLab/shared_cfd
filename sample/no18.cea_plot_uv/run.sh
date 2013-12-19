@@ -1,6 +1,6 @@
 #origin=`pwd`
 #cd ../../
-origin="sample/no17.cea_plot_hp"
+origin="sample/no18.cea_plot_uv"
 
 #checkout model
 rm checkout.inp

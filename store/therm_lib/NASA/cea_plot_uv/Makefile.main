@@ -1,0 +1,3 @@
+
+conditions.o : conditions.f90 mod_chem.o
+	$(compiler) -c $<
