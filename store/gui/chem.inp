@@ -1,7 +1,20 @@
 ------------------------ Radio Box --------------------------------
-task selection
-Flame Sheet                 : plot hp,Perfect Equilibrium : plot uv,Perfect Equilibrium : plot hp,Perfect Equilibrium : reduction hp
-task number: 
-\n# task number\n# thermal model=flame sheet of nasa\n#	0 : plot parameters such as temperature and specific heat ratio against different mixture ratio
+thermal model
+flame sheet of nasa,NASA CEA
+thermal model: 
+ # flame sheet of nasa(0) / NASA CEA(1) / chemkin(2)
 
------------------------- END --------------------------------------
+calc model
+only stoichiometry,plot,reduction
+calc model   : 
+ # mono(0) / plot(1) / reduction(2)
+
+constants
+constant volume and energy,constant pressure and enthalpy
+constants    : 
+ # uv(0) / hp(1)
+
+------------------------ NG list ----------------------------------
+ 0, 2,-1
+ 0,-1, 1 
+-1, 2, 0

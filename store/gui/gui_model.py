@@ -158,10 +158,10 @@ def set_panel(mainframe,base_panel):
 	RA=[]
 	for i in range(len(datRA)):
 		RA.append(RAelm(i,RightPanel,datRA[i]))
-		layoutRight.Add(RA[i],		flag=wx.GROW|wx.ALL,border=10)
+		layoutRight.Add(RA[i],flag=wx.GROW,border=10)
 
 	LB=LBplane(RightPanel)
-	layoutRight.Add(LB,flag=wx.GROW|wx.ALL,border=10)
+	layoutRight.Add(LB,flag=wx.GROW,border=10)
 
 	# Control Buttons
 	cb=CONTROL_BUTTONS_MODEL(RightPanel)

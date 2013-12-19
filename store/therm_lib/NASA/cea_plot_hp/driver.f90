@@ -8,4 +8,6 @@ program driver
    call read_conditions
    call calcTeq(flag)
    if(.not.flag) print *,"Calculation failed to converge."
+   call out_plt
+   print *,"done"
 end program driver
