@@ -30,33 +30,59 @@ def checkout_chem_nasa():
 
 	####################################################################################
 	print "***thermal model***"
-	print "\tNASA database is selected."
-	engage("therm_lib/NASA/core","checkout_chem",arr_engage)
-	
-	# process mod_chem.f90
-	if not os.path.exists("chem.inp"):
-		print "ERROR:Can't find 'chem.inp'. Please try again."
-		sys.exit(1)
-	os.system("cp chem.inp checkout_chem/")
-	import store.checkout.ckinterp
-	val = store.checkout.ckinterp.ckinterp()
-	val = map(str,val)
-	fromto = [ \
-		["NE",val[0]],\
-		["NS",val[1]]]
-	raw2pro("checkout_chem/mod_chem.raw.f90","checkout_chem/mod_chem.f90",fromto)
-	ABOUTNV="with-nV"
-	nY  = 2
-
 	val_model = read_control_next_int(fp)
-	if   val_model == 0:
-		print "\tflame sheet model is selected."
-		nV  = 3
-		string_model="flame_sheet/"
-	elif val_model == 1:
-		print "\tperfect equilibrium model is selected."
-		nV  = val[1]
-		string_model="cea/"
+	if val_model < 2:
+		print "\tNASA database is selected."
+		engage("therm_lib/NASA/core","checkout_chem",arr_engage)
+		string_data="NASA/"
+		
+		# process mod_chem.f90
+		if not os.path.exists("chem.inp"):
+			print "ERROR:Can't find 'chem.inp'. Please try again."
+			sys.exit(1)
+		os.system("cp chem.inp checkout_chem/")
+		import store.checkout.ckinterp
+		val = store.checkout.ckinterp.ckinterp()
+		val = map(str,val)
+		fromto = [ \
+			["NE",val[0]],\
+			["NS",val[1]]]
+		raw2pro("checkout_chem/mod_chem.raw.f90","checkout_chem/mod_chem.f90",fromto)
+		ABOUTNV="with-nV"
+		nY  = 2
+
+		if   val_model == 0:
+			print "\tflame sheet model is selected."
+			nV  = 3
+			string_model="flame_sheet/"
+		elif val_model == 1:
+			print "\tperfect equilibrium model is selected."
+			nV  = val[1]
+			string_model="cea/"
+	elif val_model == 2:
+		print "\tCHEMKIN is selected."
+		engage("therm_lib/chemkin/core","checkout_chem",arr_engage)
+		string_data="chemkin/"
+		
+		# process mod_chem.f90
+		if not os.path.exists("chem.inp"):
+			print "ERROR:Can't find 'chem.inp'. Please try again."
+			sys.exit(1)
+		os.system("cp chem.inp checkout_chem/")
+		import store.checkout.ckinterp
+		val = store.checkout.ckinterp.ckinterp()
+		val = map(str,val)
+		fromto = [ \
+			["NE",val[0]],\
+			["NS",val[1]],\
+			["NR",val[2]]]
+		raw2pro("checkout_chem/mod_chem.raw.f90","checkout_chem/mod_chem.f90",fromto)
+		ABOUTNV="no-nV"
+		nY  = val[1]
+		nV  = nY
+
+		print "\tchemical kinetic model is selected."
+		string_model=""
 	else:
 		print "\tOdd Input at thermal model! value is ",val
 		sys.exit(1)
@@ -91,7 +117,7 @@ def checkout_chem_nasa():
 		sys.exit(1)
 
 	####################################################################################
-	engage("therm_lib/NASA/"+string_model+string_calc+string_hpuv,"checkout_chem",arr_engage)
+	engage("therm_lib/"+string_data+string_model+string_calc+string_hpuv,"checkout_chem",arr_engage)
 
 	####################################################################################
 	# close checkout.inp

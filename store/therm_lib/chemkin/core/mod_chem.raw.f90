@@ -12,9 +12,9 @@ module const_chem
    double precision,parameter::logPR=- 4.407418526701446!log(Pst/Ru)
   
    !!!!!!!!!!!!!!!!! CHANGE BELOW IF YOU CHANGE CHEM.INP !!!!!!!!!!!!!!!!!!!!!
-   integer,parameter::ne=NumOfElements  !num of elements
-   integer,parameter::ns=NumOfSpecies   !num of species
-   integer,parameter::nr=NumOfReactions !num of reactions
+   integer,parameter::ne=NE !num of elements
+   integer,parameter::ns=NS !num of species
+   integer,parameter::nr=NR !num of reactions
 
    integer,parameter::LRW=22+9*(ns+1)+2*(ns+1)**2
    integer,parameter::LIW=30+  (ns+1)

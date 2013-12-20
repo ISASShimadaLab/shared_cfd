@@ -220,13 +220,13 @@ def checkout_flow():
 		engage("therm_lib/chemkin/core","checkout",arr_engage)
 		if(val == 1) :
 			print "\tCold Flow using chemical kinetics database is selected."
-			engage("therm_lib/chemkin/cold_flow","checkout",arr_engage)
+			engage("therm_lib/chemkin/flow/cold","checkout",arr_engage)
 		else:
 			print "\tChemical Kinetics Model is selected."
 			if(val_dt == 1):
 				print "Error : Chemical Kinetics Model cannot be used at local time step."
 				sys.exit(1)
-			engage("therm_lib/chemkin/reactive_flow","checkout",arr_engage)
+			engage("therm_lib/chemkin/flow/reactive","checkout",arr_engage)
 
 		# process mod_chem.f90
 		if not os.path.exists("chem.inp"):
@@ -238,9 +238,9 @@ def checkout_flow():
 		val = map(str,val)
 		val[2]=max(val[2],1)
 		fromto = [ \
-			["NumOfElements " ,val[0]],\
-			["NumOfSpecies  " ,val[1]],\
-			["NumOfReactions" ,val[2]]]
+			["NE" ,val[0]],\
+			["NS" ,val[1]],\
+			["NR" ,val[2]]]
 		raw2pro("checkout/mod_chem.raw.f90","checkout/mod_chem.f90",fromto)
 	
 		nY  = val[1]

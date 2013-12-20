@@ -1,11 +1,11 @@
 ------------------------ Radio Box --------------------------------
 thermal model
-flame sheet of nasa,NASA CEA
+flame sheet of nasa,NASA CEA, chemkin
 thermal model: 
  # flame sheet of nasa(0) / NASA CEA(1) / chemkin(2)
 
 calc model
-only stoichiometry,plot,reduction
+only one condition,plot,reduction
 calc model   : 
  # mono(0) / plot(1) / reduction(2)
 

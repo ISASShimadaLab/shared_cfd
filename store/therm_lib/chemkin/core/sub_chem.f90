@@ -187,7 +187,34 @@ subroutine set_coeff_mu(T,logT,cmu)!{{{
 end subroutine set_coeff_mu!}}}
 end module func_therm
 
-! data_read routines
+! initialization
+subroutine read_chemkin_parameter!{{{
+   use chem
+   use mod_mpi
+   use chem_var
+   implicit none
+
+   if(myid .eq. 0) then
+      open(8,file="control_chem.inp")
+      read(8,'()')
+      read(8,'(25x,i10)')    ns_tocalc
+      close(8)
+
+      !!! adjust data !!!
+      select case(ns_tocalc)
+         case(:-1)
+            ns_tocalc = ns
+         case(0,ns+1:)
+            print *,"Odd Number to calculation at flame sheet. : value = ",ns_tocalc
+            stop
+      end select
+   end if
+
+   !print *,"ns_tocalc = ",ns_tocalc
+
+   !!! MPI COMMUNICATIONS
+   call MPI_Bcast(ns_tocalc,1,          MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
+end subroutine read_chemkin_parameter!}}}
 subroutine set_reac_and_therm_data!{{{
    use mod_mpi
    use const_chem
@@ -863,6 +890,93 @@ contains
       search_species_trans=-1
    end function search_species_trans
 end subroutine set_trans_data!}}}
+subroutine read_fo_composition!{{{
+   use chem
+   use mod_mpi
+   use chem_var
+   implicit none
+   character*100 buf,buf2
+   double precision amount
+   integer ind
+
+   double precision DHit(nY)
+   integer i
+
+   if(myid .eq. 0) then
+      vrhoo =1d-20
+      vrhof =1d-20
+
+      open(8,file="control_chem.inp")
+      read(8,'()')
+      read(8,'()')
+      read(8,'(25x,es15.7)') po
+      read(8,'(25x,es15.7)') To
+      read(8,'()')
+      do
+         read(8,'(a)') buf
+         if(buf(1:3) .eq. 'end') exit
+         buf=adjustl(trim(buf)) !delete front and back spaces
+         ind=index(buf,' ')
+         if(ind .eq. 0) stop "Bad format at control_chem.inp while reading Oxidizer Compositions"
+         read(buf(ind+1:),*) amount
+         vrhoo(search_species(buf(1:ind-1))) = amount
+      end do
+      read(8,'(25x,es15.7)') pf
+      read(8,'(25x,es15.7)') Tf
+      read(8,'()')
+      do
+         read(8,'(a)') buf
+         if(buf(1:3) .eq. 'end') exit
+         buf=adjustl(trim(buf)) !delete front and back spaces
+         ind=index(buf,' ')
+         if(ind .eq. 0) stop "Bad format at control_chem.inp while reading Fuel Compositions"
+         read(buf(ind+1:),*) amount
+         vrhof(search_species(buf(1:ind-1))) = amount
+      end do
+      close(8)
+   end if
+
+   !print *,"ns_tocalc = ",ns_tocalc
+
+   !!! MPI COMMUNICATIONS
+   call MPI_Bcast(po,       1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
+   call MPI_Bcast(To,       1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
+   call MPI_Bcast(vrhoo,   ns, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
+
+   call MPI_Bcast(pf,       1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
+   call MPI_Bcast(Tf,       1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
+   call MPI_Bcast(vrhof,   ns, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
+
+
+   !!! calculate other properties for oxidizer and fuel
+   call rho_rel2abs(po,To, vrhoo, rhoo,Eo)
+   call calc_T(vrhoo,rhoo,Eo, To, kappao,MWo,DHit,vhio,muo)
+   vwo(1:nY) = vrhoo(1:nY)/rhoo
+
+   call rho_rel2abs(pf,Tf, vrhof, rhof,Ef)
+   call calc_T(vrhof,rhof,Ef, Tf, kappaf,MWf,DHit,vhif,muf)
+   vwf(1:nY) = vrhof(1:nY)/rhof
+contains
+   integer function search_species(str)
+      use chem
+      character(*),intent(in)::str
+      integer i
+   
+      do i=1,ns_tocalc
+         if(trim(SYM_SPC(i)) .eq. trim(str)) then
+            search_species=i
+            return
+         end if
+      end do
+      search_species=-1
+   end function search_species
+end subroutine read_fo_composition!}}}
+subroutine init_therm!{{{
+   call read_chemkin_parameter
+   call set_reac_and_therm_data
+   call set_trans_data
+   call read_fo_composition
+end subroutine init_therm!}}}
 
 ! reaction
 subroutine Fex(neq_outer, tt, n, dndt, rpar, ipar)!{{{
@@ -1270,117 +1384,7 @@ subroutine Jex(neq_outer, tt, n, ML, MU, dndn, nrpd, rpar, ipar)!{{{
    !end do
 end subroutine Jex!}}}
 
-!read control.inp
-subroutine read_chemkin_parameter!{{{
-   use chem
-   use mod_mpi
-   use chem_var
-   implicit none
-
-   if(myid .eq. 0) then
-      open(8,file="control_chem.inp")
-      read(8,'()')
-      read(8,'(25x,i10)')    ns_tocalc
-      close(8)
-
-      !!! adjust data !!!
-      select case(ns_tocalc)
-         case(:-1)
-            ns_tocalc = ns
-         case(0,ns+1:)
-            print *,"Odd Number to calculation at flame sheet. : value = ",ns_tocalc
-            stop
-      end select
-   end if
-
-   !print *,"ns_tocalc = ",ns_tocalc
-
-   !!! MPI COMMUNICATIONS
-   call MPI_Bcast(ns_tocalc,1,          MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
-end subroutine read_chemkin_parameter!}}}
-subroutine read_fo_composition!{{{
-   use chem
-   use mod_mpi
-   use chem_var
-   implicit none
-   character*100 buf,buf2
-   double precision amount
-   integer ind
-
-   double precision DHit(nY)
-   integer i
-
-   if(myid .eq. 0) then
-      vrhoo =1d-20
-      vrhof =1d-20
-
-      open(8,file="control_chem.inp")
-      read(8,'()')
-      read(8,'()')
-      read(8,'(25x,es15.7)') po
-      read(8,'(25x,es15.7)') To
-      read(8,'()')
-      do
-         read(8,'(a)') buf
-         if(buf(1:3) .eq. 'end') exit
-         buf=adjustl(trim(buf)) !delete front and back spaces
-         ind=index(buf,' ')
-         if(ind .eq. 0) stop "Bad format at control_chem.inp while reading Oxidizer Compositions"
-         read(buf(ind+1:),*) amount
-         vrhoo(search_species(buf(1:ind-1))) = amount
-      end do
-      read(8,'(25x,es15.7)') pf
-      read(8,'(25x,es15.7)') Tf
-      read(8,'()')
-      do
-         read(8,'(a)') buf
-         if(buf(1:3) .eq. 'end') exit
-         buf=adjustl(trim(buf)) !delete front and back spaces
-         ind=index(buf,' ')
-         if(ind .eq. 0) stop "Bad format at control_chem.inp while reading Fuel Compositions"
-         read(buf(ind+1:),*) amount
-         vrhof(search_species(buf(1:ind-1))) = amount
-      end do
-      close(8)
-   end if
-
-   !print *,"ns_tocalc = ",ns_tocalc
-
-   !!! MPI COMMUNICATIONS
-   call MPI_Bcast(po,       1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
-   call MPI_Bcast(To,       1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
-   call MPI_Bcast(vrhoo,   ns, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
-
-   call MPI_Bcast(pf,       1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
-   call MPI_Bcast(Tf,       1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
-   call MPI_Bcast(vrhof,   ns, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
-
-
-   !!! calculate other properties for oxidizer and fuel
-   call rho_rel2abs(po,To, vrhoo, rhoo,Eo)
-   call calc_T(vrhoo,rhoo,Eo, To, kappao,MWo,DHit,vhio,muo)
-   vwo(1:nY) = vrhoo(1:nY)/rhoo
-
-   call rho_rel2abs(pf,Tf, vrhof, rhof,Ef)
-   call calc_T(vrhof,rhof,Ef, Tf, kappaf,MWf,DHit,vhif,muf)
-   vwf(1:nY) = vrhof(1:nY)/rhof
-contains
-   integer function search_species(str)
-      use chem
-      character(*),intent(in)::str
-      integer i
-   
-      do i=1,ns_tocalc
-         if(trim(SYM_SPC(i)) .eq. trim(str)) then
-            search_species=i
-            return
-         end if
-      end do
-      search_species=-1
-   end function search_species
-end subroutine read_fo_composition!}}}
-
-! flame sheet model
+! cold flow
 subroutine calc_T(vrho,rho,E, T, kappa,MWave,DHi,vhi,mu)!{{{
    use const_chem
    use chem
@@ -1675,6 +1679,38 @@ subroutine rho_rel2abs(p,T, vrho, rho,E)!{{{
    end do
    E=E*Ru*T/rho/1d1
 end subroutine rho_rel2abs!}}}
+
+!boundary condition
+subroutine calc_boundary(p,T,deg, wt,vhi)!{{{
+   use grbl_prmtr
+   use prmtr
+   use const_chem
+   implicit none
+   double precision,intent(in)::p
+   double precision,intent(inout)::T
+   double precision,intent(in)::deg
+
+   double precision,intent(out)::wt(dimw)
+   double precision,intent(out)::vhi(ns)
+
+   double precision,dimension(ns)::vrho,DHi
+   double precision rho,E,MWave
+   integer j
+
+   call calc_vrho(p,T,deg, rho,vrho,E)
+   call calc_T(vrho,rho,E, T, wt(indxg),MWave,DHi,vhi,wt(indxMu))
+
+   !set wt
+   wt(1)=rho
+   wt(2)=0d0
+   wt(3)=0d0
+   wt(4)=p
+   do j=1,ns
+      wt(4+j)=vrho(j)/rho
+   end do
+   wt(indxht)=E+p/rho
+   wt(indxR) =R_uni/MWave
+end subroutine calc_boundary!}}}
 
 !!for post process
 !calculate dTdt
