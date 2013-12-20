@@ -388,14 +388,18 @@ subroutine initialize_flame_sheet!{{{
    !calc n,E
    Y(1)=1d0;Y(2)=0d0
    call calc_ini(pf,Tf, nf, Ef)
+   nfini=nf
    call flame_sheet(Y,Ef,Tf, MWf,kappaf,muf,DHi,Yvf,vhif)
    rhof=pf/(Ru*1d3/MWf*Tf)
+   Hf  =Ef+pf/rhof
    call set_static_qw(pf,rhof,Tf,Ef,kappaf,muf,Y,qf,wf)
 
    Y(1)=0d0;Y(2)=1d0
    call calc_ini(po,To, no, Eo)
+   noini=no
    call flame_sheet(Y,Eo,To, MWo,kappao,muo,DHi,Yvo,vhio)
    rhoo=po/(Ru*1d3/MWo*To)
+   Ho  =Eo+po/rhoo
    call set_static_qw(po,rhoo,To,Eo,kappao,muo,Y,qo,wo)
  
    sm=0d0
@@ -605,6 +609,143 @@ subroutine flame_sheet(Y,E, T, MWave,kappa,mu,DHi,Yv,vhi)!{{{
    end do
    mu = mu * 1d-7
 end subroutine flame_sheet!}}}
+subroutine flame_sheet_hp(Y,H, T, MWave,kappa,mu,DHi,Yv,vhi)!{{{
+   use chem
+   use chem_var
+   use func_therm
+   implicit none
+   double precision,intent(in)   ::Y(2)
+   double precision,intent(in)   ::H
+   double precision,intent(inout)::T
+   double precision,intent(out)  ::MWave
+   double precision,intent(out)  ::kappa
+   double precision,intent(out)  ::mu
+   double precision,intent(out)  ::DHi(2)
+   double precision,intent(out)  ::Yv(3)
+   double precision,intent(out)  ::vhi(3)
+
+   double precision Yf,Yo,Yp
+   double precision n(  ns)
+   double precision muN(ns)
+
+   double precision T_old
+
+   integer secN,sect
+   double precision denom
+   double precision cprnow,HRTnow,logT,sn,phi
+   double precision,dimension(9)::vThrt,vTcpr
+   double precision,dimension(4)::vTmu
+   double precision MWi,MWj
+   double precision,dimension(ns)::vhi_s,DHi_s
+
+   double precision tmp,tmp2
+   integer i,j,k
+
+   !set n
+   Yo = Y(2)-of*Y(1)
+   if(Yo>0d0) then
+      Yf=0d0
+      Yp=Y(1)*(1d0+of)
+   else
+      Yf=-Yo/of
+      Yo=0d0
+      Yp=Y(2)*(1d0+1d0/of)
+   end if
+   n=Yo*no+Yf*nf+Yp*np !mole/kg
+   Yv(1)=Yf
+   Yv(2)=Yo
+   Yv(3)=Yp
+
+   sn=sum(n,1)
+   MWave=1d3/sn !(g/kg)/(mole/kg)=g/mole
+
+   !calc T
+   logT=log(T)
+   HRTnow=0d0;cprnow=0d0
+   call calc_vThrt( T,logT,vThrt)
+   call calc_vTcpr( T,     vTcpr)
+   do i=1,ns
+      call check_section_number(i,T,secN)
+      tmp =0d0;tmp2=0d0
+      do j=1,9
+         tmp  = tmp +co(j,secN,i)*vThrt(j)
+         tmp2 = tmp2+co(j,secN,i)*vTcpr(j)
+      end do
+      HRTnow = HRTnow + tmp *n(i)
+      cprnow = cprnow + tmp2*n(i)
+   end do
+
+   k=0
+   T_old = T*0.5d0
+   do while(abs(H/Ru-HRTnow*T)>cprnow*eps*1d-2 .and. abs(T-T_old)>eps .and. k<100)
+      T_old =T
+      T     =T+omega*(H/Ru-HRTnow*T)/cprnow
+      logT=log(T)
+
+      HRTnow=0d0;cprnow=0d0
+      call calc_vThrt( T,logT,vThrt)
+      call calc_vTcpr( T,     vTcpr)
+      do i=1,ns
+         call check_section_number(i,T,secN)
+         tmp =0d0;tmp2=0d0
+         do j=1,9
+            tmp  = tmp +co(j,secN,i)*vThrt(j)
+            tmp2 = tmp2+co(j,secN,i)*vTcpr(j)
+         end do
+         HRTnow = HRTnow + tmp *n(i)
+         cprnow = cprnow + tmp2*n(i)
+      end do
+
+      k=k+1
+   end do
+
+   if(k >= 100) then
+      print *, "Not Converted at flame_sheet"
+      !call exit(1)
+   end if
+
+   !calc kappa
+   kappa=cprnow/(cprnow-sn)
+
+   !calc DHi and vhi
+   do i=1,ns
+      call check_section_number(i,T,secN)
+      tmp= 0d0
+      do j=1,9
+         tmp =tmp +co(j,secN,i)*vThrt(j)
+      end do
+      DHi_s(i)=1d0*(kappa-(kappa-1d0)*tmp)
+      vhi_s(i)=1d0*tmp
+   end do
+   tmp=Ru*T
+   DHi(1)=dot_product(nf,DHi_s)*tmp
+   DHi(2)=dot_product(no,DHi_s)*tmp
+
+   vhi(1)=dot_product(nf,vhi_s)*tmp
+   vhi(2)=dot_product(no,vhi_s)*tmp
+   vhi(3)=dot_product(np,vhi_s)*tmp
+
+   !calc mu
+   call calc_vTmu(T,logT,vTmu)
+   do i=1,nt
+      call check_section_number_trans(i,T,sect)
+      muN(i)=exp(dot_product(trans(:,sect,i),vTmu))
+   end do
+
+   mu = 0d0
+   do i=1,nt
+      denom = 0d0
+      MWi=MW(tr2th(i))
+      do j=1,nt
+         MWj=MW(tr2th(j))
+         phi = 0.25d0*(1d0+sqrt(muN(i)/muN(j))*(MWj/MWi)**0.25d0 )**2 &
+                     *sqrt(2d0*MWj/(MWi+MWj))
+         denom = denom + n(tr2th(j)) * phi
+      end do
+      mu = mu + n(tr2th(i)) * muN(i) / denom
+   end do
+   mu = mu * 1d-7
+end subroutine flame_sheet_hp!}}}
 
 !cea
 subroutine init_pack_cea(flag)!{{{

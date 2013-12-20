@@ -52,11 +52,11 @@ def checkout_chem_nasa():
 	if   val_model == 0:
 		print "\tflame sheet model is selected."
 		nV  = 3
-		string_model="flame_sheet_"
+		string_model="flame_sheet/"
 	elif val_model == 1:
 		print "\tperfect equilibrium model is selected."
 		nV  = val[1]
-		string_model="cea_"
+		string_model="cea/"
 	else:
 		print "\tOdd Input at thermal model! value is ",val
 		sys.exit(1)
@@ -66,13 +66,13 @@ def checkout_chem_nasa():
 	val_calc  = read_control_next_int(fp)
 	if   val_calc == 0:
 		print "\tmono selected"
-		string_calc="mono_"
+		string_calc="mono/"
 	elif val_calc == 1:
 		print "\tplot selected"
-		string_calc="plot_"
+		string_calc="plot/"
 	elif val_calc == 2:
 		print "\treduction selected"
-		string_calc="reduction_"
+		string_calc="reduction/"
 	else:
 		print "\tOdd Input at calculation model! value is ",val
 		sys.exit(1)

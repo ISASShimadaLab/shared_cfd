@@ -5,7 +5,7 @@ module const_chem
 
    double precision,parameter::Ru         = 8.3144621d0 !universal gas constant
    double precision,parameter::pst        = 1d5         !standard state pressure
-   double precision,parameter::omega      = 0.1d0       !relaxation factor
+   double precision,parameter::omega      = 0.5d0       !relaxation factor
    double precision,parameter::eps        = 1d-9        !epsilon for convergence
    double precision,parameter::initial_eps= 1d-5        !epsilon to stabilize calculation
    double precision,parameter::Y_eps      = 1d-6        !epsilon for reduction determination

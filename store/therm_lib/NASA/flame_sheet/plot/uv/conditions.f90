@@ -161,7 +161,7 @@ subroutine out_plt!{{{
       call sub("Initial Temperature(K)","1",&
                "Mole Fraction of fuel",numYf,list_Yf,'f6.3')
    else
-      call sub("Mole Fraction of fuel","3",&
+      call sub("Mole Fraction of fuel","2",&
                "Initial Temperature(K)",numT, list_T, 'f5.0')
    end if
    close(55)
@@ -181,10 +181,10 @@ subroutine sub(stringa,chara,stringc,numc,listc,formc)
    write(55,'(a)') 'set title "Equilibrium Temperature"'
    write(55,'(a)') 'plot \'
    do j=1,numc-1
-      write(55,'(a,i3.3,a,i3.3,a,'//trim(formc)//',a)') &
+      write(55,'(a,i3.3,a,'//trim(formc)//',a)') &
               '"plot.',j,'.dat" u '//chara//':4  w l title "'//trim(stringc)//'=',listc(j),'",\'
    end do
-   write(55,'(a,i3.3,a,i3.3,a,'//trim(formc)//',a)') &
+   write(55,'(a,i3.3,a,'//trim(formc)//',a)') &
            '"plot.',j,'.dat" u '//chara//':4  w l title "'//trim(stringc)//'=',listc(j),'"'
 end subroutine sub
 end subroutine out_plt!}}}

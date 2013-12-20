@@ -249,7 +249,7 @@ def checkout_flow():
 	elif(val == 3):
 		print "\tflame sheet model is selected."
 		engage("therm_lib/NASA/core","checkout",arr_engage)
-		engage("therm_lib/NASA/flame_sheet","checkout",arr_engage)
+		engage("therm_lib/NASA/flame_sheet/flow","checkout",arr_engage)
 	
 		# process mod_chem.f90
 		if not os.path.exists("chem.inp"):
