@@ -51,6 +51,7 @@ module chem_var
    integer          elistf(ne+2)
    integer          nelistf(ne+2)
    double precision maskf(max_ns)
+   double precision maskbf(ne+2)
 
    double precision qo(dimq),wo(dimw)
    double precision rhoo,po,To,Eo,Ho,MWo,kappao,muo
@@ -62,6 +63,7 @@ module chem_var
    integer          elisto(ne+2)
    integer          nelisto(ne+2)
    double precision masko(max_ns)
+   double precision maskbo(ne+2)
 
    !for flame sheet model
    double precision np(max_ns)

@@ -794,14 +794,18 @@ subroutine initialize_cea(flag)!{{{
    !set shift and mask
    nshiftf=0
    nshifto=0
+   maskbf =1d0
+   maskbo =1d0
    do i=1,ne
       if(b0f(i) .eq. 0d0) then
+         maskbf(i) = 0d0
          nshiftf=nshiftf+1
          nelistf(nshiftf)=i
       else
          elistf(i-nshiftf)=i
       end if
       if(b0o(i) .eq. 0d0) then
+         maskbo(i) = 0d0
          nshifto=nshifto+1
          nelisto(nshifto)=i
       else
@@ -958,7 +962,7 @@ subroutine cea(rho,Y,E, T,n, MWave,kappa,mu,Yv,vhi)!{{{
    double precision phi,denom,MWj,MWi
 
    integer i,j,k,counter
-   logical flag,LUflag,REDUCEflag
+   logical flag,LUflag,REDUCEflag,debugflag
    integer nen,elist(ne+2),nelist(ne+2)
 
    double precision lambda1,lambda2,omega_var,logsn
@@ -967,6 +971,7 @@ subroutine cea(rho,Y,E, T,n, MWave,kappa,mu,Yv,vhi)!{{{
    double precision,dimension(4)::vTmu
 
 
+   debugflag= .false.
    logrhoRu = log(rho*Ru/pst)
 
    !calc b0 of elements
@@ -978,13 +983,15 @@ subroutine cea(rho,Y,E, T,n, MWave,kappa,mu,Yv,vhi)!{{{
       nen=neo
       elist =elisto
       nelist=nelisto
-      n     =n*masko
+      n     =n *masko
+      b0    =b0*maskbo
    else if(Y(2)<Y_eps) then
       REDUCEflag=.true.
       nen=nef
       elist =elistf
       nelist=nelistf
-      n     =n*maskf
+      n     =n *maskf
+      b0    =b0*maskbf
    else
       REDUCEflag=.false.
    end if
@@ -1022,6 +1029,7 @@ subroutine cea(rho,Y,E, T,n, MWave,kappa,mu,Yv,vhi)!{{{
 
    if(.not. flag) then
       counter=1
+      !open(33,file="debug")
       do
          !set b0(ne+1)
          b0(ne+1)=E/(Ru*T)
@@ -1078,6 +1086,7 @@ subroutine cea(rho,Y,E, T,n, MWave,kappa,mu,Yv,vhi)!{{{
          end if
 
          if(LUflag) then
+            debugflag=.true.
             !set new n
             n=n+initial_eps
 
@@ -1102,6 +1111,7 @@ subroutine cea(rho,Y,E, T,n, MWave,kappa,mu,Yv,vhi)!{{{
 
          !calc Delta
          DlogT=vpi(ne+1)
+         !write(33,*) counter,abs(DlogT)
          do j=1,ns
             tmp=0d0
             do i=1,ne
@@ -1156,18 +1166,31 @@ subroutine cea(rho,Y,E, T,n, MWave,kappa,mu,Yv,vhi)!{{{
 
          !check convergence
          flag = .true.
-         if(abs(Dnmax)>eps*sn) flag = .false.
+         if(abs(Dnmax)>eps*sn) then
+            flag = .false.
+            !if(counter .eq. 501) print *,"flag1"
+         end if
          do i=1,ne
-            if(b0(i) > eps .and. abs(b0(i)-b(i))>b0max*eps)       flag = .false.
+            if(b0(i) > eps .and. abs(b0(i)-b(i))>b0max*eps)       then
+               flag = .false.
+               !if(counter .eq. 501) print *,"flag2",i
+            end if
          end do
-         if(abs(DlogT)>eps .and. abs(E-b(ne+1)*Ru*T) >eps*abs(E)) flag = .false.
+         if(abs(DlogT)>eps .and. abs(E-b(ne+1)*Ru*T) >eps*abs(E)) then
+            flag = .false.
+            !if(counter .eq. 501) print *,"flag3"
+         end if
          if(counter>500) flag = .true.
          if(flag) exit
 
          counter=counter+1
       end do
 
-      if(counter>500) print *,"not converted. at cea"
+      !close(33)
+      if(counter>500) then
+         !print *,E,T,Y,REDUCEflag,debugflag
+         print *,"not converted. at cea"
+      end if
    end if
 
    MWave=1d3/sn

@@ -1,0 +1,5 @@
+thermal model: 1 #flame sheet of nasa(0) / NASA CEA(1) / chemkin(2)
+Species Selection:
+H2
+O2
+end

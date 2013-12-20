@@ -1,5 +1,5 @@
 #Input File for PostProcessing
-File Read Freq.         : 500
+File Read Freq.         : 5000
 From Where              : -1
 Database Place          : ../checkout/
 OverWrite? Yes(1)/No(0) : 0

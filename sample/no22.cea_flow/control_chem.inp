@@ -1,0 +1,11 @@
+#Control parameters for chemistry
+Oxidizer Pressure(Pa)   : 1.e5
+Oxidizer Temperature(K) : 300.
+Oxygen Composition(mole ratio):
+O2 2
+end
+Fuel Pressure(Pa)       : 1.e5
+Fuel Temperature(K)     : 300.
+Fuel Composition(mole ratio):
+H2 1
+end

@@ -266,6 +266,26 @@ def checkout_flow():
 		nY  = 2
 		nV  = 3
 		ABOUTNV="with-nV"
+	elif(val == 4):
+		print "\tPerfect Equilibrium model is selected."
+		engage("therm_lib/NASA/core","checkout",arr_engage)
+		engage("therm_lib/NASA/cea/flow","checkout",arr_engage)
+	
+		# process mod_chem.f90
+		if not os.path.exists("chem.inp"):
+			print "ERROR:Can't find 'chem.inp'. Please try again."
+			sys.exit(1)
+		os.system("cp chem.inp checkout/")
+		import store.checkout.ckinterp
+		val = store.checkout.ckinterp.ckinterp()
+		val = map(str,val)
+		fromto = [ \
+			["NE",val[0]],\
+			["NS",val[1]]]
+		raw2pro("checkout/mod_chem.raw.f90","checkout/mod_chem.f90",fromto)
+		nY  = 2
+		nV  = val[1]
+		ABOUTNV="with-nV"
 	else:
 		print "\tOdd Input at thermal model! value is ",val
 		sys.exit(1)

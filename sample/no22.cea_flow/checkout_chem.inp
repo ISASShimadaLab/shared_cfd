@@ -1,0 +1,3 @@
+thermal model: 1 # flame sheet of nasa(0) / NASA CEA(1) / chemkin(2)
+calc model   : 2 # mono(0) / plot(1) / reduction(2)
+constants    : 1 # uv(0) / hp(1)
