@@ -188,39 +188,12 @@ end subroutine set_coeff_mu!}}}
 end module func_therm
 
 ! initialization
-subroutine read_chemkin_parameter!{{{
-   use chem
-   use mod_mpi
-   use chem_var
-   implicit none
-
-   if(myid .eq. 0) then
-      open(8,file="control_chem.inp")
-      read(8,'()')
-      read(8,'(25x,i10)')    ns_tocalc
-      close(8)
-
-      !!! adjust data !!!
-      select case(ns_tocalc)
-         case(:-1)
-            ns_tocalc = ns
-         case(0,ns+1:)
-            print *,"Odd Number to calculation at flame sheet. : value = ",ns_tocalc
-            stop
-      end select
-   end if
-
-   !print *,"ns_tocalc = ",ns_tocalc
-
-   !!! MPI COMMUNICATIONS
-   call MPI_Bcast(ns_tocalc,1,          MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
-end subroutine read_chemkin_parameter!}}}
 subroutine set_reac_and_therm_data!{{{
    use mod_mpi
    use const_chem
    use chem
    !results
-   double precision   MWe(ne)
+   double precision   MWe(max_ne)
    double precision T_def(3)
 
    !buffers
@@ -291,7 +264,7 @@ subroutine set_reac_and_therm_data!{{{
                end do!}}}
                91 close(LMW)
 
-               if( NUM_ELM .ne. elm_found) go to 99
+               if( NUM_ELM .ne. elm_found) stop "Error"
                !}}}
             else if(state .eq. 2) then
                NUM_SPC=i
@@ -329,7 +302,7 @@ subroutine set_reac_and_therm_data!{{{
             !elements data
             do
                i=i+1
-               if(i > ne) stop "chem.inp element number exceeded assigned one."
+               if(i > max_ne) stop "chem.inp element number exceeded assigned one."
                call read_head_char(linebuf,cha(1),flag)
                SYM_ELM(i)=cha(1)
                if(flag) exit
@@ -338,7 +311,7 @@ subroutine set_reac_and_therm_data!{{{
             !species data
             do
                i=i+1
-               if(i > ns) stop "chem.inp species number exceeded assigned one."
+               if(i > max_ns) stop "chem.inp species number exceeded assigned one."
                call read_head_char(linebuf,cha(1),flag)
                SYM_SPC(i)=cha(1)
                if(flag) exit
@@ -427,7 +400,7 @@ subroutine set_reac_and_therm_data!{{{
             if(ind .eq. 0) then
                !main{{{
                NUM_RCT=NUM_RCT+1
-               if(NUM_RCT > nr) stop "chem.inp reaction number exceeded assigned one."
+               if(NUM_RCT > max_nr) stop "chem.inp reaction number exceeded assigned one."
 
                !read default ABE{{{
                call read_tail_number(linebuf,NUM)
@@ -455,7 +428,7 @@ subroutine set_reac_and_therm_data!{{{
                !about M{{{
                ind=index(line_reactants,"(+M)")
                if(ind>0) then
-                  if(ind+3 .ne. len_trim(line_reactants)) go to 99
+                  if(ind+3 .ne. len_trim(line_reactants)) stop "Error"
                   line_reactants=line_reactants(:len_trim(line_reactants)-4)
                   line_products =line_products (:len_trim(line_products )-4)
                   exist_M(NUM_RCT)=.true.
@@ -464,7 +437,7 @@ subroutine set_reac_and_therm_data!{{{
                else
                   ind=index(line_reactants,"+M")
                   if(ind>0) then
-                     if(ind+1 .ne. len_trim(line_reactants)) go to 99
+                     if(ind+1 .ne. len_trim(line_reactants)) stop "Error"
                      line_reactants=line_reactants(:len_trim(line_reactants)-2)
                      line_products =line_products (:len_trim(line_products )-2)
                      exist_M(NUM_RCT)=.true.
@@ -519,18 +492,18 @@ subroutine set_reac_and_therm_data!{{{
                linebuf=linebuf(ind:)
                if     (trim(cha(1)) .eq. "REV"       .or. trim(cha(1)) .eq. "rev")  then
                     !rev{{{
-                    if(Rstate(NUM_RCT,1) .ne. 0) go to 99
+                    if(Rstate(NUM_RCT,1) .ne. 0) stop "Error"
 
                     select case(Rstate(NUM_RCT,2))
                        case(2,3)
-                          go to 99
+                          stop "Error"
                        case(0)
                           Rstate(NUM_RCT,2)=1
                        case(4)
                           Rstate(NUM_RCT,2)=5
                        case default
                           print *,"Odd rev! Rstate2=",Rstate(NUM_RCT,2)
-                          go to 99
+                          stop "Error"
                     end select
 
                     call fetch_slash(linebuf,str)
@@ -541,22 +514,22 @@ subroutine set_reac_and_therm_data!{{{
                     call read_tail_number(str,NUM)
                     cABE(1,NUM_RCT)=log(NUM)
 
-                    if(len_trim(str) .ne. 0) go to 99
+                    if(len_trim(str) .ne. 0) stop "Error"
                     !}}}
                else if(trim(cha(1)) .eq. "LOW"       .or. trim(cha(1)) .eq. "low")  then
                     !low{{{
-                    if(Rstate(NUM_RCT,1) .ne. 0) go to 99
+                    if(Rstate(NUM_RCT,1) .ne. 0) stop "Error"
                     select case(Rstate(NUM_RCT,2))
                        case(1,3)
-                          go to 99
+                          stop "Error"
                        case(0)
                           Rstate(NUM_RCT,2)=2
                        case default
                           print *,"Odd low! Rstate2=",Rstate(NUM_RCT,2)
-                          go to 99
+                          stop "Error"
                     end select
 
-                    if(Rstate(NUM_RCT,2) .eq. 1 .or. Rstate(NUM_RCT,2) .eq. 3) go to 99
+                    if(Rstate(NUM_RCT,2) .eq. 1 .or. Rstate(NUM_RCT,2) .eq. 3) stop "Error"
                     Rstate(NUM_RCT,2)=2
 
                     call fetch_slash(linebuf,str)
@@ -567,12 +540,12 @@ subroutine set_reac_and_therm_data!{{{
                     call read_tail_number(str,NUM)
                     cABE(1,NUM_RCT)=log(NUM)
 
-                    if(len_trim(str) .ne. 0) go to 99
+                    if(len_trim(str) .ne. 0) stop "Error"
                     !}}}
                else if(trim(cha(1)) .eq. "TROE"      .or. trim(cha(1)) .eq. "troe") then
                     !troe{{{
-                    if(Rstate(NUM_RCT,1) .ne. 0) go to 99
-                    if(Rstate(NUM_RCT,2) .ne. 2) go to 99
+                    if(Rstate(NUM_RCT,1) .ne. 0)  stop "Error"
+                    if(Rstate(NUM_RCT,2) .ne. 2)  stop "Error"
                     Rstate(NUM_RCT,2)=3
 
                     call fetch_slash(linebuf,str)
@@ -585,11 +558,11 @@ subroutine set_reac_and_therm_data!{{{
                     call read_tail_number(str,NUM)
                     TROE(1,NUM_RCT)=NUM
 
-                    if(len_trim(str) .ne. 0) go to 99
+                    if(len_trim(str) .ne. 0) stop "Error"
                     !}}}
                else
                     !M enhanced{{{
-                    if(.not. exist_M(NUM_RCT)) go to 99
+                    if(.not. exist_M(NUM_RCT)) stop "Error"
                     Men(:,NUM_RCT)=0d0
 
                     do j=1,NUM_SPC
@@ -612,21 +585,13 @@ subroutine set_reac_and_therm_data!{{{
             stop "Error."
          end if
       end do
+
 95    close(LCHM)
 
-      !check consistency of the numbers
-      if(NUM_ELM .ne. ne) then
-         print *,"The Number of Elements is different between input file and hard-code: ",NUM_ELM,ne," each other."
-         stop
-      end if
-      if(NUM_SPC .ne. ns) then
-         print *,"The Number of Specices is different between input file and hard-code: ",NUM_SPC,ns," each other."
-         stop
-      end if
-      if(NUM_RCT .ne. nr .and. .not. (nr .eq. 1 .and. NUM_RCT .eq. 0)) then
-         print *,"The Number of Reactions is different between input file and hard-code: ",NUM_RCT,nr," each other."
-         stop
-      end if
+     
+      ne=NUM_ELM
+      ns=NUM_SPC
+      nr=max(NUM_RCT,1)
 
       !!!!!!!!!!! post process !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
       do i=1,NUM_RCT
@@ -656,11 +621,6 @@ subroutine set_reac_and_therm_data!{{{
    call MPI_Bcast(    ABE,   3*nr, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
    call MPI_Bcast(   cABE,   3*nr, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
    call MPI_Bcast(   TROE,   4*nr, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
-
-   return
-
-99 print *,"Error"
-   stop
 contains
 subroutine rm_comment(line)!{{{
    character(*),intent(inout)::line
@@ -778,6 +738,33 @@ subroutine fetch_slash(line,cha)!{{{
    line=trim(adjustl(line(ind2+1:)))
 end subroutine fetch_slash!}}}
 end subroutine set_reac_and_therm_data!}}}
+subroutine read_chemkin_parameter!{{{
+   use chem
+   use mod_mpi
+   use chem_var
+   implicit none
+
+   if(myid .eq. 0) then
+      open(8,file="control_chem.inp")
+      read(8,'()')
+      read(8,'(25x,i10)')    ns_tocalc
+      close(8)
+
+      !!! adjust data !!!
+      select case(ns_tocalc)
+         case(:-1)
+            ns_tocalc = ns
+         case(0,max_ns+1:)
+            print *,"Odd Number to calculation at flame sheet. : value = ",ns_tocalc
+            stop
+      end select
+   end if
+
+   !print *,"ns_tocalc = ",ns_tocalc
+
+   !!! MPI COMMUNICATIONS
+   call MPI_Bcast(ns_tocalc,1,          MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
+end subroutine read_chemkin_parameter!}}}
 subroutine set_trans_data!{{{
    use mod_mpi
    use const_chem
@@ -821,33 +808,23 @@ subroutine set_trans_data!{{{
             end if
             !!! end for binary interaction statements
 
-
             !!! the statements below are for binary interaction
-
             !increment nt and save sname as species_name_trans
             nt=nt+1
             species_name_trans(nt)=sname
-            !print *,nt,trim(sname)
             num_sctn_trans(nt)    =iv
             tr2th(nt)             =itr2th
-            !print *,nt,sname
 
             !for V
             do i=1,iv
                read(10,'(1x,a1,2(f7.1,2x),4e15.8)') v,(Trange_trans(j,i,nt),j=1,2),(trans(j,i,nt),j=1,4)
-               if(v .ne. "V") then
-                  print *,"ERROR : ODD FORMAT AT trans.inp"
-                  call exit(1)
-               end if
+               if(v .ne. "V") stop "ERROR : ODD FORMAT AT trans.inp"
             end do
 
             !for C --- which are not used now.
             do i=1,ic
                read(10,'(a)') comment_long
-               if(comment_long(2:2) .ne. "C") then
-                  print *,"ERROR : ODD FORMAT AT trans.inp"
-                  call exit(1)
-               end if
+               if(comment_long(2:2) .ne. "C") stop "ERROR : ODD FORMAT AT trans.inp"
             end do
       end do
 999   continue
@@ -899,12 +876,13 @@ subroutine read_fo_composition!{{{
    double precision amount
    integer ind
 
+   double precision no(nY),nf(nY)
    double precision DHit(nY)
    integer i
 
    if(myid .eq. 0) then
-      vrhoo =1d-20
-      vrhof =1d-20
+      no=0d0
+      nf=0d0
 
       open(8,file="control_chem.inp")
       read(8,'()')
@@ -919,7 +897,7 @@ subroutine read_fo_composition!{{{
          ind=index(buf,' ')
          if(ind .eq. 0) stop "Bad format at control_chem.inp while reading Oxidizer Compositions"
          read(buf(ind+1:),*) amount
-         vrhoo(search_species(buf(1:ind-1))) = amount
+         no(search_species(buf(1:ind-1))) = amount
       end do
       read(8,'(25x,es15.7)') pf
       read(8,'(25x,es15.7)') Tf
@@ -931,7 +909,7 @@ subroutine read_fo_composition!{{{
          ind=index(buf,' ')
          if(ind .eq. 0) stop "Bad format at control_chem.inp while reading Fuel Compositions"
          read(buf(ind+1:),*) amount
-         vrhof(search_species(buf(1:ind-1))) = amount
+         nf(search_species(buf(1:ind-1))) = amount
       end do
       close(8)
    end if
@@ -947,6 +925,9 @@ subroutine read_fo_composition!{{{
    call MPI_Bcast(Tf,       1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
    call MPI_Bcast(vrhof,   ns, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
 
+   of=sum(no*MWs,1)/sum(nf*MWs,1)
+   vrhoo=no*MWs
+   vrhof=nf*MWs
 
    !!! calculate other properties for oxidizer and fuel
    call rho_rel2abs(po,To, vrhoo, rhoo,Eo)
@@ -972,11 +953,78 @@ contains
    end function search_species
 end subroutine read_fo_composition!}}}
 subroutine init_therm!{{{
-   call read_chemkin_parameter
    call set_reac_and_therm_data
    call set_trans_data
+   call read_chemkin_parameter
    call read_fo_composition
 end subroutine init_therm!}}}
+subroutine calc_vrho(p,T,deg, rho,vrho,E)!{{{
+   use const_chem
+   use chem
+   use chem_var
+   use func_therm
+   implicit none
+   double precision,intent(in)::p
+   double precision,intent(in)::T
+   double precision,intent(in)::deg
+   double precision,intent(out)::rho
+   double precision,intent(out)::vrho(ns)
+   double precision,intent(out)::E
+
+   vrho = rhof * deg + rhoo*(1d0-deg)
+
+   call rho_rel2abs(p,T, vrho, rho,E)
+end subroutine calc_vrho!}}}
+subroutine rho_rel2abs(p,T, vrho, rho,E)!{{{
+   use const_chem
+   use chem
+   use func_therm
+   implicit none
+   double precision,intent(in)::p
+   double precision,intent(in)::T
+   double precision,intent(inout)::vrho(ns)
+   double precision,intent(out)::rho
+   double precision,intent(out)::E
+
+   double precision n(ns)
+   double precision,dimension(7)::cmurt,chrt,ccpr
+ 
+   double precision dh,tmp
+   integer i,j
+   integer sec(ns)
+
+   !vrho to n
+   do j=1,ns
+      n(j)=vrho(j)*invMW(j)
+   end do
+
+   !calc n
+   tmp=sum(n,1)*Ru*T
+   tmp=p*1d1/tmp
+   n  =n*tmp
+
+   !calc rho
+   rho=dot_product(n,MWs(1:ns))
+   !convert unit from g/cm^3 to kg/m^3
+   rho=rho*1d3
+
+   !calc vrho
+   do j=1,ns
+      vrho(j)=n(j)*MWs(j)*1d3
+   end do
+
+   call check_section_number(T,sec)
+   call set_coeff(T,log(T),cmurt,chrt,ccpr)
+   E = 0d0
+   do j=1,ns
+      dh= 0d0
+      do i=1,7
+         dh=dh+coeff(i,sec(j),j)*chrt(i)
+      end do
+      E=E+(dh-1d0)*n(j)
+   end do
+   E=E*Ru*T/rho/1d1
+end subroutine rho_rel2abs!}}}
 
 ! reaction
 subroutine Fex(neq_outer, tt, n, dndt, rpar, ipar)!{{{
@@ -1383,6 +1431,170 @@ subroutine Jex(neq_outer, tt, n, ML, MU, dndn, nrpd, rpar, ipar)!{{{
    !   end do
    !end do
 end subroutine Jex!}}}
+subroutine reaction(T,vrho,tout)!{{{
+   use const_chem
+   use chem
+   implicit none
+   double precision,intent(in)::T
+   double precision,intent(inout)::vrho(ns)
+   double precision,intent(in)::tout
+
+   double precision n(ns+1)
+   double precision tt
+
+   integer istate
+   double precision,save::RWORK(LRW)
+   integer         ,save::IWORK(LIW)
+   !$omp threadprivate(RWORK,IWORK)
+   integer          neq
+   double precision rtol,atol
+   integer          ipar(1)
+   double precision rpar(1)
+   external Fex,Jex
+
+   integer,parameter::itol   =1  ! scalar atol
+   integer,parameter::itask  =1  ! normal output
+   integer,parameter::iopt   =0  ! optional input off
+   integer,parameter::mf     =21 ! full matrix and direct jac.
+   !integer,parameter::mf     =22 ! full matrix and non-direct jac.
+
+   integer num_recalc,j
+
+   !vrho to n
+   do j=1,ns
+      n(j)=vrho(j)*invMW(j)*1d-3
+      n(j) = max(n(j),1d-20)
+   end do
+
+   if(T < 0d0) then
+      print *,"negative temperature=",T
+      call exit(0)
+   end if
+
+   if(tout < 0d0) then
+      print *,"negative dt=",tout
+      call exit(0)
+   end if
+
+   !set parameters
+   n(ns+1)= T
+   tt          = 0d0
+   istate      = 1
+   neq         = ns+1
+   rtol        = 1d-10
+   atol        = 0d0
+   num_recalc  = 0
+
+   do
+      call dvode (Fex, neq, n(1:ns+1), tt, tout, itol, rtol, atol, itask,  &
+                  istate, iopt, rwork, lrw, iwork, liw, jex, mf,&
+                  rpar, ipar)
+
+      if(istate > 0) then
+         exit
+      else if(istate < 0) then
+         istate = 1
+         atol=1d-12
+         num_recalc = num_recalc+1
+         if(num_recalc>max_recalc) then
+            print *,"Exceed max_recalc=",max_recalc," istate = ",istate
+            call exit(1)
+         end if
+      else
+         print *,"istate number =",istate
+         call exit(1)
+      end if
+   end do
+
+   !!set T
+   !T=n(ns+1)
+
+   !n to vrho
+   do j=1,ns
+      n(j) = max(n(j),1d-20)
+      vrho(j)=n(j)*MWs(j)*1d3
+   end do
+end subroutine reaction!}}}
+subroutine reaction_plot(T,vrho,dt,tout)!{{{
+   use const_chem
+   use chem
+   implicit none
+   double precision,intent(in)::T
+   double precision,intent(inout)::vrho(ns)
+   double precision,intent(in)::dt
+   double precision,intent(in)::tout
+
+   double precision n(ns+1)
+   double precision tt,to
+
+   integer istate
+   double precision,save::RWORK(LRW)
+   integer         ,save::IWORK(LIW)
+   !$omp threadprivate(RWORK,IWORK)
+   integer          neq
+   double precision rtol,atol
+   integer          ipar(1)
+   double precision rpar(1)
+   external Fex,Jex
+
+   integer,parameter::itol   =1  ! scalar atol
+   integer,parameter::itask  =1  ! normal output
+   integer,parameter::iopt   =0  ! optional input off
+   integer,parameter::mf     =21 ! full matrix and direct jac.
+
+   integer num_recalc,i,j,nloop
+
+   !vrho to n
+   do j=1,ns
+      n(j)=vrho(j)*invMW(j)*1d-3
+      n(j) = max(n(j),1d-40)
+   end do
+
+   if(T    < 0d0) stop "negative temperature"
+   if(tout < 0d0) stop "negative dt"
+
+   !set parameters
+   n(ns+1) = T
+   tt      = 0d0
+   to      = 0d0
+   istate  = 1
+   neq     = ns+1
+   rtol    = 1d-6
+   atol    = 0d0
+   num_recalc = 0
+
+   nloop=tout/dt
+   do i=1,nloop
+      to=to+dt
+      do
+         call dvode (Fex, neq, n(1:ns+1), tt, to, itol, rtol, atol, itask,  &
+                     istate, iopt, rwork, lrw, iwork, liw, jex, mf,&
+                     rpar, ipar)
+
+         if(istate > 0) then
+            exit
+         else if(istate < 0) then
+            istate = 1
+            atol=1d-8
+            num_recalc = num_recalc+1
+            if(num_recalc>max_recalc) then
+               print *,"Exceed max_recalc=",max_recalc," istate = ",istate
+               call exit(1)
+            end if
+         else
+            print *,"istate number =",istate
+            call exit(1)
+         end if
+      end do
+      write(20,*) tt,n(ns+1)
+   end do
+
+   !n to vrho
+   do j=1,ns
+      n(j) = max(n(j),1d-40)
+      vrho(j)=n(j)*MWs(j)*1d3
+   end do
+end subroutine reaction_plot!}}}
 
 ! cold flow
 subroutine calc_T(vrho,rho,E, T, kappa,MWave,DHi,vhi,mu)!{{{
@@ -1525,165 +1737,9 @@ subroutine calc_T(vrho,rho,E, T, kappa,MWave,DHi,vhi,mu)!{{{
    !print '(a10, f15.7)',"mu O2(mP)=",muN(13)*1d-3
 end subroutine calc_T!}}}
 
-! reaction
-subroutine reaction(T,vrho,tout)!{{{
-   use const_chem
-   use chem
-   implicit none
-   double precision,intent(in)::T
-   double precision,intent(inout)::vrho(ns)
-   double precision,intent(in)::tout
-
-   double precision n(ns+1)
-   double precision tt
-
-   integer istate
-   double precision,save::RWORK(LRW)
-   integer         ,save::IWORK(LIW)
-   !$omp threadprivate(RWORK,IWORK)
-   integer          neq
-   double precision rtol,atol
-   integer          ipar(1)
-   double precision rpar(1)
-   external Fex,Jex
-
-   integer,parameter::itol   =1  ! scalar atol
-   integer,parameter::itask  =1  ! normal output
-   integer,parameter::iopt   =0  ! optional input off
-   integer,parameter::mf     =21 ! full matrix and direct jac.
-   !integer,parameter::mf     =22 ! full matrix and non-direct jac.
-
-   integer num_recalc,j
-
-   !vrho to n
-   do j=1,ns
-      n(j)=vrho(j)*invMW(j)*1d-3
-      n(j) = max(n(j),1d-20)
-   end do
-
-   if(T < 0d0) then
-      print *,"negative temperature=",T
-      call exit(0)
-   end if
-
-   if(tout < 0d0) then
-      print *,"negative dt=",tout
-      call exit(0)
-   end if
-
-   !set parameters
-   n(ns+1)= T
-   tt          = 0d0
-   istate      = 1
-   neq         = ns+1
-   rtol        = 1d-10
-   atol        = 0d0
-   num_recalc  = 0
-
-   do
-      call dvode (Fex, neq, n(1:ns+1), tt, tout, itol, rtol, atol, itask,  &
-                  istate, iopt, rwork, lrw, iwork, liw, jex, mf,&
-                  rpar, ipar)
-
-      if(istate > 0) then
-         exit
-      else if(istate < 0) then
-         istate = 1
-         atol=1d-12
-         num_recalc = num_recalc+1
-         if(num_recalc>max_recalc) then
-            print *,"Exceed max_recalc=",max_recalc," istate = ",istate
-            call exit(1)
-         end if
-      else
-         print *,"istate number =",istate
-         call exit(1)
-      end if
-   end do
-
-   !!set T
-   !T=n(ns+1)
-
-   !n to vrho
-   do j=1,ns
-      n(j) = max(n(j),1d-20)
-      vrho(j)=n(j)*MWs(j)*1d3
-   end do
-end subroutine reaction!}}}
-
-!initial condition
-subroutine calc_vrho(p,T,deg, rho,vrho,E)!{{{
-   use const_chem
-   use chem
-   use chem_var
-   use func_therm
-   implicit none
-   double precision,intent(in)::p
-   double precision,intent(in)::T
-   double precision,intent(in)::deg
-   double precision,intent(out)::rho
-   double precision,intent(out)::vrho(ns)
-   double precision,intent(out)::E
-
-   vrho = rhof * deg + rhoo*(1d0-deg)
-
-   call rho_rel2abs(p,T, vrho, rho,E)
-end subroutine calc_vrho!}}}
-subroutine rho_rel2abs(p,T, vrho, rho,E)!{{{
-   use const_chem
-   use chem
-   use func_therm
-   implicit none
-   double precision,intent(in)::p
-   double precision,intent(in)::T
-   double precision,intent(inout)::vrho(ns)
-   double precision,intent(out)::rho
-   double precision,intent(out)::E
-
-   double precision n(ns)
-   double precision,dimension(7)::cmurt,chrt,ccpr
- 
-   double precision dh,tmp
-   integer i,j
-   integer sec(ns)
-
-   !vrho to n
-   do j=1,ns
-      n(j)=vrho(j)*invMW(j)
-   end do
-
-   !calc n
-   tmp=sum(n,1)*Ru*T
-   tmp=p*1d1/tmp
-   n  =n*tmp
-
-   !calc rho
-   rho=dot_product(n,MWs(1:ns))
-   !convert unit from g/cm^3 to kg/m^3
-   rho=rho*1d3
-
-   !calc vrho
-   do j=1,ns
-      vrho(j)=n(j)*MWs(j)*1d3
-   end do
-
-   call check_section_number(T,sec)
-   call set_coeff(T,log(T),cmurt,chrt,ccpr)
-   E = 0d0
-   do j=1,ns
-      dh= 0d0
-      do i=1,7
-         dh=dh+coeff(i,sec(j),j)*chrt(i)
-      end do
-      E=E+(dh-1d0)*n(j)
-   end do
-   E=E*Ru*T/rho/1d1
-end subroutine rho_rel2abs!}}}
-
 !boundary condition
 subroutine calc_boundary(p,T,deg, wt,vhi)!{{{
    use grbl_prmtr
-   use prmtr
    use const_chem
    implicit none
    double precision,intent(in)::p
@@ -1709,8 +1765,9 @@ subroutine calc_boundary(p,T,deg, wt,vhi)!{{{
       wt(4+j)=vrho(j)/rho
    end do
    wt(indxht)=E+p/rho
-   wt(indxR) =R_uni/MWave
+   wt(indxR) =Ru*1d-4/MWave
 end subroutine calc_boundary!}}}
+
 
 !!for post process
 !calculate dTdt

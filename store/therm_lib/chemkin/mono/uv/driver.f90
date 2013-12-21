@@ -5,7 +5,7 @@ program driver
    character*100    buf
    double precision rho,E,T, MWave,kappa,mu, tout
    double precision Y(2)
-   double precision vrho(ns)
+   double precision vrho(max_ns)
 
    integer i
 

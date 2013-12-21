@@ -12,12 +12,13 @@ module const_chem
    double precision,parameter::logPR=- 4.407418526701446!log(Pst/Ru)
   
    !!!!!!!!!!!!!!!!! CHANGE BELOW IF YOU CHANGE CHEM.INP !!!!!!!!!!!!!!!!!!!!!
-   integer,parameter::ne=NE !num of elements
-   integer,parameter::ns=NS !num of species
-   integer,parameter::nr=NR !num of reactions
+   integer,parameter::max_ne=NE !num of elements
+   integer,parameter::max_ns=NS !num of species
+   integer,parameter::max_nr=NR !num of reactions
+   integer ne,ns,nr
 
-   integer,parameter::LRW=22+9*(ns+1)+2*(ns+1)**2
-   integer,parameter::LIW=30+  (ns+1)
+   integer,parameter::LRW=22+9*(max_ns+1)+2*(max_ns+1)**2
+   integer,parameter::LIW=30+  (max_ns+1)
 
    integer,parameter::max_recalc=50
    !!!!!!!!!!!!!!!!! CHANGE ABOVE IF YOU CHANGE CHEM.INP !!!!!!!!!!!!!!!!!!!!!
@@ -28,49 +29,51 @@ module chem
    implicit none
    integer nt,ns_tocalc
 
-   character(3), dimension(ne)::SYM_ELM
-   character(18),dimension(ns)::SYM_SPC
-   character(80),dimension(nr)::SYM_RCT
+   character(3), dimension(max_ne)::SYM_ELM
+   character(18),dimension(max_ns)::SYM_SPC
+   character(80),dimension(max_nr)::SYM_RCT
 
-   double precision    ES(ne,ns)
+   double precision    ES(max_ne,max_ns)
 
-   double precision Tthre(3,  ns)
-   double precision coeff(7,2,ns)
-   double precision   MWs(    ns)
-   double precision invMW(    ns)
+   double precision Tthre(3,  max_ns)
+   double precision coeff(7,2,max_ns)
+   double precision   MWs(    max_ns)
+   double precision invMW(    max_ns)
 
-   integer          Rstate(nr,2) !(,1)...0:bi-direction;1:mono-direction
-                                      !(,2)...0:none;1:rev;2:low;3:troe;4:+M
-   integer          IndNu(3,2,nr)
-   integer          NumNu(  2,nr)
-   integer          snu(      nr)
+   integer          Rstate(max_nr,2) !(,1)...0:bi-direction;1:mono-direction
+                                     !(,2)...0:none;1:rev;2:low;3:troe;4:+M
+   integer          IndNu(3,2,max_nr)
+   integer          NumNu(  2,max_nr)
+   integer          snu(      max_nr)
 
-   logical          exist_M(nr)
-   integer          IndM(ns,nr)
-   integer          NumM(   nr)
-   double precision Men( ns,nr)
+   logical          exist_M(    max_nr)
+   integer          IndM(max_ns,max_nr)
+   integer          NumM(       max_nr)
+   double precision Men( max_ns,max_nr)
 
-   double precision    ABE(3,nr)
-   double precision   cABE(3,nr)
-   double precision   TROE(4,nr)
+   double precision    ABE(3,max_nr)
+   double precision   cABE(3,max_nr)
+   double precision   TROE(4,max_nr)
 
-   character(18),dimension(ns)::species_name_trans
-   integer,dimension(ns)::num_sctn_trans,tr2th
-   double precision Trange_trans(2,5,ns)
-   double precision trans(4,5,ns)
+   character(18),dimension(max_ns)::species_name_trans
+   integer,dimension(max_ns)::num_sctn_trans,tr2th
+   double precision Trange_trans(2,5,max_ns)
+   double precision trans(       4,5,max_ns)
 end module chem
 
 module chem_var
    use const_chem
    implicit none
 
+   double precision     of
+
    double precision     pf
    double precision   rhof
    double precision     Tf
    double precision     Ef
-   double precision  vrhof(ns)
-   double precision    vwf(ns)
-   double precision   vhif(ns)
+   double precision  vrhof(max_ns)
+   double precision    vwf(max_ns)
+   double precision   vhif(max_ns)
    double precision    MWf
    double precision kappaf
    double precision    muf
@@ -79,9 +82,9 @@ module chem_var
    double precision   rhoo
    double precision     To
    double precision     Eo
-   double precision  vrhoo(ns)
-   double precision    vwo(ns)
-   double precision   vhio(ns)
+   double precision  vrhoo(max_ns)
+   double precision    vwo(max_ns)
+   double precision   vhio(max_ns)
    double precision    MWo
    double precision kappao
    double precision    muo

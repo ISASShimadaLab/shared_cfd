@@ -14,7 +14,7 @@ program driver
    Y(1)=1d0/(1d0+of)
    Y(2)=1d0-Y(1)
    E  =  Ef*Y(1)+  Eo*Y(2)
-   rho=rhof*Y(1)+rhoo*Y(2)
+   rho=1d0/(Y(1)/rhof+Y(2)/rhoo)
    n  = n_save(:,1,1,1)
    T=300d0
    call cea(rho,Y,E, T,n, MWave,kappa,mu,Yv,vhi)
