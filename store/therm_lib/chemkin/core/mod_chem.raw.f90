@@ -15,10 +15,11 @@ module const_chem
    double precision rtol_user,atol_user
   
    !!!!!!!!!!!!!!!!! CHANGE BELOW IF YOU CHANGE CHEM.INP !!!!!!!!!!!!!!!!!!!!!
+   logical,parameter::isColdFlow = ISCOLDFLOW
    integer,parameter::max_ne=NE !num of elements
    integer,parameter::max_ns=NS !num of species
    integer,parameter::max_nr=NR !num of reactions
-   integer ne,ns,nr
+   integer ne,ns,nr,num_reac
 
    integer,parameter::LRW=22+9*(max_ns+1)+2*(max_ns+1)**2
    integer,parameter::LIW=30+  (max_ns+1)
@@ -66,6 +67,7 @@ end module chem
 
 module chem_var
    use const_chem
+   use grbl_prmtr
    implicit none
 
    double precision     of
@@ -80,6 +82,8 @@ module chem_var
    double precision    MWf
    double precision kappaf
    double precision    muf
+   double precision     qf(dimq)
+   double precision     wf(dimw)
 
    double precision     po
    double precision   rhoo
@@ -91,4 +95,6 @@ module chem_var
    double precision    MWo
    double precision kappao
    double precision    muo
+   double precision     qo(dimq)
+   double precision     wo(dimw)
 end module chem_var

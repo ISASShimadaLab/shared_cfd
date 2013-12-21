@@ -703,8 +703,9 @@ subroutine read_fo_composition!{{{
    double precision amount
    integer ind
 
-   double precision no(nY),nf(nY)
-   double precision DHit(nY)
+   double precision no(max_ns),nf(max_ns),vrho(max_ns)
+   double precision DHit(max_ns)
+   integer,dimension(max_ns)::list_reac
    integer i
 
    if(myid .eq. 0) then
@@ -738,7 +739,6 @@ subroutine read_fo_composition!{{{
          nf(search_species(buf(1:ind-1))) = amount
       end do
 
-      read(8,'(25x,i10)') ns_tocalc
       read(8,'(25x,es15.7)') rtol_user
       read(8,'(25x,es15.7)') atol_user
       close(8)
@@ -757,14 +757,7 @@ subroutine read_fo_composition!{{{
 
    call MPI_Bcast(ns_tocalc,1,          MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
 
-   !!! adjust ns_tocalc !!!
-   select case(ns_tocalc)
-      case(:-1)
-         ns_tocalc = ns
-      case(0,max_ns+1:)
-         print *,"Odd Number to calculation at flame sheet. : value = ",ns_tocalc
-         stop
-   end select
+   ns_tocalc=ns! temporal one
 
    of=sum(no*MWs,1)/sum(nf*MWs,1)
    vrhoo=no*MWs
@@ -778,6 +771,26 @@ subroutine read_fo_composition!{{{
    call rho_rel2abs(pf,Tf, vrhof, rhof,Ef)
    call calc_T(vrhof,rhof,Ef, Tf, kappaf,MWf,DHit,vhif,muf)
    vwf(1:nY) = vrhof(1:nY)/rhof
+
+   !move reactants to top of the list
+   num_reac=0
+   vrho=vrhof+vrhoo
+   do i=1,ns
+      if(vrho(i).ne.0d0) then
+         num_reac=num_reac+1
+         list_reac(num_reac)=i
+      end if
+   end do
+   do i=1,num_reac
+      call swap_species(i,list_reac(i))
+   end do
+   if(isColdFlow) then
+      ns_tocalc=num_reac
+   else
+      ns_tocalc=ns
+   end if
+   call set_static_qw(pf,rhof,Tf,Ef,kappaf,muf,vrhof,qf,wf)
+   call set_static_qw(po,rhoo,To,Eo,kappao,muo,vrhoo,qo,wo)
 contains
    integer function search_species(str)
       use chem
@@ -792,6 +805,35 @@ contains
       end do
       search_species=-1
    end function search_species
+   subroutine set_static_qw(p,rho,T,E,kappa,mu,vrho,q_local,w_local)
+      implicit none
+      double precision,intent(in)::p
+      double precision,intent(in)::rho
+      double precision,intent(in)::T
+      double precision,intent(in)::E
+      double precision,intent(in)::kappa
+      double precision,intent(in)::mu
+      double precision,intent(in)::vrho(max_ns)
+      double precision,intent(out)::q_local(dimq)
+      double precision,intent(out)::w_local(dimw)
+      integer i
+      do i=1,ns
+         q_local(i)   = vrho(i)
+         w_local(i+4) = vrho(i)/rho
+      end do
+      q_local(nY+1)=0d0
+      q_local(nY+2)=0d0
+      q_local(nY+3)=rho*E
+
+      w_local(1)=rho
+      w_local(2)=0d0
+      w_local(3)=0d0
+      w_local(4)=p
+      w_local(indxg )=kappa
+      w_local(indxht)=E+p/rho
+      w_local(indxR )=p/(rho*T)
+      w_local(indxMu)=mu
+   end subroutine set_static_qw
 end subroutine read_fo_composition!}}}
 subroutine init_therm!{{{
    call read_cheminp
@@ -865,6 +907,152 @@ subroutine rho_rel2abs(p,T, vrho, rho,E)!{{{
    end do
    E=E*Ru*T/rho/1d1
 end subroutine rho_rel2abs!}}}
+
+! swapping
+subroutine swap_species(ind1,ind2)!{{{
+   use chem
+   use chem_var
+   implicit none
+   integer,intent(in)::ind1,ind2
+
+   integer i,j,k
+
+   if(ind1 .eq. ind2) return
+
+   call swap_char(SYM_SPC(ind1),SYM_SPC(ind2))
+   do i=1,max_ne
+      call swap_real(ES(i,ind1),ES(i,ind2))
+   end do
+   do i=1,3
+      call swap_real(Tthre(i,ind1),Tthre(i,ind2))
+   end do
+   do j=1,2
+      do i=1,7
+         call swap_real(coeff(i,j,ind1),coeff(i,j,ind2))
+      end do
+   end do
+   call swap_real(  MWs(ind1),  MWs(ind2))
+   call swap_real(invMW(ind1),invMW(ind2))
+   call swap_real(vrhof(ind1),vrhof(ind2))
+   call swap_real(vrhoo(ind1),vrhoo(ind2))
+   call swap_real(  vwf(ind1),  vwf(ind2))
+   call swap_real(  vwo(ind1),  vwo(ind2))
+   call swap_real( vhif(ind1), vhif(ind2))
+   call swap_real( vhio(ind1), vhio(ind2))
+
+   do k=1,max_nr
+      do j=1,2
+         do i=1,NumNu(j,k)
+            call swap_integer_var(ind1,ind2,IndNu(i,j,k))
+         end do
+      end do
+
+      do i=1,NumM(k)
+         call swap_integer_var(ind1,ind2,IndM(i,k))
+      end do
+   end do
+
+   do i=1,max_ns
+      call swap_integer_var(ind1,ind2,tr2th(i))
+   end do
+contains
+subroutine swap_integer(a,b)
+   integer a,b
+   integer tmp
+   tmp = a
+   a   = b
+   b   = tmp
+end subroutine swap_integer
+subroutine swap_real(a,b)
+   double precision a,b
+   double precision tmp
+   tmp = a
+   a   = b
+   b   = tmp
+end subroutine swap_real
+subroutine swap_char(a,b)
+   character*18 a,b
+   character*18 tmp
+   tmp = a
+   a   = b
+   b   = tmp
+end subroutine swap_char
+subroutine swap_integer_var(ind1,ind2,var)
+   integer ind1,ind2
+   integer var
+
+   if(     var .eq. ind1) then
+      var=ind2
+   else if(var .eq. ind2) then
+      var=ind1
+   end if
+end subroutine swap_integer_var
+end subroutine swap_species!}}}
+subroutine swap_reaction(ind1,ind2)!{{{
+   use chem
+   use chem_var
+   implicit none
+   integer,intent(in)::ind1,ind2
+
+   integer i,j,k
+
+   if(ind1 .eq. ind2) return
+
+   call swap_char(SYM_RCT(ind1),SYM_RCT(ind2))
+   do j=1,2
+      do i=1,3
+         call swap_integer(IndNu(i,j,ind1),IndNu(i,j,ind2))
+      end do
+   end do
+   do j=1,max_ns
+      call swap_integer(IndM(j,ind1),IndM(j,ind2))
+      call swap_real(    Men(j,ind1), Men(j,ind2))
+   end do
+   call swap_integer(Rstate(ind1,1),Rstate(ind2,1))
+   call swap_integer(Rstate(ind1,2),Rstate(ind2,2))
+   call swap_integer(NumNu(1,ind1),NumNu(1,ind2))
+   call swap_integer(NumNu(2,ind1),NumNu(2,ind2))
+   call swap_integer(  snu(  ind1),  snu(  ind2))
+   call swap_integer( NumM(  ind1), NumM(  ind2))
+
+   call swap_logical(exist_M(ind1),exist_M(ind2))
+
+   do i=1,3
+      call swap_real( ABE(i,ind1), ABE(i,ind2))
+      call swap_real(cABE(i,ind1),cABE(i,ind2))
+      call swap_real(TROE(i,ind1),TROE(i,ind2))
+   end do
+   call swap_real(TROE(4,ind1),TROE(4,ind2))
+contains
+subroutine swap_logical(a,b)
+   logical a,b
+   logical tmp
+   tmp = a
+   a   = b
+   b   = tmp
+end subroutine swap_logical
+subroutine swap_integer(a,b)
+   integer a,b
+   integer tmp
+   tmp = a
+   a   = b
+   b   = tmp
+end subroutine swap_integer
+subroutine swap_real(a,b)
+   double precision a,b
+   double precision tmp
+   tmp = a
+   a   = b
+   b   = tmp
+end subroutine swap_real
+subroutine swap_char(a,b)
+   character(80) a,b
+   character(80) tmp
+   tmp = a
+   a   = b
+   b   = tmp
+end subroutine swap_char
+end subroutine swap_reaction!}}}
 
 ! reaction
 subroutine Fex(neq_outer, tt, n, dndt, rpar, ipar)!{{{
@@ -1396,6 +1584,7 @@ subroutine reaction_plot(T,vrho,dt,tout)!{{{
    nloop=tout/dt
    do i=1,nloop
       to=to+dt
+      if(i .eq. nloop) to=tout
       do
          call dvode (Fex, neq, n(1:ns+1), tt, to, itol, rtol, atol, itask,  &
                      istate, iopt, rwork, lrw, iwork, liw, jex, mf,&

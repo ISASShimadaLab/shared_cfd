@@ -221,12 +221,14 @@ def checkout_flow():
 		if(val == 1) :
 			print "\tCold Flow using chemical kinetics database is selected."
 			engage("therm_lib/chemkin/flow/cold","checkout",arr_engage)
+			isColdFlow=".true."
 		else:
 			print "\tChemical Kinetics Model is selected."
 			if(val_dt == 1):
 				print "Error : Chemical Kinetics Model cannot be used at local time step."
 				sys.exit(1)
 			engage("therm_lib/chemkin/flow/reactive","checkout",arr_engage)
+			isColdFlow=".false."
 
 		# process mod_chem.f90
 		if not os.path.exists("chem.inp"):
@@ -238,6 +240,7 @@ def checkout_flow():
 		val = map(str,val)
 		val[2]=max(val[2],1)
 		fromto = [ \
+			["ISCOLDFLOW",isColdFlow],\
 			["NE" ,val[0]],\
 			["NS" ,val[1]],\
 			["NR" ,val[2]]]

@@ -73,6 +73,7 @@ def checkout_chem_nasa():
 		val = store.checkout.ckinterp.ckinterp()
 		val = map(str,val)
 		fromto = [ \
+			["ISCOLDFLOW",".false."],\
 			["NE",val[0]],\
 			["NS",val[1]],\
 			["NR",val[2]]]

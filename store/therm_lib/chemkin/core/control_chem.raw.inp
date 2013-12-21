@@ -1,13 +1,13 @@
 #Control parameters for chemistry
-NumToCalcAtFlameSheet   : -1
 Oxidizer Pressure(Pa)   : 1.e5
-Oxidizer Temperature(K) : 300.
-Oxidizer Composition(mass ratio):
-O2 1
-N2 1
+Oxidizer Temperature(K) : 1200.
+Oxygen Composition(mole ratio):
+O2 2
 end
 Fuel Pressure(Pa)       : 1.e5
-Fuel Temperature(K)     : 300.
-Fuel Composition(mass ratio):
-O2 1
+Fuel Temperature(K)     : 1200.
+Fuel Composition(mole ratio):
+CH4 1
 end
+Relative Torelance VODE : 1.e-6
+Absolute Torelance VODE : 1.e-8
