@@ -188,424 +188,277 @@ end subroutine set_coeff_mu!}}}
 end module func_therm
 
 ! initialization
-subroutine set_reac_and_therm_data!{{{
+subroutine read_cheminp!{{{
    use mod_mpi
    use const_chem
    use chem
-   !results
+   implicit none
    double precision   MWe(max_ne)
-   double precision T_def(3)
 
-   !buffers
-   character*100    linebuf
-   character*50     line_reactants
-   character*50     line_products
-   character*100    str
-   character*24     cha(2)
-   character*2      scha(5)
+   character*100    linebuf,str
+   character*50     line_reactants,line_products
+   character*24     cha
    character        sscha
-   integer          inte(6)
-   double precision num
-   integer          inum
+   character*2      scha(5)
+   integer          inte(5)
+   double precision T_def(3)
    double precision T_buf(3)
 
-   !flag etc.
-   integer state !0...unormal, 1...elements, 2...species, 3...thermo,4...reactions
-   integer ind
+   integer ind,Nfound
    integer i,j,k,l
-   logical flag
-   logical thermo_flag
-   integer thermo_line
-   integer elm_found
-   integer spc_found
-
-   integer NUM_ELM
-   integer NUM_SPC
-   integer NUM_RCT
 
    integer,parameter::LMW =86
    integer,parameter::LCHM=87
-   integer,parameter::LOUT=88
 
    if(myid .eq. 0) then
-      state=0
       open(LCHM,file="chem.inp",status="old")
 
+      !!!!!!!!!!!!!!!!!!!!!! element read !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+      call next_line(LCHM,linebuf)
+      if(trim(linebuf) .ne. "elements") stop "elements declaration not found."
+      ne=0
       do
-         !header{{{
-         read(LCHM,'(a100)',end=95) linebuf
-         call rm_comment(linebuf)
-         if(len_trim(linebuf) .eq. 0) cycle
-         if(state .ne. 3) call chomp(linebuf)
-         !if(state .eq. 4) print '(a)',trim(linebuf)
-         !}}}
+         call next_line(LCHM,linebuf)
+         call chomp(linebuf)
+         if(linebuf .eq. "end" .or. linebuf .eq. "END")  exit
+         do
+            ne=ne+1
+            if(ne > max_ne) stop "chem.inp element number exceeded assigned one."
+            call read_head_char(linebuf,cha)
+            SYM_ELM(ne)=cha
+            if(linebuf .eq. "") exit
+         end do
+      end do
 
-         if("end" .eq. trim(linebuf)) then
-            !finalization of each status
-            if     (state .eq. 1) then
-               NUM_ELM=i
-               !read MW.log{{{
-               elm_found=0
+      !read MW.log
+      Nfound=0
+      open(LMW,file="MW.inp",status="old")
+      do
+         call next_line(LMW,linebuf)
+         if(linebuf .eq. "") exit
 
-               open(LMW,file="MW.inp",status="old")
-               do!{{{
-                  read(LMW,'(a100)',end=91) linebuf
-                  call rm_comment(linebuf)
-                  if(len_trim(linebuf) .eq. 0) cycle
-
-                  call read_head_char(linebuf,cha(1),flag)
-                  do i=1,NUM_ELM
-                     if(trim(cha(1)) .eq. trim(SYM_ELM(i))) then
-                        elm_found=elm_found+1
-                        call read_tail_number(linebuf,MWe(i))
-                        exit
-                     end if
-                  end do
-               end do!}}}
-               91 close(LMW)
-
-               if( NUM_ELM .ne. elm_found) stop "Error"
-               !}}}
-            else if(state .eq. 2) then
-               NUM_SPC=i
-            else if(state .eq. 3) then
-               if(spc_found .ne. NUM_SPC) then!{{{
-                  print *,"Error: spc_found:",spc_found," is not equal to NUM_SPC:",NUM_SPC
-                  do i=1,NUM_SPC
-                     if(Tthre(1,i) .eq. 0d0) then
-                        print '(a,3f15.7)',SYM_SPC(i),Tthre(1,i),Tthre(2,i),Tthre(3,i)
-                     end if
-                  end do
-                  stop
-               end if!}}}
+         call read_head_char(linebuf,cha)
+         do i=1,ne
+            if(trim(cha) .eq. trim(SYM_ELM(i))) then
+               Nfound=Nfound+1
+               call read_tail_number(linebuf,MWe(i))
+               exit
             end if
-            state=0
-         else if(state .eq. 0) then
-            !data type config
-            if     (trim(linebuf) .eq. "elements") then
-               state=1
-            else if(trim(linebuf) .eq. "species") then
-               state=2
-            else if(trim(linebuf) .eq. "thermo all") then
-               state=3
-               spc_found=0
-               thermo_flag=.true.
-               thermo_line=1
-            else if(trim(linebuf) .eq. "reactions      cal/mole  moles") then
-               state=4
-               NUM_RCT=0
-            else
-               stop "Error!"
-            end if
-            i=0
-         else if(state .eq. 1) then
-            !elements data
-            do
-               i=i+1
-               if(i > max_ne) stop "chem.inp element number exceeded assigned one."
-               call read_head_char(linebuf,cha(1),flag)
-               SYM_ELM(i)=cha(1)
-               if(flag) exit
+         end do
+      end do
+      close(LMW)
+      if(ne .ne. Nfound) stop "Error. There is Element which does not exit in MW.inp."
+      !!!!!!!!!!!!!!!!!!!!!! END of element read !!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+      !!!!!!!!!!!!!!!!!!!!!! species read !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+      call next_line(LCHM,linebuf)
+      if(trim(linebuf) .ne. "species")  stop "species declaration not found."
+      ns=0
+      do
+         call next_line(LCHM,linebuf)
+         call chomp(linebuf)
+         if(linebuf .eq. "end" .or. linebuf .eq. "END")  exit
+         do
+            ns=ns+1
+            if(ns > max_ns) stop "chem.inp species number exceeded assigned one."
+            call read_head_char(linebuf,cha)
+            SYM_SPC(ns)=cha
+            if(linebuf .eq. "") exit
+         end do
+      end do
+      !!!!!!!!!!!!!!!!!!!!!! END of species read !!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+      !!!!!!!!!!!!!!!!!!!!!! therm read !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+      call next_line(LCHM,linebuf)
+      if(trim(linebuf) .ne. "thermo all") stop "'thermo all' declaration not found."
+
+      Nfound=0
+      !read default common threshold temperatures
+      call next_line(LCHM,linebuf)
+      read(linebuf,'(3F10.0)') T_def(1),T_def(2),T_def(3)
+      do
+         call next_line(LCHM,linebuf)
+         if(linebuf .eq. "end" .or. linebuf .eq. "END")  exit
+         read(linebuf,'(a24,4(a2,i3),a1,2f10.0,f8.0,(a2,i3))') &
+            cha,(scha(i),inte(i),i=1,4),sscha,(T_buf(i),i=1,3),&
+            scha(5),inte(5)
+         ind=index(cha," ")
+         cha=cha(:ind-1)
+         call search_SYM(SYM_SPC,ns,cha,k)
+
+         if(k.gt.0) then
+            if(sscha .ne. "G") stop "Error! Other than Gas phase is contained."
+            Nfound=Nfound+1
+            do i=1,5
+               if(len_trim(scha(i)) .eq. 0) cycle
+               call search_SYM(SYM_ELM,ne,scha(i),j)
+               ES(j,k)=inte(i)
             end do
-         else if(state .eq. 2) then
-            !species data
-            do
-               i=i+1
-               if(i > max_ns) stop "chem.inp species number exceeded assigned one."
-               call read_head_char(linebuf,cha(1),flag)
-               SYM_SPC(i)=cha(1)
-               if(flag) exit
-            end do
-         else if(state .eq. 3) then
-            !thermo data
-            if(thermo_flag) then
-               !read default common threshold temperatures{{{
-               read(linebuf,'(3F10.0)') T_def(1),T_def(2),T_def(3)
-               thermo_flag=.false.
-               !}}}
+
+            MWs(k)=dot_product(ES(:ne,k),MWe(:ne))
+
+            !Temperature range
+            if(T_buf(1) .ne. 0d0) then
+               Tthre(:,k)=T_buf(:)
             else
-               if(thermo_line .eq. 1) then!{{{
-                  !line 1{{{
-                  read(linebuf,'(a24,4(a2,i3),a1,2f10.0,f8.0,a2,i3,1x,i1)') &
-                     cha(2),(scha(i),inte(i),i=1,4),sscha,T_buf(1),T_buf(2),T_buf(3),&
-                     scha(5),inte(5),inte(6)
-                  ind=index(cha(2)," ")
-                  cha(1)=cha(2)(:ind-1)
-                  call search_SYM(SYM_SPC,NUM_SPC,cha(1),k)
-
-                  if(k.gt.0) then!{{{
-                     spc_found=spc_found+1
-                     do i=1,5!{{{
-                        if(len_trim(scha(i)) .eq. 0) cycle
-                        call search_SYM(SYM_ELM,NUM_ELM,scha(i),j)
-                        ES(j,k)=inte(i)
-                     end do!}}}
-
-                     !set MW{{{
-                     MWs(k)=dot_product(ES(:NUM_ELM,k),MWe(:NUM_ELM))
-                     !}}}
-                    
-                     if(sscha .ne. "G") then!{{{
-                        print *,"Error! Odd phase.",sscha
-                        stop
-                     end if!}}}
-
-                     !Temperature{{{
-                     do i=1,3
-                        if(T_buf(i) .ne. 0d0) then
-                           Tthre(i,k)=T_buf(i)
-                        else
-                           Tthre(i,k)=T_def(i)
-                        end if
-                     end do
-                     !}}}
-                  end if!}}}
-                  thermo_line=thermo_line+1
-                  !}}}
-               else if(thermo_line .eq. 2) then
-                  !line 2{{{
-                  thermo_line=thermo_line+1
-                  if(k .le. 0) cycle
-                  read(linebuf,'(5E15.0)') (coeff(i,2,k),i=1,5)
-                  !}}}
-               else if(thermo_line .eq. 3) then
-                  !line 3{{{
-                  thermo_line=thermo_line+1
-                  if(k .le. 0) cycle
-                  read(linebuf,'(5E15.0)') (coeff(i,2,k),i=6,7),(coeff(i,1,k),i=1,3)
-                  !}}}
-               else if(thermo_line .eq. 4) then
-                  !line 4{{{
-                  thermo_line=1
-                  if(k .le. 0) cycle
-                  read(linebuf,'(4E15.0)') (coeff(i,1,k),i=4,7)
-                  !}}}
-               else
-                  !catch error{{{
-                  print *,"Error"
-                  !print *,"k=",k
-                  !print '(a,3es7.1)',"ES=",(ES(i,k),i=1,NUM_ELM)
-                  !print '(a,3es15.7)',"Tthre=",(Tthre(k,i),i=1,3)
-                  !print '(a,7es15.7)',"Coeff(1)=",(coeff(i,1,k),i=1,7)
-                  !print '(a,7es15.7)',"Coeff(2)=",(coeff(i,2,k),i=1,7)
-                  stop
-                  !}}}
-               end if!}}}
+               Tthre(:,k)=T_def(:)
             end if
-         else if(state .eq. 4) then
-            !reactions
-            if(trim(linebuf) .eq. "duplicate" .or. trim(linebuf) .eq. "DUPLICATE") cycle
 
-            ind=index(linebuf,"/")
-            if(ind .eq. 0) then
-               !main{{{
-               NUM_RCT=NUM_RCT+1
-               if(NUM_RCT > max_nr) stop "chem.inp reaction number exceeded assigned one."
-
-               !read default ABE{{{
-               call read_tail_number(linebuf,NUM)
-               ABE(3,NUM_RCT)=NUM*invRc
-               call read_tail_number(linebuf,NUM)
-               ABE(2,NUM_RCT)=NUM
-               call read_tail_number(linebuf,NUM)
-               ABE(1,NUM_RCT)=log(NUM)
-               !}}}
-
-               SYM_RCT(NUM_RCT)=linebuf
-               ind=index(linebuf,"=")
-               line_reactants=linebuf(:ind-1)
-               line_products=linebuf(ind+1:)
-
-               if(line_products(1:1) .ne. ">") then!{{{
-                  Rstate(NUM_RCT,1)=0
-               else
-                  Rstate(NUM_RCT,1)=1
-                  inum=len_trim(line_products)
-                  line_products(:inum-1)=line_products(2:inum)
-                  line_products(inum:inum)=""
-               end if!}}}
-              
-               !about M{{{
-               ind=index(line_reactants,"(+M)")
-               if(ind>0) then
-                  if(ind+3 .ne. len_trim(line_reactants)) stop "Error"
-                  line_reactants=line_reactants(:len_trim(line_reactants)-4)
-                  line_products =line_products (:len_trim(line_products )-4)
-                  exist_M(NUM_RCT)=.true.
-                  NumM(   NUM_RCT)=0
-                  Rstate(NUM_RCT,2)=0
-               else
-                  ind=index(line_reactants,"+M")
-                  if(ind>0) then
-                     if(ind+1 .ne. len_trim(line_reactants)) stop "Error"
-                     line_reactants=line_reactants(:len_trim(line_reactants)-2)
-                     line_products =line_products (:len_trim(line_products )-2)
-                     exist_M(NUM_RCT)=.true.
-                     NumM(   NUM_RCT)=0
-                     Rstate(NUM_RCT,2)=4
-                  else
-                     exist_M(NUM_RCT)=.false.
-                     Rstate(NUM_RCT,2)=0
-                  end if
-               end if
-               !}}}
-
-               !reactants{{{
-               i=1
-               do
-                  ind=index(line_reactants,"+")
-                  if(ind .eq. 0) then
-                     call search_SYM(SYM_SPC,NUM_SPC,line_reactants,j)
-                     IndNu(i,1,NUM_RCT)=j
-                     exit
-                  else
-                     call search_SYM(SYM_SPC,NUM_SPC,line_reactants(:ind-1),j)
-                     IndNu(i,1,NUM_RCT)=j
-                     line_reactants=line_reactants(ind+1:)
-                     i=i+1
-                  end if
-               end do
-               NumNu(1,NUM_RCT)=i
-               !}}}
-
-               !products{{{
-               i=1
-               do
-                  ind=index(line_products,"+")
-                  if(ind .eq. 0) then
-                     call search_SYM(SYM_SPC,NUM_SPC,line_products,j)
-                     IndNu(i,2,NUM_RCT)=j
-                     exit
-                  else
-                     call search_SYM(SYM_SPC,NUM_SPC,line_products(:ind-1),j)
-                     IndNu(i,2,NUM_RCT)=j
-                     line_products=line_products(ind+1:)
-                     i=i+1
-                  end if
-               end do
-               NumNu(2,NUM_RCT)=i
-               !}}}
-               !}}}
-            else
-               !auxiliary{{{
-               cha(1) =linebuf(:ind-1)
-               linebuf=linebuf(ind:)
-               if     (trim(cha(1)) .eq. "REV"       .or. trim(cha(1)) .eq. "rev")  then
-                    !rev{{{
-                    if(Rstate(NUM_RCT,1) .ne. 0) stop "Error"
-
-                    select case(Rstate(NUM_RCT,2))
-                       case(2,3)
-                          stop "Error"
-                       case(0)
-                          Rstate(NUM_RCT,2)=1
-                       case(4)
-                          Rstate(NUM_RCT,2)=5
-                       case default
-                          print *,"Odd rev! Rstate2=",Rstate(NUM_RCT,2)
-                          stop "Error"
-                    end select
-
-                    call fetch_slash(linebuf,str)
-                    call read_tail_number(str,NUM)
-                    cABE(3,NUM_RCT)=NUM*invRc
-                    call read_tail_number(str,NUM)
-                    cABE(2,NUM_RCT)=NUM
-                    call read_tail_number(str,NUM)
-                    cABE(1,NUM_RCT)=log(NUM)
-
-                    if(len_trim(str) .ne. 0) stop "Error"
-                    !}}}
-               else if(trim(cha(1)) .eq. "LOW"       .or. trim(cha(1)) .eq. "low")  then
-                    !low{{{
-                    if(Rstate(NUM_RCT,1) .ne. 0) stop "Error"
-                    select case(Rstate(NUM_RCT,2))
-                       case(1,3)
-                          stop "Error"
-                       case(0)
-                          Rstate(NUM_RCT,2)=2
-                       case default
-                          print *,"Odd low! Rstate2=",Rstate(NUM_RCT,2)
-                          stop "Error"
-                    end select
-
-                    if(Rstate(NUM_RCT,2) .eq. 1 .or. Rstate(NUM_RCT,2) .eq. 3) stop "Error"
-                    Rstate(NUM_RCT,2)=2
-
-                    call fetch_slash(linebuf,str)
-                    call read_tail_number(str,NUM)
-                    cABE(3,NUM_RCT)=NUM*invRc
-                    call read_tail_number(str,NUM)
-                    cABE(2,NUM_RCT)=NUM
-                    call read_tail_number(str,NUM)
-                    cABE(1,NUM_RCT)=log(NUM)
-
-                    if(len_trim(str) .ne. 0) stop "Error"
-                    !}}}
-               else if(trim(cha(1)) .eq. "TROE"      .or. trim(cha(1)) .eq. "troe") then
-                    !troe{{{
-                    if(Rstate(NUM_RCT,1) .ne. 0)  stop "Error"
-                    if(Rstate(NUM_RCT,2) .ne. 2)  stop "Error"
-                    Rstate(NUM_RCT,2)=3
-
-                    call fetch_slash(linebuf,str)
-                    call read_tail_number(str,NUM)
-                    TROE(4,NUM_RCT)=NUM
-                    call read_tail_number(str,NUM)
-                    TROE(3,NUM_RCT)=1d0/NUM
-                    call read_tail_number(str,NUM)
-                    TROE(2,NUM_RCT)=1d0/NUM
-                    call read_tail_number(str,NUM)
-                    TROE(1,NUM_RCT)=NUM
-
-                    if(len_trim(str) .ne. 0) stop "Error"
-                    !}}}
-               else
-                    !M enhanced{{{
-                    if(.not. exist_M(NUM_RCT)) stop "Error"
-                    Men(:,NUM_RCT)=0d0
-
-                    do j=1,NUM_SPC
-                       call search_SYM(SYM_SPC,NUM_SPC,cha(1),IndM(j,NUM_RCT))
-                       call fetch_slash(linebuf,str)
-
-                       call read_tail_number(str,Men(j,NUM_RCT))
-                       Men(j,NUM_RCT)=Men(j,NUM_RCT)-1d0
-                       if(len_trim(linebuf) .eq. 0) exit
-                       ind=index(linebuf,"/")
-                       cha(1) =linebuf(:ind-1)
-                       linebuf=linebuf(ind:)
-                    end do
-                    NumM(   NUM_RCT)=j
-                    !}}}
-               end if
-               !}}}
-            end if
+            !Data
+            call next_line(LCHM,linebuf)
+            read(linebuf,'(5E15.1)') (coeff(i,2,k),i=1,5)
+            call next_line(LCHM,linebuf)
+            read(linebuf,'(5E15.1)') (coeff(i,2,k),i=6,7),(coeff(i,1,k),i=1,3)
+            call next_line(LCHM,linebuf)
+            read(linebuf,'(4E15.1)') (coeff(i,1,k),i=4,7)
          else
-            stop "Error."
+            call next_line(LCHM,linebuf)
+            call next_line(LCHM,linebuf)
+            call next_line(LCHM,linebuf)
          end if
       end do
+      if(Nfound .ne. ns) stop "There is species which does not have thermal data."
+      !!!!!!!!!!!!!!!!!!!!!! END of therm read !!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+      !!!!!!!!!!!!!!!!!!!!!! reaction read !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+      call next_line(LCHM,linebuf)
+      if(trim(linebuf) .ne. "reactions      cal/mole  moles") stop "'reactions' declaration not found."
+      nr=0
+      exist_M=.false.
+      Rstate =0
+      do
+         call next_line(LCHM,linebuf)
+         call chomp(linebuf)
+         if(linebuf .eq. "end" .or. linebuf .eq. "END")  exit
+
+         if(linebuf .eq. "duplicate" .or. linebuf .eq. "DUPLICATE") cycle
+
+         ind=index(linebuf,"/")
+         if(ind .eq. 0) then ! reaction declaration line
+            nr=nr+1
+            if(nr > max_nr) stop "chem.inp reaction number exceeded assigned one."
+
+            !read default ABE
+            call read_tail_number_arr(linebuf,3,ABE(:,nr))
+
+            SYM_RCT(nr)=linebuf
+            ind=index(linebuf,"<=>")
+            if(ind .ne. 0) then
+               line_reactants=linebuf(:ind-1)
+               line_products =linebuf(ind+3:)
+            else
+               ind=index(linebuf,"=")
+               line_reactants=linebuf(:ind-1)
+               line_products =linebuf(ind+1:)
+            end if
+
+            if(line_products(1:1) .eq. ">") then
+               Rstate(nr,1)=1
+               line_products=line_products(2:len_trim(line_products))
+            end if
+           
+            !about M
+            ind=index(line_reactants,"(+M)")
+            if(ind>0) then
+               if(ind+3 .ne. len_trim(line_reactants)) stop "Error. (+M) must be end of each side."
+               line_reactants=line_reactants(:len_trim(line_reactants)-4)
+               line_products =line_products (:len_trim(line_products )-4)
+               exist_M(nr)=.true.
+            else
+               ind=index(line_reactants,"+M")
+               if(ind>0) then
+                  if(ind+1 .ne. len_trim(line_reactants)) stop "Error. +M must be end of each side."
+                  line_reactants=line_reactants(:len_trim(line_reactants)-2)
+                  line_products =line_products (:len_trim(line_products )-2)
+                  exist_M(nr)=.true.
+                  Rstate(nr,2)=4
+               end if
+            end if
+
+            !reactants
+            i=1
+            do
+               call search_SYM(SYM_SPC,ns,line_reactants,j)
+               IndNu(i,1,nr)=j
+               if(line_reactants .eq. "") exit
+               i=i+1
+            end do
+            NumNu(1,nr)=i
+
+            !products
+            i=1
+            do
+               call search_SYM(SYM_SPC,ns,line_products,j)
+               IndNu(i,2,nr)=j
+               if(line_products .eq. "") exit
+               i=i+1
+            end do
+            NumNu(2,nr)=i
+         else
+            !auxiliary
+            cha =trim(linebuf(:ind-1))
+            linebuf=linebuf(ind:)
+            if     (cha .eq. "REV"  .or. cha .eq. "rev")  then
+                 if(Rstate(nr,1) .ne. 0) stop "Error at rev"
+                 if(Rstate(nr,2) .ne. 0 .and. &
+                    Rstate(nr,2) .ne. 4) stop "Error at rev"
+                 Rstate(nr,2)=Rstate(nr,2)+1
+
+                 call fetch_slash(linebuf,str)
+                 call read_tail_number_arr(str,3,cABE(:,nr))
+            else if(cha .eq. "LOW"  .or. cha .eq. "low")  then
+                 if(Rstate(nr,1) .ne. 0) stop "Error at low"
+                 if(Rstate(nr,2) .ne. 0) stop "Error at low"
+                 Rstate(nr,2)=2
+
+                 call fetch_slash(linebuf,str)
+                 call read_tail_number_arr(str,3,cABE(:,nr))
+            else if(cha .eq. "TROE" .or. cha .eq. "troe") then
+                 if(Rstate(nr,1) .ne. 0) stop "Error at TROE"
+                 if(Rstate(nr,2) .ne. 2) stop "Error at TROE"
+                 Rstate(nr,2)=3
+
+                 call fetch_slash(linebuf,str)
+                 call read_tail_number_arr(str,4,TROE(:,nr))
+            else !M enhanced
+                 if(.not. exist_M(nr)) stop "Error at M enhanced"
+
+                 Men(:,nr)=0d0
+                 j=0
+                 do
+                    j=j+1
+                    call search_SYM(SYM_SPC,ns,cha,IndM(j,nr))
+                    call fetch_slash(linebuf,str)
+
+                    call read_tail_number(str,Men(j,nr))
+                    Men(j,nr)=Men(j,nr)-1d0
+                    if(linebuf .eq. "") exit
+                    ind =index(linebuf,"/")
+                    cha    =linebuf(:ind-1)
+                    linebuf=linebuf(ind:)
+                 end do
+                 NumM(nr)=j
+            end if
+         end if
+      end do
+      !!!!!!!!!!!!!!!!!!!!!! END of reaction read !!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 95    close(LCHM)
-
      
-      ne=NUM_ELM
-      ns=NUM_SPC
-      nr=max(NUM_RCT,1)
-
       !!!!!!!!!!! post process !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-      do i=1,NUM_RCT
+      do i=1,nr
          snu(i)=NumNu(2,i)-NumNu(1,i)
       end do
-      do j=1,NUM_SPC
+      do j=1,ns
          invMW(j)=1d0/MWs(j)
       end do
+      nr=max(nr,1)
       !!!!!!!!!!! post process !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
    end if
 
-   call MPI_Bcast(NUM_ELM,      1,          MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
-   call MPI_Bcast(NUM_SPC,      1,          MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
-   call MPI_Bcast(NUM_RCT,      1,          MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
+   call MPI_Bcast(     ne,      1,          MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
+   call MPI_Bcast(     ns,      1,          MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
+   call MPI_Bcast(     nr,      1,          MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
    call MPI_Bcast(  Tthre,   3*ns, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
    call MPI_Bcast(  coeff, 7*2*ns, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
    call MPI_Bcast(    MWs,     ns, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
@@ -622,28 +475,58 @@ subroutine set_reac_and_therm_data!{{{
    call MPI_Bcast(   cABE,   3*nr, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
    call MPI_Bcast(   TROE,   4*nr, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
 contains
-subroutine rm_comment(line)!{{{
+subroutine read_tail_number_arr(line,num,arr)!{{{
+   implicit none
    character(*),intent(inout)::line
+   integer,intent(in)::num
+   double precision,intent(out)::arr(num)
+
+   integer ind,i
+
+   do i=num,1,-1
+      ind=index(trim(line)," ",.true.)
+      read(line(ind+1:),*) arr(i)
+      line=trim(line(:ind))
+   end do
+   if(num .eq. 3) then
+      arr(1)=log(arr(1))
+      arr(3)=arr(3)*invRc
+   else if(num .eq. 4) then
+      arr(2)=1d0/arr(2)
+      arr(3)=1d0/arr(3)
+   end if
+end subroutine read_tail_number_arr!}}}
+subroutine next_line(NUM,linebuf)!{{{
+   implicit none
+   integer,intent(in)::NUM
+   character(100),intent(out)::linebuf
+
    integer ind
 
-   ind=index(line,"!")
-   if(ind .gt. 1) then
-      line=line(:ind-1)
-      line=trim(line)
-   else if(ind .eq. 1) then
-      line=""
-   else
-      line=trim(line)
-   end if
-end subroutine rm_comment!}}}
+   do
+      read(NUM,'(a100)',end=99) linebuf
 
+      ind=index(linebuf,"!")
+      if(ind .gt. 1) then
+         linebuf=linebuf(:ind-1)
+         linebuf=trim(linebuf)
+      else if(ind .eq. 1) then
+         cycle
+      else
+         linebuf=trim(linebuf)
+      end if
+
+      if(len_trim(linebuf) .ne. 0) exit
+   end do
+   return
+99 linebuf=""
+end subroutine next_line!}}}
 subroutine chomp(line)!{{{
    character(*),intent(inout)::line
    integer ind
 
    line=trim(adjustl(line))
 end subroutine chomp!}}}
-
 subroutine read_tail_number(line,num)!{{{
    character(*),intent(inout)::line
    double precision,intent(out)::num
@@ -654,35 +537,11 @@ subroutine read_tail_number(line,num)!{{{
    read(line(ind+1:),*) num
    line=trim(line(:ind))
 end subroutine read_tail_number!}}}
-
-subroutine read_tail_char(line,cha,flag)!{{{
+subroutine read_head_char(line,cha)!{{{
    character(*),intent(inout)::line
    character(*),intent(out)::cha
-   logical,intent(out)::flag
 
    integer ind
-
-   flag=.false.
-
-
-   ind=index(trim(line)," ",.true.)
-   if(ind .ne. 0) then
-      cha=line(ind+1:)
-      line=trim(line(:ind))
-   else
-      cha=line
-      flag=.true.
-   end if
-end subroutine read_tail_char!}}}
-
-subroutine read_head_char(line,cha,flag)!{{{
-   character(*),intent(inout)::line
-   character(*),intent(out)::cha
-   logical,intent(out)::flag
-
-   integer ind
-
-   flag=.false.
 
    ind=index(trim(line)," ")
    if(ind .ne. 0) then
@@ -690,40 +549,35 @@ subroutine read_head_char(line,cha,flag)!{{{
       line=trim(adjustl(line(ind:)))
    else
       cha=line
-      flag=.true.
+      line=""
    end if
 end subroutine read_head_char!}}}
-
 subroutine search_SYM(SYM,NUM_SYM,str,i)!{{{ 
+   implicit none
    character(*),dimension(*),intent(in)::SYM
    integer,intent(in)                  ::NUM_SYM
-   character(*),intent(in)             ::str
+   character(*),intent(inout)          ::str
    integer,intent(out)                 ::i
+   integer ind
+   character*18 buf
+
+   ind = index(str,"+")
+   if(ind .eq. 0) then
+      buf=trim(str)
+      str=""
+   else
+      buf=trim(str(:ind-1))
+      str=trim(str(ind+1:))
+   end if
 
    i=1
    do while(i<=NUM_SYM)
-      !print *,i,":",trim(SYM(i)),":",trim(str)
-      if(trim(SYM(i)) .eq. trim(str)) exit
+      if(trim(SYM(i)) .eq. buf) exit
       i=i+1
    end do
 
    if(i>NUM_SYM) i=-1
 end subroutine search_SYM!}}}
-
-subroutine increment_RS(SYM_SPC,NUM_SPC,NUM_RCT,str,RS)!{{{
-   use const_chem
-   character(*),dimension(*),intent(in)   ::SYM_SPC
-   integer                  ,intent(in)   ::NUM_SPC
-   integer                  ,intent(in)   ::NUM_RCT
-   character(*)             ,intent(in)   ::str
-   integer                  ,intent(inout)::RS(nr,*)
-
-   integer j
-
-   call search_SYM(SYM_SPC,NUM_SPC,str,j)
-   RS(NUM_RCT,j)=RS(NUM_RCT,j)+1
-end subroutine increment_RS!}}}
-
 subroutine fetch_slash(line,cha)!{{{
    character(*),intent(inout)::line
    character(*),intent(out)::cha
@@ -737,34 +591,7 @@ subroutine fetch_slash(line,cha)!{{{
    cha=line(ind1+1:ind2-1)
    line=trim(adjustl(line(ind2+1:)))
 end subroutine fetch_slash!}}}
-end subroutine set_reac_and_therm_data!}}}
-subroutine read_chemkin_parameter!{{{
-   use chem
-   use mod_mpi
-   use chem_var
-   implicit none
-
-   if(myid .eq. 0) then
-      open(8,file="control_chem.inp")
-      read(8,'()')
-      read(8,'(25x,i10)')    ns_tocalc
-      close(8)
-
-      !!! adjust data !!!
-      select case(ns_tocalc)
-         case(:-1)
-            ns_tocalc = ns
-         case(0,max_ns+1:)
-            print *,"Odd Number to calculation at flame sheet. : value = ",ns_tocalc
-            stop
-      end select
-   end if
-
-   !print *,"ns_tocalc = ",ns_tocalc
-
-   !!! MPI COMMUNICATIONS
-   call MPI_Bcast(ns_tocalc,1,          MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
-end subroutine read_chemkin_parameter!}}}
+end subroutine read_cheminp!}}}
 subroutine set_trans_data!{{{
    use mod_mpi
    use const_chem
@@ -886,7 +713,6 @@ subroutine read_fo_composition!{{{
 
       open(8,file="control_chem.inp")
       read(8,'()')
-      read(8,'()')
       read(8,'(25x,es15.7)') po
       read(8,'(25x,es15.7)') To
       read(8,'()')
@@ -911,6 +737,10 @@ subroutine read_fo_composition!{{{
          read(buf(ind+1:),*) amount
          nf(search_species(buf(1:ind-1))) = amount
       end do
+
+      read(8,'(25x,i10)') ns_tocalc
+      read(8,'(25x,es15.7)') rtol_user
+      read(8,'(25x,es15.7)') atol_user
       close(8)
    end if
 
@@ -924,6 +754,17 @@ subroutine read_fo_composition!{{{
    call MPI_Bcast(pf,       1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
    call MPI_Bcast(Tf,       1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
    call MPI_Bcast(vrhof,   ns, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
+
+   call MPI_Bcast(ns_tocalc,1,          MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
+
+   !!! adjust ns_tocalc !!!
+   select case(ns_tocalc)
+      case(:-1)
+         ns_tocalc = ns
+      case(0,max_ns+1:)
+         print *,"Odd Number to calculation at flame sheet. : value = ",ns_tocalc
+         stop
+   end select
 
    of=sum(no*MWs,1)/sum(nf*MWs,1)
    vrhoo=no*MWs
@@ -943,7 +784,7 @@ contains
       character(*),intent(in)::str
       integer i
    
-      do i=1,ns_tocalc
+      do i=1,ns
          if(trim(SYM_SPC(i)) .eq. trim(str)) then
             search_species=i
             return
@@ -953,9 +794,8 @@ contains
    end function search_species
 end subroutine read_fo_composition!}}}
 subroutine init_therm!{{{
-   call set_reac_and_therm_data
+   call read_cheminp
    call set_trans_data
-   call read_chemkin_parameter
    call read_fo_composition
 end subroutine init_therm!}}}
 subroutine calc_vrho(p,T,deg, rho,vrho,E)!{{{
@@ -1463,25 +1303,18 @@ subroutine reaction(T,vrho,tout)!{{{
    !vrho to n
    do j=1,ns
       n(j)=vrho(j)*invMW(j)*1d-3
-      n(j) = max(n(j),1d-20)
+      n(j)=max(n(j),n_eps)
    end do
 
-   if(T < 0d0) then
-      print *,"negative temperature=",T
-      call exit(0)
-   end if
-
-   if(tout < 0d0) then
-      print *,"negative dt=",tout
-      call exit(0)
-   end if
+   if(T    < 0d0) stop "negative temperature"
+   if(tout < 0d0) stop "negative dt"
 
    !set parameters
    n(ns+1)= T
    tt          = 0d0
    istate      = 1
    neq         = ns+1
-   rtol        = 1d-10
+   rtol        = rtol_user
    atol        = 0d0
    num_recalc  = 0
 
@@ -1494,15 +1327,12 @@ subroutine reaction(T,vrho,tout)!{{{
          exit
       else if(istate < 0) then
          istate = 1
-         atol=1d-12
+         atol=atol_user
          num_recalc = num_recalc+1
          if(num_recalc>max_recalc) then
             print *,"Exceed max_recalc=",max_recalc," istate = ",istate
             call exit(1)
          end if
-      else
-         print *,"istate number =",istate
-         call exit(1)
       end if
    end do
 
@@ -1511,7 +1341,7 @@ subroutine reaction(T,vrho,tout)!{{{
 
    !n to vrho
    do j=1,ns
-      n(j) = max(n(j),1d-20)
+      n(j) = max(n(j),n_eps)
       vrho(j)=n(j)*MWs(j)*1d3
    end do
 end subroutine reaction!}}}
@@ -1547,7 +1377,7 @@ subroutine reaction_plot(T,vrho,dt,tout)!{{{
    !vrho to n
    do j=1,ns
       n(j)=vrho(j)*invMW(j)*1d-3
-      n(j) = max(n(j),1d-40)
+      n(j)=max(n(j),n_eps)
    end do
 
    if(T    < 0d0) stop "negative temperature"
@@ -1559,7 +1389,7 @@ subroutine reaction_plot(T,vrho,dt,tout)!{{{
    to      = 0d0
    istate  = 1
    neq     = ns+1
-   rtol    = 1d-6
+   rtol    = rtol_user
    atol    = 0d0
    num_recalc = 0
 
@@ -1571,27 +1401,24 @@ subroutine reaction_plot(T,vrho,dt,tout)!{{{
                      istate, iopt, rwork, lrw, iwork, liw, jex, mf,&
                      rpar, ipar)
 
+         write(20,*) tt,n(ns+1)
          if(istate > 0) then
             exit
          else if(istate < 0) then
             istate = 1
-            atol=1d-8
+            atol=atol_user
             num_recalc = num_recalc+1
             if(num_recalc>max_recalc) then
                print *,"Exceed max_recalc=",max_recalc," istate = ",istate
                call exit(1)
             end if
-         else
-            print *,"istate number =",istate
-            call exit(1)
          end if
       end do
-      write(20,*) tt,n(ns+1)
    end do
 
    !n to vrho
    do j=1,ns
-      n(j) = max(n(j),1d-40)
+      n(j)=max(n(j),n_eps)
       vrho(j)=n(j)*MWs(j)*1d3
    end do
 end subroutine reaction_plot!}}}
@@ -1768,7 +1595,6 @@ subroutine calc_boundary(p,T,deg, wt,vhi)!{{{
    wt(indxR) =Ru*1d-4/MWave
 end subroutine calc_boundary!}}}
 
-
 !!for post process
 !calculate dTdt
 subroutine calc_dTdt(T,vrho,dTdt)!{{{
@@ -1793,7 +1619,7 @@ subroutine calc_dTdt(T,vrho,dTdt)!{{{
    !vrho to n
    do j=1,ns
       n(j)=vrho(j)*invMW(j)*1d-3
-      n(j) = max(n(j),1d-20)
+      n(j) = max(n(j),n_eps)
    end do
 
    n(ns+1)= T
@@ -1804,4 +1630,3 @@ subroutine calc_dTdt(T,vrho,dTdt)!{{{
 
    dTdt=dndt(ns+1)
 end subroutine calc_dTdt!}}}
-
