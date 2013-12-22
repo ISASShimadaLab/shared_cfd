@@ -18,7 +18,8 @@ program driver
    rho =1d0/(Y(1)/rhof+Y(2)/rhoo)
    vrho=rho*(vwf*Y(1)+vwo*Y(2))
    T   =   Tf*Y(1)+   To*Y(2)
-   call reaction_plot(T,vrho,2d-5,0.02d0)
+   !call reaction_plot(T,vrho,1d-8,5d-3)
+   call reaction_chemeq2(T,vrho,1d-4,5d-3)
    !print '(a,  f15.7)',"Y of f    ",Y(1)
    !print '(a,  f15.7)',"MWave     ",MWave
    !print '(a,  f15.7)',"kappa     ",kappa

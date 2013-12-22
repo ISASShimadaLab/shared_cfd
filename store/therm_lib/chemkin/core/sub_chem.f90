@@ -1204,6 +1204,173 @@ subroutine Fex(neq_outer, tt, n, dndt, rpar, ipar)!{{{
    end do
    dndt(ns+1)=-de*T/cv
 end subroutine Fex!}}}
+subroutine Fex_var(n, dndtp, dndtm)!{{{
+   !variables
+   use const_chem
+   use chem
+   use func_therm
+   implicit none
+   double precision,intent(in) :: n(ns+1)
+   double precision,intent(out):: dndtp(ns+1)
+   double precision,intent(out):: dndtm(ns+1)
+
+   double precision,parameter::dd=0.14d0
+   double precision,parameter::loge210=0.43429448190325!log10(exp(1d0))
+
+   double precision T
+   double precision,dimension(ns)::vmu0rt,vert,vcvr
+   double precision vlogM,Dr,r
+   double precision vlogk(2)
+   double precision de,cv,sn,logsn
+   double precision logT,Tinv
+   double precision logkinf,logk0
+   double precision Pr
+   double precision logFcent,logF,cc,nn,aa,log_Pr,logPrc,logPRT
+   double precision temp1,temp2,temp3,tmp
+   double precision,dimension(7)::cmurt,chrt,ccpr
+   integer          sec(ns)
+   integer i,j,k,itmp
+
+   T    =n(ns+1)
+   logT=log(T)
+   Tinv=1d0/T
+   logPRT=log(pst/Ru)-logT
+   sn   =sum(n(1:ns))
+   logsn=log(sn)
+
+   !set thermodynamical values
+   call check_section_number(T,sec)
+   call set_coeff(T,logT,cmurt,chrt,ccpr)
+   do j=1,ns
+      temp1=0d0
+      temp2=-1d0
+      temp3=-1d0
+      do i=1,7
+         tmp=coeff(i,sec(j),j)
+         temp1=temp1+tmp*cmurt(i)
+         temp2=temp2+tmp*chrt( i)
+         temp3=temp3+tmp*ccpr( i)
+      end do
+      vmu0rt(j)=temp1
+      vert(  j)=temp2
+      vcvr(  j)=temp3
+
+      dndtp(  j)=0d0
+      dndtm(  j)=0d0
+   end do
+
+   do i=1,nr
+      !calc M
+      if(exist_M(i)) then
+         tmp =sn
+         do j=1,NumM(i)
+            tmp=tmp+Men(j,i)*n(IndM(j,i))
+         end do
+
+         if(tmp .eq. sn) then
+            vlogM=logsn
+         else
+            vlogM=log(tmp)
+         end if
+      end if
+
+      !calc k
+      vlogk(1)=ABE(1,i)+ABE(2,i)*logT-ABE(3,i)*Tinv
+      vlogk(2)=0d0
+      if(Rstate(i,2) >= 4) vlogk(1)=vlogk(1)+vlogM
+
+      if(Rstate(i,1) .eq. 0) then !bi-direction
+         if(Rstate(i,2) .eq. 1 .or. Rstate(i,2) .eq. 5) then !rev
+            vlogk(2)=cABE(1,i)+cABE(2,i)*logT-cABE(3,i)*Tinv !read cABE
+            if(Rstate(i,2) .eq. 5) vlogk(2)=vlogk(2)+vlogM
+         else !none, low, troe
+            if(Rstate(i,2) .eq. 2 .or. Rstate(i,2) .eq. 3) then!low, troe
+               !Pr
+               logk0  =cABE(1,i)+cABE(2,i)*logT-cABE(3,i)*Tinv
+               logkinf=vlogk(1)
+               log_Pr=logk0-logkinf+vlogM
+               Pr=exp(log_Pr)
+               vlogk(1)=logkinf+log(Pr/(1d0+Pr))
+
+               !Troe
+               if(Rstate(i,2) .eq. 3) then
+                  aa=TROE(1,i)
+                  logFcent=log10((1d0-aa)*exp(-T   *TROE(2,i))&
+                                +aa      *exp(-T   *TROE(3,i))&
+                                +         exp(-Tinv*TROE(4,i)))
+                  cc=-0.4d0-0.67d0*logFcent
+                  nn=0.75d0-1.27d0*logFcent
+                  logPrc=log_Pr*loge210+cc
+                  logF=(1d0+(logPrc/(nn-dd*logPrc))**2)**(-1)*logFcent
+                  vlogk(1)=vlogk(1)+logF/loge210
+               end if
+            end if
+
+            !calc numu0rt
+            temp1=0d0
+            do k=1,NumNu(1,i)
+               temp1=temp1-vmu0rt(IndNu(k,1,i))
+            end do
+            do k=1,NumNu(2,i)
+               temp1=temp1+vmu0rt(IndNu(k,2,i))
+            end do
+
+            vlogk(2)=vlogk(1)-snu(i)*logPRT+temp1
+         end if
+      end if
+
+      !calc r
+      r=exp(vlogk(1))
+      do k=1,NumNu(1,i)
+         r=r*n(IndNu(k,1,i))
+      end do
+      do k=1,NumNu(1,i)
+         itmp=IndNu(k,1,i)
+         dndtm(itmp)=dndtm(itmp)-r
+      end do
+      do k=1,NumNu(2,i)
+         itmp=IndNu(k,2,i)
+         dndtp(itmp)=dndtp(itmp)+r
+      end do
+
+      if(Rstate(i,1) .eq. 0) then
+         r=exp(vlogk(2))
+         do k=1,NumNu(2,i)
+            r=r*n(IndNu(k,2,i))
+         end do
+         do k=1,NumNu(1,i)
+            itmp=IndNu(k,1,i)
+            dndtp(itmp)=dndtp(itmp)+r
+         end do
+         do k=1,NumNu(2,i)
+            itmp=IndNu(k,2,i)
+            dndtm(itmp)=dndtm(itmp)-r
+         end do
+      end if
+   end do
+
+   de=0d0; cv=0d0
+   do j=1,ns
+      de=de+vert(j)*(dndtp(j)+dndtm(j))
+      cv=cv+vcvr(j)*n(   j)
+   end do
+   dndtp(ns+1)=max(-de*T/cv,0d0)
+   dndtm(ns+1)=min(-de*T/cv,0d0)
+end subroutine Fex_var!}}}
+subroutine Fex2(neq_outer, tt, n, dndt, rpar, ipar)!{{{
+   use chem
+   implicit none
+   integer         ,intent(in) :: neq_outer   !not used now.
+   double precision,intent(in) :: tt
+   double precision,intent(in) :: n(ns+1)
+   double precision,intent(out):: dndt(ns+1)
+   double precision,intent(inout):: rpar(*)
+   integer         ,intent(inout):: ipar(*)
+
+   double precision dndtp(ns+1),dndtm(ns+1)
+   call Fex_var(n, dndtp, dndtm)
+   dndt=dndtp+dndtm
+end subroutine Fex2!}}}
 subroutine Jex(neq_outer, tt, n, ML, MU, dndn, nrpd, rpar, ipar)!{{{
    !variables
    use const_chem
@@ -1459,6 +1626,7 @@ subroutine Jex(neq_outer, tt, n, ML, MU, dndn, nrpd, rpar, ipar)!{{{
    !   end do
    !end do
 end subroutine Jex!}}}
+
 subroutine reaction(T,vrho,tout)!{{{
    use const_chem
    use chem
@@ -1553,7 +1721,7 @@ subroutine reaction_plot(T,vrho,dt,tout)!{{{
    double precision rtol,atol
    integer          ipar(1)
    double precision rpar(1)
-   external Fex,Jex
+   external Fex2,Jex
 
    integer,parameter::itol   =1  ! scalar atol
    integer,parameter::itask  =1  ! normal output
@@ -1586,7 +1754,7 @@ subroutine reaction_plot(T,vrho,dt,tout)!{{{
       to=to+dt
       if(i .eq. nloop) to=tout
       do
-         call dvode (Fex, neq, n(1:ns+1), tt, to, itol, rtol, atol, itask,  &
+         call dvode (Fex2, neq, n(1:ns+1), tt, to, itol, rtol, atol, itask,  &
                      istate, iopt, rwork, lrw, iwork, liw, jex, mf,&
                      rpar, ipar)
 
@@ -1611,6 +1779,50 @@ subroutine reaction_plot(T,vrho,dt,tout)!{{{
       vrho(j)=n(j)*MWs(j)*1d3
    end do
 end subroutine reaction_plot!}}}
+subroutine reaction_chemeq2(T,vrho,dt,tout)!{{{
+   use const_chem
+   use chem
+   implicit none
+   double precision,intent(in)::T
+   double precision,intent(inout)::vrho(ns)
+   double precision,intent(in)::dt
+   double precision,intent(in)::tout
+
+   double precision n(ns+1)
+   double precision tt,to
+
+   integer  neq
+   external Fex_var
+
+   integer num_recalc,i,j,nloop
+
+   !vrho to n
+   do j=1,ns
+      n(j)=vrho(j)*invMW(j)*1d-3
+      n(j)=max(n(j),n_eps)
+   end do
+
+   if(T    < 0d0) stop "negative temperature"
+   if(tout < 0d0) stop "negative dt"
+
+   !set parameters
+   n(ns+1) = T
+   tt=0d0;to=0d0
+   neq = ns+1
+
+   nloop=tout/dt
+   do i=1,nloop
+      to=to+dt
+      if(i .eq. nloop) to=tout
+      call chemeq2(Fex_var,neq,n,to,rtol_user,atol_user,tt)
+   end do
+
+   !n to vrho
+   do j=1,ns
+      n(j)=max(n(j),n_eps)
+      vrho(j)=n(j)*MWs(j)*1d3
+   end do
+end subroutine reaction_chemeq2!}}}
 
 ! cold flow
 subroutine calc_T(vrho,rho,E, T, kappa,MWave,DHi,vhi,mu)!{{{
@@ -1819,3 +2031,104 @@ subroutine calc_dTdt(T,vrho,dTdt)!{{{
 
    dTdt=dndt(ns+1)
 end subroutine calc_dTdt!}}}
+
+subroutine chemeq2(Fex,neq,y,tout,rtol,atol,tt)!{{{
+   use chem
+   implicit none
+   external Fex
+   integer,intent(in)::neq
+   double precision,intent(inout) ::y(neq)
+   double precision,intent(in)    ::tout
+   double precision,intent(in)    ::rtol
+   double precision,intent(in)    ::atol
+   double precision,dimension(neq)::y0,yp,p,q,p0,q0,alp
+   double precision tt,dt,ratio,var,ex
+   integer i,counter
+   integer imin
+
+   !j=0
+   dt=tout-tt
+   imin=1
+   do
+      y0=y
+      if(tout-tt<dt) dt=tout-tt
+      counter=0
+      do
+         y=y0
+         !predictor
+         call Fex(y,q0,p0)
+         p0=-p0/(y+1d-300)
+         do i=1,neq-1
+            var=p0(i)*dt
+            if(var < 1d-3) then
+               alp(i)=(var**2-4d0*var+12d0)/(var**2-12d0*var+24d0)
+            else
+               ex=1d0-exp(-var)
+               alp(i) = (1d0-ex/var)/ex
+            end if
+         end do
+         do i=1,neq-1
+            yp(i)=y0(i)+dt*(q0(i)-p0(i)*y0(i))/(1d0+alp(i)*p0(i)*dt)
+            if(isNaN(yp(i))) then
+               print *,"flag1"
+               print *,i,yp(i),y0(i)
+               print *,q0(i),p0(i),alp(i)
+               stop
+            end if
+         end do
+         yp(neq) =y0(neq)+dt*(q0(neq)-p0(neq)*y0(neq))
+         
+         !corrector
+         call Fex(yp,q,p)
+         p=-p/(yp+1d-300)
+         p  =0.5d0*(p0+p)
+         do i=1,neq-1
+            var=p(i)*dt
+            if(var < 1d-3) then
+               alp(i)=(var**2-4d0*var+12d0)/(var**2-12d0*var+24d0)
+            else
+               ex=1d0-exp(-var)
+               alp(i) = (1d0-ex/var)/ex
+            end if
+         end do
+         q  =alp*q+(1d0-alp)*q0
+         do i=1,neq-1
+            y(i) =y0(i)+dt*(q(i) -p(i) *y0(i))/(1d0+alp(i)*p(i) *dt)
+            if(isNaN(y(i))) then
+               print *,"flag2"
+               print *,i,y(i)
+               print *,q(i),p(i),p0(i),alp(i)
+               stop
+            end if
+         end do
+         y(neq) =y0(neq)+dt*(q(neq)-p(neq)*y0(neq))
+
+         !calc residual
+         ratio=1d300
+         do i=1,neq-1
+            var = (y(i)*rtol+rtol*1d-5)/abs(y(i)-yp(i)+1d-300)
+            if(y(i)>y0(i) .and. ratio>var) then
+               ratio=var
+               imin = i
+            end if
+            !ratio=min(ratio,(y(i)*rtol+atol)/abs(y(i)-yp(i)+1d-300))
+         end do
+
+         !print *,"ratio",ratio
+         !j=j+1
+         if(1d0<ratio) exit
+         !print *,"recalc"
+         dt=dt*sqrt(ratio)*0.8d0
+         counter=counter+1
+         if(counter>10) stop "not converted at CHEMEQ2"
+      end do
+      tt=tt+dt
+      write(20,'(2es15.7,3es9.1,2i5,x,a8,es9.1)') tt,y(neq),y(imin),y0(imin),dt,counter,&
+                                              imin,trim(SYM_SPC(imin)),alp(imin)
+      if(tout <= tt) exit
+      dt=dt*sqrt(ratio)
+         !print *,"enlarge dt"
+   end do
+   !print *,j
+end subroutine chemeq2!}}}
+
