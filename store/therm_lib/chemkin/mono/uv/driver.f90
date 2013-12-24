@@ -4,10 +4,9 @@ program driver
    implicit none
    character*100    buf
    double precision rho,E,T, MWave,kappa,mu, tout
+   double precision tign,Teq
    double precision Y(2)
    double precision vrho(max_ns)
-
-   integer i
 
    !read files
    call init_therm
@@ -17,9 +16,11 @@ program driver
    Y(2)=1d0-Y(1)
    rho =1d0/(Y(1)/rhof+Y(2)/rhoo)
    vrho=rho*(vwf*Y(1)+vwo*Y(2))
-   T   =   Tf*Y(1)+   To*Y(2)
-   !call reaction_plot(T,vrho,1d-8,5d-3)
-   call reaction_chemeq2(T,vrho,1d-4,5d-3)
+   T   =      Tf*Y(1)+ To*Y(2)
+   !call plot_time_history(T,vrho,5d-3,1000)
+   !call plot_time_history(T,vrho,5d-3,1000)
+   call calc_Tign_Teq(T,vrho,tign,Teq)
+   print *,tign,Teq
    !print '(a,  f15.7)',"Y of f    ",Y(1)
    !print '(a,  f15.7)',"MWave     ",MWave
    !print '(a,  f15.7)',"kappa     ",kappa

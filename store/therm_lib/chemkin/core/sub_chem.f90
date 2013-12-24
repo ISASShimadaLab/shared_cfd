@@ -1357,20 +1357,6 @@ subroutine Fex_var(n, dndtp, dndtm)!{{{
    dndtp(ns+1)=max(-de*T/cv,0d0)
    dndtm(ns+1)=min(-de*T/cv,0d0)
 end subroutine Fex_var!}}}
-subroutine Fex2(neq_outer, tt, n, dndt, rpar, ipar)!{{{
-   use chem
-   implicit none
-   integer         ,intent(in) :: neq_outer   !not used now.
-   double precision,intent(in) :: tt
-   double precision,intent(in) :: n(ns+1)
-   double precision,intent(out):: dndt(ns+1)
-   double precision,intent(inout):: rpar(*)
-   integer         ,intent(inout):: ipar(*)
-
-   double precision dndtp(ns+1),dndtm(ns+1)
-   call Fex_var(n, dndtp, dndtm)
-   dndt=dndtp+dndtm
-end subroutine Fex2!}}}
 subroutine Jex(neq_outer, tt, n, ML, MU, dndn, nrpd, rpar, ipar)!{{{
    !variables
    use const_chem
@@ -1701,76 +1687,62 @@ subroutine reaction(T,vrho,tout)!{{{
       vrho(j)=n(j)*MWs(j)*1d3
    end do
 end subroutine reaction!}}}
-subroutine reaction_plot(T,vrho,dt,tout)!{{{
+subroutine reaction_cont(T,tt,tout,vrho,n,istate,RWORK,IWORK,atol)!{{{
    use const_chem
    use chem
    implicit none
-   double precision,intent(in)::T
+   double precision,intent(inout)::T
+   double precision,intent(inout)::tt
+   double precision,intent(in)   ::tout
    double precision,intent(inout)::vrho(ns)
-   double precision,intent(in)::dt
-   double precision,intent(in)::tout
+   double precision,intent(inout)::n(ns+1)
+   integer         ,intent(inout)::istate
+   double precision,intent(inout)::RWORK(LRW)
+   integer         ,intent(inout)::IWORK(LIW)
+   double precision,intent(inout)::atol
 
-   double precision n(ns+1)
-   double precision tt,to
-
-   integer istate
-   double precision,save::RWORK(LRW)
-   integer         ,save::IWORK(LIW)
-   !$omp threadprivate(RWORK,IWORK)
-   integer          neq
-   double precision rtol,atol
+   integer          neq,Nrecalc,j
+   double precision rtol
    integer          ipar(1)
    double precision rpar(1)
-   external Fex2,Jex
+   external Fex,Jex
 
    integer,parameter::itol   =1  ! scalar atol
    integer,parameter::itask  =1  ! normal output
    integer,parameter::iopt   =0  ! optional input off
    integer,parameter::mf     =21 ! full matrix and direct jac.
 
-   integer num_recalc,i,j,nloop
 
-   !vrho to n
-   do j=1,ns
-      n(j)=vrho(j)*invMW(j)*1d-3
-      n(j)=max(n(j),n_eps)
-   end do
-
-   if(T    < 0d0) stop "negative temperature"
-   if(tout < 0d0) stop "negative dt"
+   if(istate .eq. 1) then
+      !vrho to n
+      do j=1,ns
+         n(j)=vrho(j)*invMW(j)*1d-3
+         n(j)=max(n(j),n_eps)
+      end do
+      n(ns+1) = T
+      atol    = 0d0
+   end if
 
    !set parameters
-   n(ns+1) = T
-   tt      = 0d0
-   to      = 0d0
-   istate  = 1
    neq     = ns+1
    rtol    = rtol_user
-   atol    = 0d0
-   num_recalc = 0
+   Nrecalc = 0
+   do
+      call dvode (Fex, neq, n(1:ns+1), tt, tout, itol, rtol, atol, itask,  &
+                  istate, iopt, rwork, lrw, iwork, liw, jex, mf,&
+                  rpar, ipar)
 
-   nloop=tout/dt
-   do i=1,nloop
-      to=to+dt
-      if(i .eq. nloop) to=tout
-      do
-         call dvode (Fex2, neq, n(1:ns+1), tt, to, itol, rtol, atol, itask,  &
-                     istate, iopt, rwork, lrw, iwork, liw, jex, mf,&
-                     rpar, ipar)
-
-         write(20,*) tt,n(ns+1)
-         if(istate > 0) then
-            exit
-         else if(istate < 0) then
-            istate = 1
-            atol=atol_user
-            num_recalc = num_recalc+1
-            if(num_recalc>max_recalc) then
-               print *,"Exceed max_recalc=",max_recalc," istate = ",istate
-               call exit(1)
-            end if
+      if(istate > 0) then
+         exit
+      else if(istate < 0) then
+         istate = 1
+         atol=atol_user
+         Nrecalc = Nrecalc+1
+         if(Nrecalc>max_recalc) then
+            print *,"Exceed max_recalc=",max_recalc," istate = ",istate
+            call exit(1)
          end if
-      end do
+      end if
    end do
 
    !n to vrho
@@ -1778,51 +1750,98 @@ subroutine reaction_plot(T,vrho,dt,tout)!{{{
       n(j)=max(n(j),n_eps)
       vrho(j)=n(j)*MWs(j)*1d3
    end do
-end subroutine reaction_plot!}}}
-subroutine reaction_chemeq2(T,vrho,dt,tout)!{{{
+   T=n(ns+1)
+end subroutine reaction_cont!}}}
+subroutine plot_time_history(T,vrho,tout,Nloop)!{{{
    use const_chem
-   use chem
    implicit none
-   double precision,intent(in)::T
+   double precision,intent(inout)::T
    double precision,intent(inout)::vrho(ns)
-   double precision,intent(in)::dt
-   double precision,intent(in)::tout
+   double precision,intent(in)   ::tout
+   integer,         intent(inout)::Nloop
 
-   double precision n(ns+1)
    double precision tt,to
+   double precision n(ns+1)
+   double precision RWORK(LRW)
+   integer          IWORK(LIW)
+   integer          istate,i
+   double precision atol
 
-   integer  neq
-   external Fex_var
+   tt    =0d0
+   istate=1
 
-   integer num_recalc,i,j,nloop
-
-   !vrho to n
-   do j=1,ns
-      n(j)=vrho(j)*invMW(j)*1d-3
-      n(j)=max(n(j),n_eps)
+   open(22,file="plt.dat")
+   write(22,'(2es15.7)') tt,T
+   do i=1,Nloop
+      to=dble(i)/dble(Nloop)*tout
+      call reaction_cont(T,tt,to,vrho,n,istate,RWORK,IWORK,atol)
+      write(22,'(2es15.7)') tt,T
    end do
+   close(22)
+end subroutine plot_time_history!}}}
+subroutine calc_Tign_Teq(Tini,vrhoini,tign,Teq)!{{{
+   use const_chem
+   implicit none
+   double precision,intent(in)::Tini
+   double precision,intent(in)::vrhoini(ns)
+   double precision,intent(out)::tign
+   double precision,intent(out)::Teq
 
-   if(T    < 0d0) stop "negative temperature"
-   if(tout < 0d0) stop "negative dt"
+   double precision T
+   double precision vrho(ns)
 
-   !set parameters
-   n(ns+1) = T
-   tt=0d0;to=0d0
-   neq = ns+1
+   double precision tt,to,tu,tl
+   double precision n(ns+1)
+   double precision RWORK(LRW)
+   integer          IWORK(LIW)
+   integer          istate,i
+   double precision atol
 
-   nloop=tout/dt
-   do i=1,nloop
-      to=to+dt
-      if(i .eq. nloop) to=tout
-      call chemeq2(Fex_var,neq,n,to,rtol_user,atol_user,tt)
+   T   =Tini
+   vrho=vrhoini
+
+   tt    =0d0
+   istate=1
+   to=1d-10
+   call reaction_cont(T,tt,to,vrho,n,istate,RWORK,IWORK,atol)
+   if(tt<to) stop "Ignition occurred in 1e-10 sec. Too small."
+   do
+      to=to*1d2
+      call reaction_cont(T,tt,to,vrho,n,istate,RWORK,IWORK,atol)
+      if(T>Tini+400d0) exit
+      if(to>1d2) stop "Ignition delay is larger than 1e2 sec. Too large."
    end do
+   tu=to
+   tl=to*1d-2
 
-   !n to vrho
-   do j=1,ns
-      n(j)=max(n(j),n_eps)
-      vrho(j)=n(j)*MWs(j)*1d3
+   tt    =0d0
+   istate=1
+   T   =Tini
+   vrho=vrhoini
+   to=exp((log(tu)+log(tl))/2d0)
+   do while((tu-tl)/(tu+tl)*2d0>1d-3)
+      call reaction_cont(T,tt,to,vrho,n,istate,RWORK,IWORK,atol)
+      if(T>Tini+400d0) then
+         tu=to
+         tt    =0d0
+         istate=1
+         T   =Tini
+         vrho=vrhoini
+      else
+         tl=to
+      end if
+      to=exp((log(tu)+log(tl))/2d0)
    end do
-end subroutine reaction_chemeq2!}}}
+   tign=tu
+
+   tt    =0d0
+   istate=1
+   T   =Tini
+   vrho=vrhoini
+   to=10d0*tign
+   call reaction_cont(T,tt,to,vrho,n,istate,RWORK,IWORK,atol)
+   Teq=T
+end subroutine calc_Tign_Teq!}}}
 
 ! cold flow
 subroutine calc_T(vrho,rho,E, T, kappa,MWave,DHi,vhi,mu)!{{{
@@ -2032,6 +2051,51 @@ subroutine calc_dTdt(T,vrho,dTdt)!{{{
    dTdt=dndt(ns+1)
 end subroutine calc_dTdt!}}}
 
+!chemeq2
+subroutine reaction_chemeq2(T,vrho,dt,tout)!{{{
+   use const_chem
+   use chem
+   implicit none
+   double precision,intent(in)::T
+   double precision,intent(inout)::vrho(ns)
+   double precision,intent(in)::dt
+   double precision,intent(in)::tout
+
+   double precision n(ns+1)
+   double precision tt,to
+
+   integer  neq
+   external Fex_var
+
+   integer num_recalc,i,j,nloop
+
+   !vrho to n
+   do j=1,ns
+      n(j)=vrho(j)*invMW(j)*1d-3
+      n(j)=max(n(j),n_eps)
+   end do
+
+   if(T    < 0d0) stop "negative temperature"
+   if(tout < 0d0) stop "negative dt"
+
+   !set parameters
+   n(ns+1) = T
+   tt=0d0;to=0d0
+   neq = ns+1
+
+   nloop=tout/dt
+   do i=1,nloop
+      to=to+dt
+      if(i .eq. nloop) to=tout
+      call chemeq2(Fex_var,neq,n,to,rtol_user,atol_user,tt)
+   end do
+
+   !n to vrho
+   do j=1,ns
+      n(j)=max(n(j),n_eps)
+      vrho(j)=n(j)*MWs(j)*1d3
+   end do
+end subroutine reaction_chemeq2!}}}
 subroutine chemeq2(Fex,neq,y,tout,rtol,atol,tt)!{{{
    use chem
    implicit none
@@ -2060,11 +2124,11 @@ subroutine chemeq2(Fex,neq,y,tout,rtol,atol,tt)!{{{
          p0=-p0/(y+1d-300)
          do i=1,neq-1
             var=p0(i)*dt
-            if(var < 1d-3) then
-               alp(i)=(var**2-4d0*var+12d0)/(var**2-12d0*var+24d0)
+            if(var < 1d0) then
+               alp(i)=(180d0+60d0*var+11d0*var**2+var**3)/(360d0+60d0*var+12d0*var**2+var**3)
             else
-               ex=1d0-exp(-var)
-               alp(i) = (1d0-ex/var)/ex
+               var=1d0/var
+               alp(i)=(180d0*var**3+60d0*var**2+11d0*var+1d0)/(360d0*var**3+60d0*var**2+12d0*var+1d0)
             end if
          end do
          do i=1,neq-1
@@ -2084,11 +2148,11 @@ subroutine chemeq2(Fex,neq,y,tout,rtol,atol,tt)!{{{
          p  =0.5d0*(p0+p)
          do i=1,neq-1
             var=p(i)*dt
-            if(var < 1d-3) then
-               alp(i)=(var**2-4d0*var+12d0)/(var**2-12d0*var+24d0)
+            if(var < 1d0) then
+               alp(i)=(180d0+60d0*var+11d0*var**2+var**3)/(360d0+60d0*var+12d0*var**2+var**3)
             else
-               ex=1d0-exp(-var)
-               alp(i) = (1d0-ex/var)/ex
+               var=1d0/var
+               alp(i)=(180d0*var**3+60d0*var**2+11d0*var+1d0)/(360d0*var**3+60d0*var**2+12d0*var+1d0)
             end if
          end do
          q  =alp*q+(1d0-alp)*q0
@@ -2118,16 +2182,18 @@ subroutine chemeq2(Fex,neq,y,tout,rtol,atol,tt)!{{{
          !j=j+1
          if(1d0<ratio) exit
          !print *,"recalc"
-         dt=dt*sqrt(ratio)*0.8d0
+         !dt=dt*sqrt(ratio)*0.8d0
+         dt=dt*sqrt(ratio)/dble(counter+1)
          counter=counter+1
+         write(40,*) dt,ratio
          if(counter>10) stop "not converted at CHEMEQ2"
       end do
+      close(40)
       tt=tt+dt
       write(20,'(2es15.7,3es9.1,2i5,x,a8,es9.1)') tt,y(neq),y(imin),y0(imin),dt,counter,&
                                               imin,trim(SYM_SPC(imin)),alp(imin)
       if(tout <= tt) exit
       dt=dt*sqrt(ratio)
-         !print *,"enlarge dt"
    end do
    !print *,j
 end subroutine chemeq2!}}}
