@@ -6,7 +6,11 @@ program driver
    double precision rho,E,T, MWave,kappa,mu, tout
    double precision tign,Teq
    double precision Y(2)
-   double precision vrho(max_ns)
+   double precision vrho(max_ns),max_Y(max_ns)
+
+   double precision allowable_limit
+
+   logical flag
 
    !read files
    call init_therm
@@ -17,10 +21,19 @@ program driver
    rho =1d0/(Y(1)/rhof+Y(2)/rhoo)
    vrho=rho*(vwf*Y(1)+vwo*Y(2))
    T   =      Tf*Y(1)+ To*Y(2)
+
+   !plot
    !call plot_time_history(T,vrho,5d-3,1000)
-   !call plot_time_history(T,vrho,5d-3,1000)
-   call calc_Tign_Teq(T,vrho,tign,Teq)
+
+   allowable_limit=0.03d0
+   call calc_Tign_Teq(T,vrho,allowable_limit,tign,Teq)
    print *,tign,Teq
+
+   print *,ns
+   !call sort_n(T,vrho,tign,.true.)
+   !call reduct_in_order(T,vrho,tign,Teq,allowable_limit)
+   call reduction(T,vrho,tign,Teq,allowable_limit)
+   print *,ns
    !print '(a,  f15.7)',"Y of f    ",Y(1)
    !print '(a,  f15.7)',"MWave     ",MWave
    !print '(a,  f15.7)',"kappa     ",kappa
