@@ -32,8 +32,10 @@ program driver
    print *,ns
    !call sort_n(T,vrho,tign,.true.)
    !call reduct_in_order(T,vrho,tign,Teq,allowable_limit)
-   call reduction(T,vrho,tign,Teq,allowable_limit)
-   print *,ns
+   call reduction_species(T,vrho,tign,Teq,allowable_limit)
+   print *,ns,nr
+   call reduction_reactions(T,vrho,tign,Teq,allowable_limit)
+   print *,ns,nr
    !print '(a,  f15.7)',"Y of f    ",Y(1)
    !print '(a,  f15.7)',"MWave     ",MWave
    !print '(a,  f15.7)',"kappa     ",kappa

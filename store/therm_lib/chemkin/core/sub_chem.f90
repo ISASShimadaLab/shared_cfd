@@ -1055,6 +1055,156 @@ end subroutine swap_char
 end subroutine swap_reaction!}}}
 
 ! reaction
+subroutine calc_CSP(n, csp_out)!{{{
+   !variables
+   use const_chem
+   use chem
+   use func_therm
+   implicit none
+   double precision,intent(in) :: n(ns+1)
+   double precision,intent(inout):: csp_out(nr)
+
+   double precision csp(ns,nr)
+
+   double precision,parameter::dd=0.14d0
+   double precision,parameter::loge210=0.43429448190325!log10(exp(1d0))
+
+   double precision T
+   double precision,dimension(ns)::vmu0rt
+   double precision vlogM,Dr,r
+   double precision vlogk(2)
+   double precision de,cv,sn,logsn
+   double precision logT,Tinv
+   double precision logkinf,logk0
+   double precision Pr
+   double precision logFcent,logF,cc,nn,aa,log_Pr,logPrc,logPRT
+   double precision temp1,temp2,temp3,tmp
+   double precision,dimension(7)::cmurt,chrt,ccpr
+   integer          sec(ns)
+   integer i,j,k,itmp
+
+   csp=0d0
+
+   T    =n(ns+1)
+   logT=log(T)
+   Tinv=1d0/T
+   logPRT=log(pst/Ru)-logT
+   sn   =sum(n(1:ns))
+   logsn=log(sn)
+
+   !set thermodynamical values
+   call check_section_number(T,sec)
+   call set_coeff(T,logT,cmurt,chrt,ccpr)
+   do j=1,ns
+      temp1=0d0
+      do i=1,7
+         temp1=temp1+coeff(i,sec(j),j)*cmurt(i)
+      end do
+      vmu0rt(j)=temp1
+   end do
+
+   do i=1,nr
+      !calc M
+      if(exist_M(i)) then
+         tmp =sn
+         do j=1,NumM(i)
+            tmp=tmp+Men(j,i)*n(IndM(j,i))
+         end do
+
+         if(tmp .eq. sn) then
+            vlogM=logsn
+         else
+            vlogM=log(tmp)
+         end if
+      end if
+
+      !calc k
+      vlogk(1)=ABE(1,i)+ABE(2,i)*logT-ABE(3,i)*Tinv
+      vlogk(2)=0d0
+      if(Rstate(i,2) >= 4) vlogk(1)=vlogk(1)+vlogM
+
+      if(Rstate(i,1) .eq. 0) then !bi-direction
+         if(Rstate(i,2) .eq. 1 .or. Rstate(i,2) .eq. 5) then !rev
+            vlogk(2)=cABE(1,i)+cABE(2,i)*logT-cABE(3,i)*Tinv !read cABE
+            if(Rstate(i,2) .eq. 5) vlogk(2)=vlogk(2)+vlogM
+         else !none, low, troe
+            if(Rstate(i,2) .eq. 2 .or. Rstate(i,2) .eq. 3) then!low, troe
+               !Pr
+               logk0  =cABE(1,i)+cABE(2,i)*logT-cABE(3,i)*Tinv
+               logkinf=vlogk(1)
+               log_Pr=logk0-logkinf+vlogM
+               Pr=exp(log_Pr)
+               vlogk(1)=logkinf+log(Pr/(1d0+Pr))
+
+               !Troe
+               if(Rstate(i,2) .eq. 3) then
+                  aa=TROE(1,i)
+                  logFcent=log10((1d0-aa)*exp(-T   *TROE(2,i))&
+                                +aa      *exp(-T   *TROE(3,i))&
+                                +         exp(-Tinv*TROE(4,i)))
+                  cc=-0.4d0-0.67d0*logFcent
+                  nn=0.75d0-1.27d0*logFcent
+                  logPrc=log_Pr*loge210+cc
+                  logF=(1d0+(logPrc/(nn-dd*logPrc))**2)**(-1)*logFcent
+                  vlogk(1)=vlogk(1)+logF/loge210
+               end if
+            end if
+
+            !calc numu0rt
+            temp1=0d0
+            do k=1,NumNu(1,i)
+               temp1=temp1-vmu0rt(IndNu(k,1,i))
+            end do
+            do k=1,NumNu(2,i)
+               temp1=temp1+vmu0rt(IndNu(k,2,i))
+            end do
+
+            vlogk(2)=vlogk(1)-snu(i)*logPRT+temp1
+         end if
+      end if
+
+      !calc r
+      r=exp(vlogk(1))
+      do k=1,NumNu(1,i)
+         r=r*n(IndNu(k,1,i))
+      end do
+      Dr=r
+      if(Rstate(i,1) .eq. 0) then
+         r=exp(vlogk(2))
+         do k=1,NumNu(2,i)
+            r=r*n(IndNu(k,2,i))
+         end do
+         Dr=Dr-r
+      end if
+      Dr=abs(Dr)
+
+      !calc csp
+      do k=1,NumNu(1,i)
+         itmp=IndNu(k,1,i)
+         csp(itmp,i)=csp(itmp,i)+Dr
+      end do
+      do k=1,NumNu(2,i)
+         itmp=IndNu(k,2,i)
+         csp(itmp,i)=csp(itmp,i)+Dr
+      end do
+   end do
+
+   do j=1,ns
+      tmp=0d0
+      do i=1,nr
+         tmp=tmp+csp(j,i)
+      end do
+      tmp=1d0/(tmp+1d-300)
+      do i=1,nr
+         csp(j,i)=csp(j,i)*tmp
+      end do
+   end do
+   do i=1,nr
+      do j=1,ns
+         csp_out(i)=max(csp_out(i),csp(j,i))
+      end do
+   end do
+end subroutine calc_CSP!}}}
 subroutine Fex(neq_outer, tt, n, dndt, rpar, ipar)!{{{
    !variables
    use const_chem
@@ -1791,6 +1941,8 @@ subroutine calc_Tign_Teq(Tini,vrhoini,allowable_limit,tign,Teq)!{{{
    double precision T
    double precision vrho(ns)
 
+   double precision csp(nr)
+
    double precision tt,to,tu,tl
    double precision n(ns+1)
    double precision RWORK(LRW)
@@ -1847,6 +1999,43 @@ subroutine calc_Tign_Teq(Tini,vrhoini,allowable_limit,tign,Teq)!{{{
    call check_model(Tini,vrhoini,tign,Teq,allowable_limit,flag)
    if(.not.flag) stop "Consistency check failed at calc_Tign_Teq."
 end subroutine calc_Tign_Teq!}}}
+subroutine check_model(Tini,vrhoini,tign,Teq,allowable_limit,flag)!{{{
+   use chem
+   implicit none
+   double precision,intent(in)::Tini
+   double precision,intent(in)::vrhoini(ns)
+   double precision,intent(in)::tign
+   double precision,intent(in)::Teq
+   double precision,intent(in)::allowable_limit
+   logical         ,intent(out)::flag
+
+   double precision T
+   double precision vrho(ns)
+
+   double precision tt,to
+   double precision n(ns+1)
+   double precision RWORK(LRW)
+   integer          IWORK(LIW)
+   integer          istate
+   double precision atol
+
+   T   =Tini
+   vrho=vrhoini
+
+   flag   = .false.
+   tt     = 0d0
+   istate = 1
+   to=tign*(1d0-allowable_limit)
+   call reaction_cont(T,tt,to,vrho,n,istate,RWORK,IWORK,atol)
+   if(T>=Tini+400d0) return
+   to=tign*(1d0+allowable_limit)
+   call reaction_cont(T,tt,to,vrho,n,istate,RWORK,IWORK,atol)
+   if(T<Tini+400d0) return
+   to=tign*10d0
+   call reaction_cont(T,tt,to,vrho,n,istate,RWORK,IWORK,atol)
+   if(abs(T-Teq)>Teq*allowable_limit) return
+   flag=.true.
+end subroutine check_model!}}}
 subroutine sort_n(Tini,vrhoini,tign,flag)!{{{
    use chem
    implicit none
@@ -1906,44 +2095,7 @@ subroutine sort_n(Tini,vrhoini,tign,flag)!{{{
       close(20)
    end if
 end subroutine sort_n!}}}
-subroutine check_model(Tini,vrhoini,tign,Teq,allowable_limit,flag)!{{{
-   use chem
-   implicit none
-   double precision,intent(in)::Tini
-   double precision,intent(in)::vrhoini(ns)
-   double precision,intent(in)::tign
-   double precision,intent(in)::Teq
-   double precision,intent(in)::allowable_limit
-   logical         ,intent(out)::flag
-
-   double precision T
-   double precision vrho(ns)
-
-   double precision tt,to
-   double precision n(ns+1)
-   double precision RWORK(LRW)
-   integer          IWORK(LIW)
-   integer          istate
-   double precision atol
-
-   T   =Tini
-   vrho=vrhoini
-
-   flag   = .false.
-   tt     = 0d0
-   istate = 1
-   to=tign*(1d0-allowable_limit)
-   call reaction_cont(T,tt,to,vrho,n,istate,RWORK,IWORK,atol)
-   if(T>=Tini+400d0) return
-   to=tign*(1d0+allowable_limit)
-   call reaction_cont(T,tt,to,vrho,n,istate,RWORK,IWORK,atol)
-   if(T<Tini+400d0) return
-   to=tign*10d0
-   call reaction_cont(T,tt,to,vrho,n,istate,RWORK,IWORK,atol)
-   if(abs(T-Teq)>Teq*allowable_limit) return
-   flag=.true.
-end subroutine check_model!}}}
-subroutine reduction(Tini,vrhoini,tign,Teq,allowable_limit)!{{{
+subroutine reduction_species(Tini,vrhoini,tign,Teq,allowable_limit)!{{{
    use chem
    implicit none
    double precision,intent(in)::Tini
@@ -1958,14 +2110,14 @@ subroutine reduction(Tini,vrhoini,tign,Teq,allowable_limit)!{{{
 
    ns_org=ns
    do
-      call reduct_in_order(Tini,vrhoini,tign,Teq,allowable_limit)
+      call reduct_species_in_order(Tini,vrhoini,tign,Teq,allowable_limit)
       if(ns .eq. ns_org) exit
       ns_org=ns
       call sort_n(Tini,vrhoini,tign,.false.)
    end do
    call reduct_every_species(Tini,vrhoini,tign,Teq,allowable_limit)
-end subroutine reduction!}}}
-subroutine reduct_in_order(Tini,vrhoini,tign,Teq,allowable_limit)!{{{
+end subroutine reduction_species!}}}
+subroutine reduct_species_in_order(Tini,vrhoini,tign,Teq,allowable_limit)!{{{
    use chem
    implicit none
    double precision,intent(in)::Tini
@@ -1991,7 +2143,7 @@ subroutine reduct_in_order(Tini,vrhoini,tign,Teq,allowable_limit)!{{{
       end if
    end do
    ns=nsu
-end subroutine reduct_in_order!}}}
+end subroutine reduct_species_in_order!}}}
 subroutine reduct_every_species(Tini,vrhoini,tign,Teq,allowable_limit)!{{{
    use chem
    implicit none
@@ -2018,6 +2170,7 @@ subroutine reduct_every_species(Tini,vrhoini,tign,Teq,allowable_limit)!{{{
       ind=ind-1
    end do
    ns=ns+1
+   call change_nr_via_ns
 end subroutine reduct_every_species!}}}
 subroutine change_nr_via_ns!{{{
    use chem
@@ -2026,9 +2179,11 @@ subroutine change_nr_via_ns!{{{
    logical flag
    double precision dtmp
    integer          itmp
-   i=nr
+   nr=max_nr
+   i =max_nr
    do while(i>0)
       flag=.true.
+      if(NumNu(1,i)<1)  flag = .false.
       do k=1,NumNu(1,i)
          if(IndNu(k,1,i)>ns) flag=.false.
       end do
@@ -2036,7 +2191,7 @@ subroutine change_nr_via_ns!{{{
          if(IndNu(k,2,i)>ns) flag=.false.
       end do
 
-      if(exist_M(i)) then
+      if(flag .and. exist_M(i)) then
          !calc original NumM
          n=1
          do
@@ -2072,6 +2227,134 @@ subroutine change_nr_via_ns!{{{
       i=i-1
    end do
 end subroutine change_nr_via_ns!}}}
+subroutine sort_r(Tini,vrhoini,tign,flag)!{{{
+   use chem
+   implicit none
+   double precision,intent(in)::Tini
+   double precision,intent(in)::vrhoini(ns)
+   double precision,intent(in)::tign
+   logical         ,intent(in)::flag
+
+   double precision T
+   double precision vrho(ns)
+   double precision csp(nr)
+
+   double precision tt,to
+   double precision n(ns+1)
+   double precision RWORK(LRW)
+   integer          IWORK(LIW)
+   integer          istate,i,j
+   double precision atol
+
+   double precision sm,dtemp
+
+   T   =Tini
+   vrho=vrhoini
+
+   tt    =0d0
+   istate=1
+   to=tign/2d0**3
+   csp=0d0
+   do i=1,7
+      to=to*2d0
+      call reaction_cont(T,tt,to,vrho,n,istate,RWORK,IWORK,atol)
+      call calc_CSP(n, csp)
+   end do
+
+   ! sort --- bubble sort
+   do i=1,nr-1
+      do j=2,nr-i+1
+         if(csp(j)>csp(j-1)) then
+            dtemp   =csp(j)
+            csp(j)  =csp(j-1)
+            csp(j-1)=dtemp
+
+            call swap_reaction(j-1,j)
+         end if
+      end do
+   end do
+
+   if(flag) then
+      !write out
+      open(20,file="sort_r.dat")
+      write(20,'(i3,es15.7,a83)')  (i,csp(i)," # "//SYM_RCT(i),i=1,nr)
+      close(20)
+   end if
+end subroutine sort_r!}}}
+subroutine reduction_reactions(Tini,vrhoini,tign,Teq,allowable_limit)!{{{
+   use chem
+   implicit none
+   double precision,intent(in)::Tini
+   double precision,intent(in)::vrhoini(ns)
+   double precision,intent(in)::tign
+   double precision,intent(in)::Teq
+   double precision,intent(in)::allowable_limit
+
+   integer nr_org
+
+   call sort_r(Tini,vrhoini,tign,.true.)
+
+   nr_org=nr
+   do
+      call reduct_reactions_in_order(Tini,vrhoini,tign,Teq,allowable_limit)
+      if(nr .eq. nr_org) exit
+      nr_org=nr
+      call sort_r(Tini,vrhoini,tign,.false.)
+   end do
+   call reduct_every_reactions(Tini,vrhoini,tign,Teq,allowable_limit)
+end subroutine reduction_reactions!}}}
+subroutine reduct_reactions_in_order(Tini,vrhoini,tign,Teq,allowable_limit)!{{{
+   use chem
+   implicit none
+   double precision,intent(in)::Tini
+   double precision,intent(in)::vrhoini(ns)
+   double precision,intent(in)::tign
+   double precision,intent(in)::Teq
+   double precision,intent(in)::allowable_limit
+
+   logical flag
+   integer nrl,nru
+
+   nrl=1
+   nru=nr
+   do while(nrl.ne.nru)
+      nr=(nrl+nru)/2
+      call check_model(Tini,vrhoini,tign,Teq,allowable_limit,flag)
+      if(flag) then
+         nru=nr
+      else
+         nrl=nr
+         if(nru-nrl .eq. 1) exit
+      end if
+   end do
+   nr=nru
+end subroutine reduct_reactions_in_order!}}}
+subroutine reduct_every_reactions(Tini,vrhoini,tign,Teq,allowable_limit)!{{{
+   use chem
+   implicit none
+   double precision,intent(in)::Tini
+   double precision,intent(in)::vrhoini(ns)
+   double precision,intent(in)::tign
+   double precision,intent(in)::Teq
+   double precision,intent(in)::allowable_limit
+
+   logical flag
+   integer ind
+
+   ind = nr
+   nr  = nr-1
+   do while(ind .ne. 0)
+      call swap_reaction(ind,nr+1)
+      call check_model(Tini,vrhoini,tign,Teq,allowable_limit,flag)
+      if(flag) then
+         ind=nr
+         nr =nr-1
+         cycle
+      end if
+      ind=ind-1
+   end do
+   nr=nr+1
+end subroutine reduct_every_reactions!}}}
 
 ! cold flow
 subroutine calc_T(vrho,rho,E, T, kappa,MWave,DHi,vhi,mu)!{{{
