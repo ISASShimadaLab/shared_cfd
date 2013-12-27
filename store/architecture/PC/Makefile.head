@@ -4,5 +4,6 @@ arc=mod_mpi_dummy.o
 compiler=ifort -convert big_endian -openmp -fast -parallel
 #compiler=ifort -convert big_endian -fast -parallel
 #compiler=ifort -convert big_endian -check all -traceback -g
+#compiler=ifort -O1
 ##### END SELECT ARCHITECTURE###################
 

@@ -50,6 +50,8 @@ module chem
    integer          NumNu(  2,max_nr)
    integer          snu(      max_nr)
 
+   logical          duplicate(max_nr)
+
    logical          exist_M(    max_nr)
    integer          IndM(max_ns,max_nr)
    integer          NumM(       max_nr)

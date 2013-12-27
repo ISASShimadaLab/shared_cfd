@@ -1,6 +1,7 @@
 program driver
    use chem
    use chem_var
+   use conditions
    implicit none
    character*100    buf
    double precision rho,E,T, MWave,kappa,mu, tout
@@ -8,12 +9,17 @@ program driver
    double precision Y(2)
    double precision vrho(max_ns),max_Y(max_ns)
 
-   double precision allowable_limit
-
    logical flag
 
    !read files
    call init_therm
+
+   allowable_limit=0.03d0
+   numT =1;numP =1;numYf=1
+   allocate(list_T(numT),list_P(numP),list_Yf(numYf))
+   list_T( 1)=Tf
+   list_P( 1)=Pf
+   list_Yf(1)=1d0/(1d0+of)
 
    !calc stoichiometry
    Y(1)=1d0/(1d0+of)
@@ -22,10 +28,10 @@ program driver
    vrho=rho*(vwf*Y(1)+vwo*Y(2))
    T   =      Tf*Y(1)+ To*Y(2)
 
+   call init_vrho
    !plot
    !call plot_time_history(T,vrho,5d-3,1000)
 
-   allowable_limit=0.03d0
    call calc_Tign_Teq(T,vrho,allowable_limit,tign,Teq)
    print *,"(tign,Teq)=",tign,Teq
 
@@ -34,6 +40,7 @@ program driver
    print *,"(ns,nr)=",ns,nr
    call reduction_reactions(T,vrho,tign,Teq,allowable_limit)
    print *,"(ns,nr)=",ns,nr
+   call out_cheminp
    !print '(a,  f15.7)',"Y of f    ",Y(1)
    !print '(a,  f15.7)',"MWave     ",MWave
    !print '(a,  f15.7)',"kappa     ",kappa
