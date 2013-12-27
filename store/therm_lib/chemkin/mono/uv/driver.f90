@@ -27,15 +27,13 @@ program driver
 
    allowable_limit=0.03d0
    call calc_Tign_Teq(T,vrho,allowable_limit,tign,Teq)
-   print *,tign,Teq
+   print *,"(tign,Teq)=",tign,Teq
 
-   print *,ns
-   !call sort_n(T,vrho,tign,.true.)
-   !call reduct_in_order(T,vrho,tign,Teq,allowable_limit)
+   print *,"(ns,nr)=",ns,nr
    call reduction_species(T,vrho,tign,Teq,allowable_limit)
-   print *,ns,nr
+   print *,"(ns,nr)=",ns,nr
    call reduction_reactions(T,vrho,tign,Teq,allowable_limit)
-   print *,ns,nr
+   print *,"(ns,nr)=",ns,nr
    !print '(a,  f15.7)',"Y of f    ",Y(1)
    !print '(a,  f15.7)',"MWave     ",MWave
    !print '(a,  f15.7)',"kappa     ",kappa

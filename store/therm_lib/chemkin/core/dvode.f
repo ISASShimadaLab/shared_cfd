@@ -1405,17 +1405,17 @@ C-----------------------------------------------------------------------
  280  IF ((TN + H) .NE. TN) GO TO 290
       NHNIL = NHNIL + 1
       IF (NHNIL .GT. MXHNIL) GO TO 290
-      MSG = 'DVODE--  Warning: internal T (=R1) and H (=R2) are'
-      CALL XERRWD (MSG, 50, 101, 1, 0, 0, 0, 0, ZERO, ZERO)
-      MSG='      such that in the machine, T + H = T on the next step  '
-      CALL XERRWD (MSG, 60, 101, 1, 0, 0, 0, 0, ZERO, ZERO)
-      MSG = '      (H = step size). solver will continue anyway'
-      CALL XERRWD (MSG, 50, 101, 1, 0, 0, 0, 2, TN, H)
-      IF (NHNIL .LT. MXHNIL) GO TO 290
-      MSG = 'DVODE--  Above warning has been issued I1 times.  '
-      CALL XERRWD (MSG, 50, 102, 1, 0, 0, 0, 0, ZERO, ZERO)
-      MSG = '      it will not be issued again for this problem'
-      CALL XERRWD (MSG, 50, 102, 1, 1, MXHNIL, 0, 0, ZERO, ZERO)
+C      MSG = 'DVODE--  Warning: internal T (=R1) and H (=R2) are'
+C      CALL XERRWD (MSG, 50, 101, 1, 0, 0, 0, 0, ZERO, ZERO)
+C      MSG='      such that in the machine, T + H = T on the next step  '
+C      CALL XERRWD (MSG, 60, 101, 1, 0, 0, 0, 0, ZERO, ZERO)
+C      MSG = '      (H = step size). solver will continue anyway'
+C      CALL XERRWD (MSG, 50, 101, 1, 0, 0, 0, 2, TN, H)
+C      IF (NHNIL .LT. MXHNIL) GO TO 290
+C      MSG = 'DVODE--  Above warning has been issued I1 times.  '
+C      CALL XERRWD (MSG, 50, 102, 1, 0, 0, 0, 0, ZERO, ZERO)
+C      MSG = '      it will not be issued again for this problem'
+C      CALL XERRWD (MSG, 50, 102, 1, 1, MXHNIL, 0, 0, ZERO, ZERO)
  290  CONTINUE
 C-----------------------------------------------------------------------
 C CALL DVSTEP (Y, YH, NYH, YH, EWT, SAVF, VSAV, ACOR,
@@ -1524,12 +1524,13 @@ C KFLAG = -1.  Error test failed repeatedly or with ABS(H) = HMIN. -----
       ISTATE = -4
       GO TO 560
 C KFLAG = -2.  Convergence failed repeatedly or with ABS(H) = HMIN. ----
- 540  MSG = 'DVODE--  At T (=R1) and step size H (=R2), the    '
-      CALL XERRWD (MSG, 50, 205, 1, 0, 0, 0, 0, ZERO, ZERO)
-      MSG = '      corrector convergence failed repeatedly     '
-      CALL XERRWD (MSG, 50, 205, 1, 0, 0, 0, 0, ZERO, ZERO)
-      MSG = '      or with abs(H) = HMIN   '
-      CALL XERRWD (MSG, 30, 205, 1, 0, 0, 0, 2, TN, H)
+ 540  continue
+C 540  MSG = 'DVODE--  At T (=R1) and step size H (=R2), the    '
+C      CALL XERRWD (MSG, 50, 205, 1, 0, 0, 0, 0, ZERO, ZERO)
+C      MSG = '      corrector convergence failed repeatedly     '
+C      CALL XERRWD (MSG, 50, 205, 1, 0, 0, 0, 0, ZERO, ZERO)
+C      MSG = '      or with abs(H) = HMIN   '
+C      CALL XERRWD (MSG, 30, 205, 1, 0, 0, 0, 2, TN, H)
       ISTATE = -5
 C Compute IMXER if relevant. -------------------------------------------
  560  BIG = ZERO
