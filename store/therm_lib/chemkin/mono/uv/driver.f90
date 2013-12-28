@@ -14,12 +14,12 @@ program driver
    !read files
    call init_therm
 
-   allowable_limit=0.03d0
-   numT =1;numP =1;numYf=1
-   allocate(list_T(numT),list_P(numP),list_Yf(numYf))
-   list_T( 1)=Tf
-   list_P( 1)=Pf
-   list_Yf(1)=1d0/(1d0+of)
+   !allowable_limit=0.03d0
+   !numT =1;numP =1;numYf=1
+   !allocate(list_T(numT),list_P(numP),list_Yf(numYf))
+   !list_T( 1)=Tf
+   !list_P( 1)=Pf
+   !list_Yf(1)=1d0/(1d0+of)
 
    !calc stoichiometry
    Y(1)=1d0/(1d0+of)
@@ -28,18 +28,22 @@ program driver
    vrho=rho*(vwf*Y(1)+vwo*Y(2))
    T   =      Tf*Y(1)+ To*Y(2)
 
-   call init_vrho
    !plot
    !call plot_time_history(T,vrho,5d-3,1000)
 
-   call calc_Tign_Teq(T,vrho,allowable_limit,tign,Teq)
-   print *,"(tign,Teq)=",tign,Teq
+   call read_conditions
+   call init_vrho
 
-   print *,"(ns,nr)=",ns,nr
-   call reduction_species(T,vrho,tign,Teq,allowable_limit)
-   print *,"(ns,nr)=",ns,nr
-   call reduction_reactions(T,vrho,tign,Teq,allowable_limit)
-   print *,"(ns,nr)=",ns,nr
+   call set_Tref
+
+   print *,"                   original (ns,nr)=",ns,nr
+   call reduction_species
+   print *,"after 1st species reduction (ns,nr)=",ns,nr
+   call reduction_reactions
+   print *,"   after reaction reduction (ns,nr)=",ns,nr
+   call remove_remaining_reactions
+   call reduction_species
+   print *,"after 2nd species reduction (ns,nr)=",ns,nr
    call out_cheminp
    !print '(a,  f15.7)',"Y of f    ",Y(1)
    !print '(a,  f15.7)',"MWave     ",MWave

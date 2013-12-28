@@ -11,7 +11,7 @@ module const_chem
    double precision,parameter::pst=1.01325d6             !standard state pressure(dyn/cm^2)
    double precision,parameter::logPR=- 4.407418526701446!log(Pst/Ru)
 
-   double precision,parameter::n_eps = 1d-20            !epsilon for small n
+   double precision,parameter::n_eps = 1d-40            !epsilon for small n
    double precision rtol_user,atol_user
   
    !!!!!!!!!!!!!!!!! CHANGE BELOW IF YOU CHANGE CHEM.INP !!!!!!!!!!!!!!!!!!!!!
