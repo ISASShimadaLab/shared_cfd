@@ -1,0 +1,11 @@
+final time (s)          : -1.e0
+time step (s)           : -1.e0
+species to include:
+CH4
+O2
+OH
+CH
+CO2
+CO
+H2O
+end
