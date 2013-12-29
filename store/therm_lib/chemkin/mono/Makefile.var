@@ -1,1 +1,1 @@
-thermalmodel=sub_chem.o mod_chem.o dvode.o
+thermalmodel=sub_chem.o FJ.o mod_chem.o dvode.o

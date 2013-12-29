@@ -6,3 +6,5 @@ mod_chem.o:  mod_chem.f90
 	$(compiler) -c $<
 sub_chem.o:  sub_chem.f90 mod_chem.o
 	$(compiler) -c $<
+FJ.o:  FJ.f90 mod_chem.o
+	$(compiler) -c $<

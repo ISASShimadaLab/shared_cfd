@@ -1,4 +1,11 @@
-Pressure (Pa)         range and Ntics : 1.e6   1.e6  1
-Temperature (K)       range and Ntics : 1300. 1500.  2
-mass fraction of fuel range and Ntics : 0.15   0.25  3
-Allowable tolerance of temperature    : 0.05
+final time (s)          : -1.e0
+time step (s)           : -1.e0
+species to include:
+CH4
+O2
+OH
+CH
+CO2
+CO
+H2O
+end

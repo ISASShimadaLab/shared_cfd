@@ -34,7 +34,7 @@ def checkout_chem_nasa():
 	if val_model < 2:
 		print "\tNASA database is selected."
 		engage("therm_lib/NASA/core","checkout_chem",arr_engage)
-		string_data="NASA/"
+		string_data="NASA"
 		
 		# process mod_chem.f90
 		if not os.path.exists("chem.inp"):
@@ -62,7 +62,7 @@ def checkout_chem_nasa():
 	elif val_model == 2:
 		print "\tCHEMKIN is selected."
 		engage("therm_lib/chemkin/core","checkout_chem",arr_engage)
-		string_data="chemkin/"
+		string_data="chemkin"
 		
 		# process mod_chem.f90
 		if not os.path.exists("chem.inp"):
@@ -93,13 +93,13 @@ def checkout_chem_nasa():
 	val_calc  = read_control_next_int(fp)
 	if   val_calc == 0:
 		print "\tmono selected"
-		string_calc="mono/"
+		string_calc="mono"
 	elif val_calc == 1:
 		print "\tplot selected"
-		string_calc="plot/"
+		string_calc="plot"
 	elif val_calc == 2:
 		print "\treduction selected"
-		string_calc="reduction/"
+		string_calc="reduction"
 	else:
 		print "\tOdd Input at calculation model! value is ",val
 		sys.exit(1)
@@ -118,7 +118,11 @@ def checkout_chem_nasa():
 		sys.exit(1)
 
 	####################################################################################
-	engage("therm_lib/"+string_data+string_model+string_calc+string_hpuv,"checkout_chem",arr_engage)
+	if string_data == "NASA":
+		engage("therm_lib/"+"/".join([string_data,string_model,string_calc,string_hpuv]),"checkout_chem",arr_engage)
+	else:
+		engage("therm_lib/"+string_data+"/uvhp/"+string_hpuv,"checkout_chem",arr_engage)
+		engage("therm_lib/"+string_data+"/"+string_calc,"checkout_chem",arr_engage)
 
 	####################################################################################
 	# close checkout.inp

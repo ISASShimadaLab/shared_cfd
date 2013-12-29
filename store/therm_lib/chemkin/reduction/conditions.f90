@@ -156,19 +156,16 @@ subroutine set_Tref!{{{
    do k=1,numYf
       do j=1,numP
          do i=1,numT
-            call calc_Tign_Teq(list_T(i),list_vrho(:,i,j,k),tign,Teq,flag)
+            call reaction_one_steps(list_T(i),list_vrho(:,i,j,k),0,Tref(:,i,j,k),flag)
             if(flag) then
                print *,i,j,k,"OK"
                write(22,*) list_P(j),list_Yf(k),list_T(i)
-               Tref(1,i,j,k)=tign
-               Tref(2,i,j,k)=Teq
-               write(24,'(5es15.7)') list_P(j),list_Yf(k),list_T(i),tign,Teq
+               write(24,'(5es15.7)') list_P(j),list_Yf(k),list_T(i),Tref(:,i,j,k)
                sm=sm+1
             else
                print *,i,j,k,"NG"
                write(23,*) list_P(j),list_Yf(k),list_T(i)
-               Tref(1,i,j,k)=-1d0
-               Tref(2,i,j,k)=-1d0
+               Tref(:,i,j,k)=-1d0
             end if
          end do
       end do

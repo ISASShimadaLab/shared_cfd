@@ -187,767 +187,7 @@ subroutine set_coeff_mu(T,logT,cmu)!{{{
 end subroutine set_coeff_mu!}}}
 end module func_therm
 
-module conditions
-   implicit none
-   double precision,dimension(:),      allocatable::list_T
-   double precision,dimension(:),      allocatable::list_P
-   double precision,dimension(:),      allocatable::list_Yf
-   double precision,dimension(:,:,:,:),allocatable::list_vrho
-   double precision,dimension(:,:,:,:),allocatable::Tref
-   integer numT
-   integer numP
-   integer numYf
-   double precision allowable_limit
-   logical flag_debug
-contains
-subroutine read_conditions!{{{
-   implicit none
-   character*200 bufnext,line
-   double precision lb,ub
-   integer i
-
-   flag_debug=.false.
-
-   open(22,file='control.inp')
-   bufnext=""
-
-   line=next_word()
-   read(line,*) lb
-   line=next_word()
-   read(line,*) ub
-   line=next_word()
-   read(line,*) nump
-   if(lb >ub) then
-      stop "lower bound is larger than upper bound."
-   else if(lb.eq. ub) then
-      nump=1
-      allocate(list_p(nump))
-      list_p=lb
-   else
-      if(nump<=0) stop "Number of Sample point is lower than 1."
-      allocate(list_p(nump))
-      do i=1,nump
-         list_p(i)=lb*(ub/lb)**(dble(i-1)/dble(nump-1))
-      end do
-   end if
-
-   line=next_word()
-   read(line,*) lb
-   line=next_word()
-   read(line,*) ub
-   line=next_word()
-   read(line,*) numT
-   if(lb >ub) then
-      stop "lower bound is larger than upper bound."
-   else if(lb.eq. ub) then
-      numT=1
-      allocate(list_T(numT))
-      list_T=lb
-   else
-      if(numT<=0) stop "Number of Sample point is lower than 1."
-      allocate(list_T(numT))
-      do i=1,numT
-         list_T(i)=lb+(ub-lb)*dble(i-1)/dble(numT-1)
-      end do
-   end if
-
-   line=next_word()
-   read(line,*) lb
-   line=next_word()
-   read(line,*) ub
-   line=next_word()
-   read(line,*) numYf
-   if(lb >ub) then
-      stop "lower bound is larger than upper bound."
-   else if(lb.eq. ub) then
-      numYf=1
-      allocate(list_Yf(numYf))
-      list_Yf=lb
-   else
-      if(numYf<=0) stop "Number of Sample point is lower than 1."
-      allocate(list_Yf(numYf))
-      do i=1,numYf
-         list_Yf(i)=lb+(ub-lb)*dble(i-1)/dble(numYf-1)
-      end do
-   end if
-
-   line=next_word()
-   read(line,*) allowable_limit
-
-   close(22)
-contains
-character*200 function next_word()
-   implicit none
-   integer ind
-   if(bufnext .eq. "") bufnext=next_line()
-   ind = index(bufnext,' ')
-   if(ind == 0) then
-      next_word=bufnext
-      bufnext=""
-   else
-      next_word=bufnext(:ind-1)
-      bufnext=trim(adjustl(bufnext(ind:)))
-   end if
-end function next_word
-character*200 function next_line()
-   implicit none
-   integer ind,ind0
-   do while(bufnext .eq. "")
-      read(22,'(a)') bufnext
-      ind  =       index(bufnext,'#')
-      ind0 = max(1,index(bufnext,':'))
-      if(ind == 1) then
-         bufnext=""
-      else if(ind > 1) then
-         bufnext=bufnext(ind0+1:ind-1)
-      else
-         bufnext=bufnext(ind0+1:)
-      end if
-      bufnext=trim(adjustl(bufnext))
-   end do
-   next_line=bufnext
-   bufnext=""
-end function next_line
-end subroutine read_conditions!}}}
-subroutine init_vrho!{{{
-   use chem
-   use chem_var
-   implicit none
-   double precision Y(2),vw(max_ns),sn,p,rho
-   integer i,j,k
-   allocate(list_vrho(max_ns,numT,numP,numYf))
-   allocate(Tref(          2,numT,numP,numYf))
-
-   do k=1,numYf
-      Y(1)=list_Yf(k)
-      Y(2)=1d0-Y(1)
-      vw=vwf*Y(1)+vwo*Y(2)
-      sn=sum(vw/MWs,1)
-      do j=1,numP
-         p=list_P(j)
-         do i=1,numT
-            rho=p/(sn*Ru*1d-4*list_T(i))
-            list_vrho(:,i,j,k)=rho*vw
-         end do
-      end do
-   end do
-end subroutine init_vrho!}}}
-subroutine set_Tref!{{{
-   implicit none
-   double precision tign,Teq
-   integer i,j,k,sm
-   logical flag
-
-   open(22,file="calculatable.out")
-   open(23,file="not_calculatable.out")
-   open(24,file="Tref.out")
-   sm=0
-   do k=1,numYf
-      do j=1,numP
-         do i=1,numT
-            call calc_Tign_Teq(list_T(i),list_vrho(:,i,j,k),tign,Teq,flag)
-            if(flag) then
-               print *,i,j,k,"OK"
-               write(22,*) list_P(j),list_Yf(k),list_T(i)
-               Tref(1,i,j,k)=tign
-               Tref(2,i,j,k)=Teq
-               write(24,'(5es15.7)') list_P(j),list_Yf(k),list_T(i),tign,Teq
-               sm=sm+1
-            else
-               print *,i,j,k,"NG"
-               write(23,*) list_P(j),list_Yf(k),list_T(i)
-               Tref(1,i,j,k)=-1d0
-               Tref(2,i,j,k)=-1d0
-            end if
-         end do
-      end do
-   end do
-   close(22)
-   close(23)
-   close(24)
-
-   print *,"(calculated points)/(all points)=",sm,"/",numYf*numP*numT
-   if(sm .eq. 0) stop "Error:There is no calculatable point. Stop calculation."
-
-   call check_model(flag)
-   if(.not.flag) stop "Consistency check failed at set_Tref."
-end subroutine set_Tref!}}}
-
-subroutine check_model(flag)!{{{
-   use chem
-   implicit none
-   logical         ,intent(out)::flag
-
-   double precision T
-   double precision vrho(ns)
-
-   double precision Tini,tign,Teq
-   double precision tt,to
-   double precision n(ns+1)
-   double precision RWORK(LRW)
-   integer          IWORK(LIW)
-   integer          istate
-   double precision atol
-
-   double precision Trefn(2)
-
-   logical flag_vode
-
-   integer i,j,k
-
-   flag   = .false.
-
-   do k=1,numYf
-      do j=1,numP
-         do i=1,numT
-            Tini=list_T(i)
-            vrho=list_vrho(:,i,j,k)
-            tign=Tref(     1,i,j,k)
-            Teq =Tref(     2,i,j,k)
-            if(tign<0) cycle
-
-            call reaction_one_steps(list_T(i),list_vrho(:,i,j,k),0,Trefn,flag_vode)
-            !if(flag_debug) write(25,'(5es15.7)') list_P(j),list_Yf(k),list_T(i),Trefn(1),Trefn(2)
-            if(.not.flag_vode) return 
-            if(abs(Trefn(1)-tign)>tign*allowable_limit) return
-            if(abs(Trefn(2)- Teq)> Teq*allowable_limit) return
-         end do
-      end do
-   end do
-   flag=.true.
-end subroutine check_model!}}}
-subroutine change_nr_via_ns!{{{
-   use chem
-   implicit none
-   integer i,k,n
-   logical flag
-   double precision dtmp
-   integer          itmp
-   nr=max_nr
-   i =max_nr
-   do while(i>0)
-      flag=.true.
-      if(NumNu(1,i)<1)  flag = .false.
-      do k=1,NumNu(1,i)
-         if(IndNu(k,1,i)>ns) flag=.false.
-      end do
-      do k=1,NumNu(2,i)
-         if(IndNu(k,2,i)>ns) flag=.false.
-      end do
-
-      if(flag .and. exist_M(i)) then
-         !calc original NumM
-         n=1
-         do
-            if(IndM(n,i) .eq. 0) then
-               n=n-1
-               exit
-            end if
-            if(n .eq. max_nr) exit
-            n=n+1
-         end do
-
-         k=n
-         do while(k>0)
-            if(IndM(k,i)>ns) then
-               itmp     = IndM(n,i)
-               IndM(n,i)= IndM(k,i)
-               IndM(k,i)= itmp
-
-               dtmp     = Men(n,i)
-               Men(n,i) = Men(k,i)
-               Men(k,i) = dtmp
-               n=n-1
-            end if
-            k=k-1
-         end do
-         NumM(i)=n
-      end if
-
-      if(.not.flag) then
-         call swap_reaction(nr,i)
-         nr=nr-1
-      end if
-      i=i-1
-   end do
-end subroutine change_nr_via_ns!}}}
-
-subroutine sort_n(flag)!{{{
-   use chem
-   implicit none
-   logical         ,intent(in)::flag
-
-   double precision Ymax(ns)
-
-   integer          i,j,k
-   double precision dtemp
-
-   logical flag_vode
-
-   call check_model(flag_vode)
-   if(.not.flag_vode) stop "Something Odd occured at sort_n"
-
-   Ymax=0d0
-   do k=1,numYf
-      do j=1,numP
-         do i=1,numT
-            if(Tref(1,i,j,k)<0d0) cycle
-            call reaction_one_steps(list_T(i),list_vrho(:,i,j,k),1,Ymax,flag_vode)
-            if(.not.flag_vode) stop "Calculation failed at sort_n."
-         end do
-      end do
-   end do
-
-   ! sort --- bubble sort
-   do i=1,ns-1-num_reac
-      do j=num_reac+2,ns-i+1
-         if(Ymax(j)>Ymax(j-1)) then
-            dtemp    =Ymax(j)
-            Ymax(j)  =Ymax(j-1)
-            Ymax(j-1)=dtemp
-
-            call swap_species(j-1,j)
-         end if
-      end do
-   end do
-
-   if(flag) then
-      !write out
-      open(20,file="sort.dat")
-      write(20,'(i3,es15.7,a21)')  (i,Ymax(i)," # "//SYM_SPC(i),i=1,ns)
-      close(20)
-   end if
-end subroutine sort_n!}}}
-subroutine reduction_species!{{{
-   use chem
-   implicit none
-   integer ns_org
-   logical flag
-
-   call sort_n(.true.)
-
-   ns_org=ns
-   do
-      call reduct_species_in_order
-      if(ns .eq. ns_org) exit
-      ns_org=ns
-      call sort_n(.false.)
-   end do
-   call reduct_every_species
-
-   call check_model(flag)
-   if(.not.flag) stop "Something Odd occured at reduction_species"
-end subroutine reduction_species!}}}
-subroutine reduct_species_in_order!{{{
-   use chem
-   implicit none
-   logical flag
-   integer nsl,nsu
-
-   nsl=num_reac
-   nsu=ns
-   do while(nsl.ne.nsu)
-      ns=(nsl+nsu)/2
-      call change_nr_via_ns
-      call check_model(flag)
-      if(flag) then
-         nsu=ns
-      else
-         nsl=ns
-         if(nsu-nsl .eq. 1) exit
-      end if
-   end do
-   ns=nsu
-   call change_nr_via_ns
-end subroutine reduct_species_in_order!}}}
-subroutine reduct_every_species!{{{
-   use chem
-   implicit none
-   logical flag
-   integer ind
-   ind = ns
-   ns  = ns-1
-   do while(ind .ne. num_reac)
-      call swap_species(ind,ns+1)
-      call change_nr_via_ns
-      call check_model(flag)
-      if(flag) then
-         ind=ns
-         ns =ns-1
-         cycle
-      end if
-      ind=ind-1
-   end do
-   ns=ns+1
-   call change_nr_via_ns
-   call out_cheminp
-end subroutine reduct_every_species!}}}
-
-subroutine sort_r(flag)!{{{
-   use chem
-   implicit none
-   logical,intent(in)::flag
-
-   double precision csp(nr)
-
-   integer          i,j,k
-
-   double precision dtemp
-
-   logical flag_vode
-
-   csp=0d0
-   do k=1,numYf
-      do j=1,numP
-         do i=1,numT
-            if(Tref(1,i,j,k)<0d0) cycle
-            call reaction_one_steps(list_T(i),list_vrho(:,i,j,k),2,csp,flag_vode)
-            if(.not.flag_vode) stop "Calculation failed at sort_r."
-         end do
-      end do
-   end do
-
-   ! sort --- bubble sort
-   do i=1,nr-1
-      do j=2,nr-i+1
-         if(csp(j)>csp(j-1)) then
-            dtemp   =csp(j)
-            csp(j)  =csp(j-1)
-            csp(j-1)=dtemp
-
-            call swap_reaction(j-1,j)
-         end if
-      end do
-   end do
-
-   if(flag) then
-      !write out
-      open(20,file="sort_r.dat")
-      write(20,'(i3,es15.7,a83)')  (i,csp(i)," # "//SYM_RCT(i),i=1,nr)
-      close(20)
-   end if
-end subroutine sort_r!}}}
-subroutine reduction_reactions!{{{
-   use chem
-   implicit none
-   integer nr_org,i
-
-   call sort_r(.true.)
-
-   nr_org=nr
-   i=1
-   do
-      write(*,'(a,i2)') "reduct_reaction_in_order. try number=",i
-      call reduct_reactions_in_order
-      if(nr .eq. nr_org) exit
-      nr_org=nr
-      call sort_r(.false.)
-      i=i+1
-   end do
-   call reduct_every_reactions
-end subroutine reduction_reactions!}}}
-subroutine reduct_reactions_in_order!{{{
-   use chem
-   implicit none
-   logical flag
-   integer nrl,nru
-
-   nrl=1
-   nru=nr
-   do while(nrl.ne.nru)
-      nr=(nrl+nru)/2
-      call check_model(flag)
-      if(flag) then
-         nru=nr
-      else
-         nrl=nr
-         if(nru-nrl .eq. 1) exit
-      end if
-   end do
-   nr=nru
-end subroutine reduct_reactions_in_order!}}}
-subroutine reduct_every_reactions!{{{
-   use chem
-   implicit none
-   logical flag
-   integer ind
-
-   ind = nr
-   nr  = nr-1
-   do while(ind .ne. 0)
-      call swap_reaction(ind,nr+1)
-      call check_model(flag)
-      if(flag) then
-         write(*,'(a,i3)') "reduct_every_reaction. current nr=",nr
-         ind=nr
-         nr =nr-1
-         cycle
-      end if
-      ind=ind-1
-   end do
-   nr=nr+1
-end subroutine reduct_every_reactions!}}}
-
-subroutine remove_remaining_reactions!{{{
-   use chem
-   implicit none
-   integer i
-   logical flag
-   do i=nr+1,max_nr
-      SYM_RCT(i)=""
-      Rstate(i,1)=0
-      Rstate(i,2)=0
-      IndNu(:,:,i)=0
-      NumNu(:,  i)=0
-      snu(      i)=0
-      duplicate(i)=.false.
-      exist_M(i)=.false.
-      IndM(:,i)=0
-      NumM(i)=0
-      Men(:,i)=0d0
-         ABE(:,i)=0d0
-        cABE(:,i)=0d0
-        TROE(:,i)=0d0
-   end do
-   call check_model(flag)
-   if(.not.flag) stop "Something Odd occured at remove_remaining_reactions"
-end subroutine remove_remaining_reactions!}}}
-subroutine change_ns_via_nr!{{{
-   use chem
-   implicit none
-   integer i,j
-   integer itmp,ind
-   integer sum_nu(max_ns)
-   logical flag
-
-   call check_model(flag)
-   if(.not.flag) stop "Something Odd occured at change_ns_via_nr.Ahh"
-   call out_cheminp
-   call system("mv chem.inp.new chem.inp.save")
-
-   sum_nu=0
-   do i=1,nr
-      do j=1,NumNu(1,i)
-         sum_nu(IndNu(j,1,i))=1
-      end do
-      do j=1,NumNu(2,i)
-         sum_nu(IndNu(j,2,i))=1
-      end do
-   end do
-
-   do j=1,ns
-      if(sum_nu(j)>0) write(20,*) trim(SYM_SPC(j))
-   end do
-   ind=ns
-   do while(ind>num_reac)
-      if(sum_nu(ind) .eq. 0) then
-         itmp        = sum_nu(ind)
-         sum_nu(ind) = sum_nu(ns)
-         sum_nu(ns)  = itmp
-         call swap_species(ind,ns)
-         ns=ns-1
-      end if
-      ind=ind-1
-   end do
-   do j=1,ns
-      write(21,*) trim(SYM_SPC(j))
-   end do
-   call out_cheminp
-   call check_model(flag)
-   if(.not.flag) stop "Something Odd occured at change_ns_via_nr."
-end subroutine change_ns_via_nr!}}}
-end module conditions
-
 ! initialization
-subroutine out_cheminp!{{{
-   use mod_mpi
-   use const_chem
-   use chem
-   implicit none
-   character*100 line
-   character*50  word1,word2
-   character*80  NAME_RCT
-   integer i,j,k
-
-   integer ind_dup(nr),Ndup
-   integer itmp
-
-   integer,parameter::LCHM=87
-
-   if(myid .eq. 0) then
-      !check duplicate
-      Ndup=0
-      do k=1,nr
-         if(duplicate(k)) then
-            Ndup=Ndup+1
-            ind_dup(Ndup)=k
-         end if
-      end do
-
-      dup:do while(Ndup>0)
-         k=Ndup
-         NAME_RCT=SYM_RCT(ind_dup(k))
-         do k=1,Ndup-1
-            if(trim(NAME_RCT) .eq. trim(SYM_RCT(ind_dup(k)))) then
-               Ndup=Ndup-1
-               itmp          = ind_dup(k)
-               ind_dup(k)    = ind_dup(Ndup)
-               ind_dup(Ndup) = itmp
-               Ndup=Ndup-1
-               cycle dup
-            end if
-         end do
-         duplicate(ind_dup(Ndup))=.false.
-         Ndup=Ndup-1
-      end do dup
-
-
-
-      open(LCHM,file="chem.inp.new",status="replace")
-      !credit
-      write(LCHM,'(a)') "!"
-      write(LCHM,'(a)') "! generated by SHIMADA CODE."
-      write(LCHM,'(a)') "! written by Shota Yamanaka. 2013."
-      write(LCHM,'(a)') "!"
-
-      !elements
-      write(LCHM,'(a)') "elements"
-      line=" "
-      do i=1,ne
-         call append_line(SYM_ELM(i))
-      end do
-      if(len_trim(line)>0) write(LCHM,'(a)') trim(line)
-      write(LCHM,'(a)') "end"
-
-      !species
-      write(LCHM,'(a)') "species"
-      line=" "
-      do i=1,ns
-         call append_line(SYM_SPC(i))
-      end do
-      if(len_trim(line)>0) write(LCHM,'(a)') trim(line)
-      write(LCHM,'(a)') "end"
-
-      !thermo
-      write(LCHM,'(a)') "thermo all"
-      write(LCHM,'(a)') "   300.000  1000.000  5000.000"
-      do j=1,ns
-         write(line,'(a)') SYM_SPC(j)
-         write(LCHM,'(a24)',advance='no') line
-         line=""
-         do i=1,ne
-            if(ES(i,j) .ne. 0d0) then
-               write(word1,'(a2,i3)') SYM_ELM(i),int(ES(i,j))
-               line=trim(line)//word1(1:5)
-            end if
-         end do
-         write(LCHM,'(a20)',advance='no') line
-         write(LCHM,'("G",2f10.2,f8.2,i07)') Tthre(:,j),1
-         write(LCHM,'(5E15.8,i05)')  (coeff(i,2,j),i=1,5),2
-         write(LCHM,'(5E15.8,i05)')  (coeff(i,2,j),i=6,7),(coeff(i,1,j),i=1,3),3
-         write(LCHM,'(4E15.8,i020)') (coeff(i,1,j),i=4,7),4
-      end do
-      write(LCHM,'(a)') "end"
-
-      !reaction
-      write(LCHM,'(a)') "reactions      cal/mole  moles"
-      do i=1,nr
-         if(len_trim(SYM_RCT(i))<25) then
-            write(line,'(a)') SYM_RCT(i)
-            write(LCHM,'(x,a25,2x,es13.3e3,f8.3,f10.1)') line,&
-                          exp(ABE(1,i)),ABE(2,i),ABE(3,i)/invRc
-         else
-            write(LCHM,'(x,a,2x,es13.3e3,f8.3,f10.1)') trim(SYM_RCT(i)),&
-                          exp(ABE(1,i)),ABE(2,i),ABE(3,i)/invRc
-         end if
-
-         if(duplicate(i)) write(LCHM,'(23x,"DUPLICATE")')
-
-         itmp=Rstate(i,2)
-         if(itmp .eq. 1 .or. itmp .eq. 5) then
-            write(LCHM,'(23x,"REV /",es13.3e3,f8.3,f10.1," /")') &
-                          exp(cABE(1,i)),cABE(2,i),cABE(3,i)/invRc
-         else if(itmp .eq. 2 .or. itmp .eq. 3) then
-            write(LCHM,'(23x,"LOW /",es13.3e3,f8.3,f10.1," /")') &
-                          exp(cABE(1,i)),cABE(2,i),cABE(3,i)/invRc
-            if(itmp .eq. 3) then
-               line="TROE /"
-               call dble2word1(TROE(1,i))
-               line=trim(line)//" "//trim(word1)
-
-               call dble2word1(1d0/TROE(2,i))
-               line=trim(line)//" "//trim(word1)
-
-               call dble2word1(1d0/TROE(3,i))
-               line=trim(line)//" "//trim(word1)
-
-               call dble2word1(TROE(4,i))
-               line=trim(line)//" "//trim(word1)//"/"
-
-               if(len_trim(line)<60) then
-                  write(LCHM,'(a61)')  trim(line)
-               else
-                  write(LCHM,'(a)') trim(line)
-               end if
-            end if
-         end if
-
-         if(NumM(i)>0) then
-            line=""
-            do k=1,NumM(i)
-               call dble2word1(Men(k,i)+1d0)
-               write(word2,'(a,"/",a,"/")') trim(SYM_SPC(IndM(k,i))),trim(word1)
-               line=trim(line)//" "//trim(word2)
-            end do
-            if(len_trim(line)<60) then
-               write(LCHM,'(a61)')  trim(line)
-            else
-               write(LCHM,'(a)') trim(line)
-            end if
-         end if
-      end do
-      write(LCHM,'(a)') "end"
-      close(LCHM)
-   end if
-contains
-subroutine append_line(word)
-   implicit none
-   character(*) word
-   line=trim(line)//" "//trim(word)
-   if(len_trim(line)>40) then
-      write(LCHM,'(a)') trim(line)
-      line=" "
-   end if
-end subroutine append_line
-subroutine dble2word1(val)
-   implicit none
-   double precision val
-   character*50 pro2
-   if((1d-1 < abs(val) .and. abs(val)<1d8) .or. val .eq. 0d0) then
-      write(word1,'(f15.5)') val
-      word1=trim(adjustl(word1))
-      do while(word1(len_trim(word1):len_trim(word1)) .eq. "0")
-         word1=word1(:len_trim(word1)-1)
-      end do
-      if(word1(len_trim(word1):len_trim(word1)) .eq. ".") &
-         word1=word1(:len_trim(word1)-1)
-   else
-      write(word1,'(es15.6e3)') val
-      pro2=word1(11:)
-      if(pro2(3:3).eq.'0') pro2=pro2(1:2)//pro2(4:)
-
-      word1=word1(:10)
-      word1=trim(word1)
-      do while(word1(len_trim(word1):len_trim(word1)) .eq. "0")
-         word1=word1(:len_trim(word1)-1)
-      end do
-      if(word1(len_trim(word1):len_trim(word1)) .eq. ".") &
-         word1=word1(:len_trim(word1)-1)
-      word1=trim(word1)//pro2
-   end if
-   word1=trim(adjustl(word1))
-end subroutine dble2word1
-end subroutine out_cheminp!}}}
 subroutine read_cheminp!{{{
    use mod_mpi
    use const_chem
@@ -1356,6 +596,195 @@ subroutine fetch_slash(line,cha)!{{{
    line=trim(adjustl(line(ind2+1:)))
 end subroutine fetch_slash!}}}
 end subroutine read_cheminp!}}}
+subroutine out_cheminp!{{{
+   use mod_mpi
+   use const_chem
+   use chem
+   implicit none
+   character*100 line
+   character*50  word1,word2
+   character*80  NAME_RCT
+   integer i,j,k
+
+   integer ind_dup(nr),Ndup
+   integer itmp
+
+   integer,parameter::LCHM=87
+
+   if(myid .eq. 0) then
+      !check duplicate
+      Ndup=0
+      do k=1,nr
+         if(duplicate(k)) then
+            Ndup=Ndup+1
+            ind_dup(Ndup)=k
+         end if
+      end do
+
+      dup:do while(Ndup>0)
+         k=Ndup
+         NAME_RCT=SYM_RCT(ind_dup(k))
+         do k=1,Ndup-1
+            if(trim(NAME_RCT) .eq. trim(SYM_RCT(ind_dup(k)))) then
+               Ndup=Ndup-1
+               itmp          = ind_dup(k)
+               ind_dup(k)    = ind_dup(Ndup)
+               ind_dup(Ndup) = itmp
+               Ndup=Ndup-1
+               cycle dup
+            end if
+         end do
+         duplicate(ind_dup(Ndup))=.false.
+         Ndup=Ndup-1
+      end do dup
+
+
+
+      open(LCHM,file="chem.inp.new",status="replace")
+      !credit
+      write(LCHM,'(a)') "!"
+      write(LCHM,'(a)') "! generated by SHIMADA CODE."
+      write(LCHM,'(a)') "! written by Shota Yamanaka. 2013."
+      write(LCHM,'(a)') "!"
+
+      !elements
+      write(LCHM,'(a)') "elements"
+      line=" "
+      do i=1,ne
+         call append_line(SYM_ELM(i))
+      end do
+      if(len_trim(line)>0) write(LCHM,'(a)') trim(line)
+      write(LCHM,'(a)') "end"
+
+      !species
+      write(LCHM,'(a)') "species"
+      line=" "
+      do i=1,ns
+         call append_line(SYM_SPC(i))
+      end do
+      if(len_trim(line)>0) write(LCHM,'(a)') trim(line)
+      write(LCHM,'(a)') "end"
+
+      !thermo
+      write(LCHM,'(a)') "thermo all"
+      write(LCHM,'(a)') "   300.000  1000.000  5000.000"
+      do j=1,ns
+         write(line,'(a)') SYM_SPC(j)
+         write(LCHM,'(a24)',advance='no') line
+         line=""
+         do i=1,ne
+            if(ES(i,j) .ne. 0d0) then
+               write(word1,'(a2,i3)') SYM_ELM(i),int(ES(i,j))
+               line=trim(line)//word1(1:5)
+            end if
+         end do
+         write(LCHM,'(a20)',advance='no') line
+         write(LCHM,'("G",2f10.2,f8.2,i07)') Tthre(:,j),1
+         write(LCHM,'(5E15.8,i05)')  (coeff(i,2,j),i=1,5),2
+         write(LCHM,'(5E15.8,i05)')  (coeff(i,2,j),i=6,7),(coeff(i,1,j),i=1,3),3
+         write(LCHM,'(4E15.8,i020)') (coeff(i,1,j),i=4,7),4
+      end do
+      write(LCHM,'(a)') "end"
+
+      !reaction
+      write(LCHM,'(a)') "reactions      cal/mole  moles"
+      do i=1,nr
+         if(len_trim(SYM_RCT(i))<25) then
+            write(line,'(a)') SYM_RCT(i)
+            write(LCHM,'(x,a25,2x,es13.3e3,f8.3,f10.1)') line,&
+                          exp(ABE(1,i)),ABE(2,i),ABE(3,i)/invRc
+         else
+            write(LCHM,'(x,a,2x,es13.3e3,f8.3,f10.1)') trim(SYM_RCT(i)),&
+                          exp(ABE(1,i)),ABE(2,i),ABE(3,i)/invRc
+         end if
+
+         if(duplicate(i)) write(LCHM,'(23x,"DUPLICATE")')
+
+         itmp=Rstate(i,2)
+         if(itmp .eq. 1 .or. itmp .eq. 5) then
+            write(LCHM,'(23x,"REV /",es13.3e3,f8.3,f10.1," /")') &
+                          exp(cABE(1,i)),cABE(2,i),cABE(3,i)/invRc
+         else if(itmp .eq. 2 .or. itmp .eq. 3) then
+            write(LCHM,'(23x,"LOW /",es13.3e3,f8.3,f10.1," /")') &
+                          exp(cABE(1,i)),cABE(2,i),cABE(3,i)/invRc
+            if(itmp .eq. 3) then
+               line="TROE /"
+               call dble2word1(TROE(1,i))
+               line=trim(line)//" "//trim(word1)
+
+               call dble2word1(1d0/TROE(2,i))
+               line=trim(line)//" "//trim(word1)
+
+               call dble2word1(1d0/TROE(3,i))
+               line=trim(line)//" "//trim(word1)
+
+               call dble2word1(TROE(4,i))
+               line=trim(line)//" "//trim(word1)//"/"
+
+               if(len_trim(line)<60) then
+                  write(LCHM,'(a61)')  trim(line)
+               else
+                  write(LCHM,'(a)') trim(line)
+               end if
+            end if
+         end if
+
+         if(NumM(i)>0) then
+            line=""
+            do k=1,NumM(i)
+               call dble2word1(Men(k,i)+1d0)
+               write(word2,'(a,"/",a,"/")') trim(SYM_SPC(IndM(k,i))),trim(word1)
+               line=trim(line)//" "//trim(word2)
+            end do
+            if(len_trim(line)<60) then
+               write(LCHM,'(a61)')  trim(line)
+            else
+               write(LCHM,'(a)') trim(line)
+            end if
+         end if
+      end do
+      write(LCHM,'(a)') "end"
+      close(LCHM)
+   end if
+contains
+subroutine append_line(word)
+   implicit none
+   character(*) word
+   line=trim(line)//" "//trim(word)
+   if(len_trim(line)>40) then
+      write(LCHM,'(a)') trim(line)
+      line=" "
+   end if
+end subroutine append_line
+subroutine dble2word1(val)
+   implicit none
+   double precision val
+   character*50 pro2
+   if((1d-1 < abs(val) .and. abs(val)<1d8) .or. val .eq. 0d0) then
+      write(word1,'(f15.5)') val
+      word1=trim(adjustl(word1))
+      do while(word1(len_trim(word1):len_trim(word1)) .eq. "0")
+         word1=word1(:len_trim(word1)-1)
+      end do
+      if(word1(len_trim(word1):len_trim(word1)) .eq. ".") &
+         word1=word1(:len_trim(word1)-1)
+   else
+      write(word1,'(es15.6e3)') val
+      pro2=word1(11:)
+      if(pro2(3:3).eq.'0') pro2=pro2(1:2)//pro2(4:)
+
+      word1=word1(:10)
+      word1=trim(word1)
+      do while(word1(len_trim(word1):len_trim(word1)) .eq. "0")
+         word1=word1(:len_trim(word1)-1)
+      end do
+      if(word1(len_trim(word1):len_trim(word1)) .eq. ".") &
+         word1=word1(:len_trim(word1)-1)
+      word1=trim(word1)//pro2
+   end if
+   word1=trim(adjustl(word1))
+end subroutine dble2word1
+end subroutine out_cheminp!}}}
 subroutine set_trans_data!{{{
    use mod_mpi
    use const_chem
@@ -1821,714 +1250,6 @@ end subroutine swap_char
 end subroutine swap_reaction!}}}
 
 ! reaction
-subroutine calc_CSP(n, csp_out)!{{{
-   !variables
-   use const_chem
-   use chem
-   use func_therm
-   implicit none
-   double precision,intent(in) :: n(ns+1)
-   double precision,intent(inout):: csp_out(nr)
-
-   double precision csp(ns,nr)
-
-   double precision,parameter::dd=0.14d0
-   double precision,parameter::loge210=0.43429448190325!log10(exp(1d0))
-
-   double precision T
-   double precision,dimension(ns)::vmu0rt
-   double precision vlogM,Dr,r
-   double precision vlogk(2)
-   double precision de,cv,sn,logsn
-   double precision logT,Tinv
-   double precision logkinf,logk0
-   double precision Pr
-   double precision logFcent,logF,cc,nn,aa,log_Pr,logPrc,logPRT
-   double precision temp1,temp2,temp3,tmp
-   double precision,dimension(7)::cmurt,chrt,ccpr
-   integer          sec(ns)
-   integer i,j,k,itmp
-
-   csp=0d0
-
-   T    =n(ns+1)
-   logT=log(T)
-   Tinv=1d0/T
-   logPRT=log(pst/Ru)-logT
-   sn   =sum(n(1:ns))
-   logsn=log(sn)
-
-   !set thermodynamical values
-   call check_section_number(T,sec)
-   call set_coeff(T,logT,cmurt,chrt,ccpr)
-   do j=1,ns
-      temp1=0d0
-      do i=1,7
-         temp1=temp1+coeff(i,sec(j),j)*cmurt(i)
-      end do
-      vmu0rt(j)=temp1
-   end do
-
-   do i=1,nr
-      !calc M
-      if(exist_M(i)) then
-         tmp =sn
-         do j=1,NumM(i)
-            tmp=tmp+Men(j,i)*n(IndM(j,i))
-         end do
-
-         if(tmp .eq. sn) then
-            vlogM=logsn
-         else
-            vlogM=log(tmp)
-         end if
-      end if
-
-      !calc k
-      vlogk(1)=ABE(1,i)+ABE(2,i)*logT-ABE(3,i)*Tinv
-      vlogk(2)=0d0
-      if(Rstate(i,2) >= 4) vlogk(1)=vlogk(1)+vlogM
-
-      if(Rstate(i,1) .eq. 0) then !bi-direction
-         if(Rstate(i,2) .eq. 1 .or. Rstate(i,2) .eq. 5) then !rev
-            vlogk(2)=cABE(1,i)+cABE(2,i)*logT-cABE(3,i)*Tinv !read cABE
-            if(Rstate(i,2) .eq. 5) vlogk(2)=vlogk(2)+vlogM
-         else !none, low, troe
-            if(Rstate(i,2) .eq. 2 .or. Rstate(i,2) .eq. 3) then!low, troe
-               !Pr
-               logk0  =cABE(1,i)+cABE(2,i)*logT-cABE(3,i)*Tinv
-               logkinf=vlogk(1)
-               log_Pr=logk0-logkinf+vlogM
-               Pr=exp(log_Pr)
-               vlogk(1)=logkinf+log(Pr/(1d0+Pr))
-
-               !Troe
-               if(Rstate(i,2) .eq. 3) then
-                  aa=TROE(1,i)
-                  logFcent=log10((1d0-aa)*exp(-T   *TROE(2,i))&
-                                +aa      *exp(-T   *TROE(3,i))&
-                                +         exp(-Tinv*TROE(4,i)))
-                  cc=-0.4d0-0.67d0*logFcent
-                  nn=0.75d0-1.27d0*logFcent
-                  logPrc=log_Pr*loge210+cc
-                  logF=(1d0+(logPrc/(nn-dd*logPrc))**2)**(-1)*logFcent
-                  vlogk(1)=vlogk(1)+logF/loge210
-               end if
-            end if
-
-            !calc numu0rt
-            temp1=0d0
-            do k=1,NumNu(1,i)
-               temp1=temp1-vmu0rt(IndNu(k,1,i))
-            end do
-            do k=1,NumNu(2,i)
-               temp1=temp1+vmu0rt(IndNu(k,2,i))
-            end do
-
-            vlogk(2)=vlogk(1)-snu(i)*logPRT+temp1
-         end if
-      end if
-
-      !calc r
-      r=exp(vlogk(1))
-      do k=1,NumNu(1,i)
-         r=r*n(IndNu(k,1,i))
-      end do
-      Dr=r
-      if(Rstate(i,1) .eq. 0) then
-         r=exp(vlogk(2))
-         do k=1,NumNu(2,i)
-            r=r*n(IndNu(k,2,i))
-         end do
-         Dr=Dr-r
-      end if
-      Dr=abs(Dr)
-
-      !calc csp
-      do k=1,NumNu(1,i)
-         itmp=IndNu(k,1,i)
-         csp(itmp,i)=csp(itmp,i)+Dr
-      end do
-      do k=1,NumNu(2,i)
-         itmp=IndNu(k,2,i)
-         csp(itmp,i)=csp(itmp,i)+Dr
-      end do
-   end do
-
-   do j=1,ns
-      tmp=0d0
-      do i=1,nr
-         tmp=tmp+csp(j,i)
-      end do
-      tmp=1d0/(tmp+1d-300)
-      do i=1,nr
-         csp(j,i)=csp(j,i)*tmp
-      end do
-   end do
-   do i=1,nr
-      do j=1,ns
-         csp_out(i)=max(csp_out(i),csp(j,i))
-      end do
-   end do
-end subroutine calc_CSP!}}}
-subroutine Fex(neq_outer, tt, n, dndt, rpar, ipar)!{{{
-   !variables
-   use const_chem
-   use chem
-   use func_therm
-   implicit none
-   integer         ,intent(in) :: neq_outer   !not used now.
-   double precision,intent(in) :: tt
-   double precision,intent(in) :: n(ns+1)
-   double precision,intent(out):: dndt(ns+1)
-   double precision,intent(inout):: rpar(*)
-   integer         ,intent(inout):: ipar(*)
-
-   double precision,parameter::dd=0.14d0
-   double precision,parameter::loge210=0.43429448190325!log10(exp(1d0))
-
-   double precision T
-   double precision,dimension(ns)::vmu0rt,vert,vcvr
-   double precision vlogM,Dr,r
-   double precision vlogk(2)
-   double precision de,cv,sn,logsn
-   double precision logT,Tinv
-   double precision logkinf,logk0
-   double precision Pr
-   double precision logFcent,logF,cc,nn,aa,log_Pr,logPrc,logPRT
-   double precision temp1,temp2,temp3,tmp
-   double precision,dimension(7)::cmurt,chrt,ccpr
-   integer          sec(ns)
-   integer i,j,k,itmp
-
-   T    =n(ns+1)
-   logT=log(T)
-   Tinv=1d0/T
-   logPRT=log(pst/Ru)-logT
-   sn   =sum(n(1:ns))
-   logsn=log(sn)
-
-   !set thermodynamical values
-   call check_section_number(T,sec)
-   call set_coeff(T,logT,cmurt,chrt,ccpr)
-   do j=1,ns
-      temp1=0d0
-      temp2=-1d0
-      temp3=-1d0
-      do i=1,7
-         tmp=coeff(i,sec(j),j)
-         temp1=temp1+tmp*cmurt(i)
-         temp2=temp2+tmp*chrt( i)
-         temp3=temp3+tmp*ccpr( i)
-      end do
-      vmu0rt(j)=temp1
-      vert(  j)=temp2
-      vcvr(  j)=temp3
-
-      dndt(  j)=0d0
-   end do
-
-   do i=1,nr
-      !calc M
-      if(exist_M(i)) then
-         tmp =sn
-         do j=1,NumM(i)
-            tmp=tmp+Men(j,i)*n(IndM(j,i))
-         end do
-
-         if(tmp .eq. sn) then
-            vlogM=logsn
-         else
-            vlogM=log(tmp)
-         end if
-      end if
-
-      !calc k
-      vlogk(1)=ABE(1,i)+ABE(2,i)*logT-ABE(3,i)*Tinv
-      vlogk(2)=0d0
-      if(Rstate(i,2) >= 4) vlogk(1)=vlogk(1)+vlogM
-
-      if(Rstate(i,1) .eq. 0) then !bi-direction
-         if(Rstate(i,2) .eq. 1 .or. Rstate(i,2) .eq. 5) then !rev
-            vlogk(2)=cABE(1,i)+cABE(2,i)*logT-cABE(3,i)*Tinv !read cABE
-            if(Rstate(i,2) .eq. 5) vlogk(2)=vlogk(2)+vlogM
-         else !none, low, troe
-            if(Rstate(i,2) .eq. 2 .or. Rstate(i,2) .eq. 3) then!low, troe
-               !Pr
-               logk0  =cABE(1,i)+cABE(2,i)*logT-cABE(3,i)*Tinv
-               logkinf=vlogk(1)
-               log_Pr=logk0-logkinf+vlogM
-               Pr=exp(log_Pr)
-               vlogk(1)=logkinf+log(Pr/(1d0+Pr))
-
-               !Troe
-               if(Rstate(i,2) .eq. 3) then
-                  aa=TROE(1,i)
-                  logFcent=log10((1d0-aa)*exp(-T   *TROE(2,i))&
-                                +aa      *exp(-T   *TROE(3,i))&
-                                +         exp(-Tinv*TROE(4,i)))
-                  cc=-0.4d0-0.67d0*logFcent
-                  nn=0.75d0-1.27d0*logFcent
-                  logPrc=log_Pr*loge210+cc
-                  logF=(1d0+(logPrc/(nn-dd*logPrc))**2)**(-1)*logFcent
-                  vlogk(1)=vlogk(1)+logF/loge210
-               end if
-            end if
-
-            !calc numu0rt
-            temp1=0d0
-            do k=1,NumNu(1,i)
-               temp1=temp1-vmu0rt(IndNu(k,1,i))
-            end do
-            do k=1,NumNu(2,i)
-               temp1=temp1+vmu0rt(IndNu(k,2,i))
-            end do
-
-            vlogk(2)=vlogk(1)-snu(i)*logPRT+temp1
-         end if
-      end if
-
-      !calc r
-      r=exp(vlogk(1))
-      do k=1,NumNu(1,i)
-         r=r*n(IndNu(k,1,i))
-      end do
-      Dr=r
-      if(Rstate(i,1) .eq. 0) then
-         r=exp(vlogk(2))
-         do k=1,NumNu(2,i)
-            r=r*n(IndNu(k,2,i))
-         end do
-         Dr=Dr-r
-      end if
-
-      !calc dndt
-      do k=1,NumNu(1,i)
-         itmp=IndNu(k,1,i)
-         dndt(itmp)=dndt(itmp)-Dr
-      end do
-      do k=1,NumNu(2,i)
-         itmp=IndNu(k,2,i)
-         dndt(itmp)=dndt(itmp)+Dr
-      end do
-   end do
-
-   de=0d0; cv=0d0
-   do j=1,ns
-      de=de+vert(j)*dndt(j)
-      cv=cv+vcvr(j)*n(   j)
-   end do
-   dndt(ns+1)=-de*T/cv
-end subroutine Fex!}}}
-subroutine Fex_var(n, dndtp, dndtm)!{{{
-   !variables
-   use const_chem
-   use chem
-   use func_therm
-   implicit none
-   double precision,intent(in) :: n(ns+1)
-   double precision,intent(out):: dndtp(ns+1)
-   double precision,intent(out):: dndtm(ns+1)
-
-   double precision,parameter::dd=0.14d0
-   double precision,parameter::loge210=0.43429448190325!log10(exp(1d0))
-
-   double precision T
-   double precision,dimension(ns)::vmu0rt,vert,vcvr
-   double precision vlogM,Dr,r
-   double precision vlogk(2)
-   double precision de,cv,sn,logsn
-   double precision logT,Tinv
-   double precision logkinf,logk0
-   double precision Pr
-   double precision logFcent,logF,cc,nn,aa,log_Pr,logPrc,logPRT
-   double precision temp1,temp2,temp3,tmp
-   double precision,dimension(7)::cmurt,chrt,ccpr
-   integer          sec(ns)
-   integer i,j,k,itmp
-
-   T    =n(ns+1)
-   logT=log(T)
-   Tinv=1d0/T
-   logPRT=log(pst/Ru)-logT
-   sn   =sum(n(1:ns))
-   logsn=log(sn)
-
-   !set thermodynamical values
-   call check_section_number(T,sec)
-   call set_coeff(T,logT,cmurt,chrt,ccpr)
-   do j=1,ns
-      temp1=0d0
-      temp2=-1d0
-      temp3=-1d0
-      do i=1,7
-         tmp=coeff(i,sec(j),j)
-         temp1=temp1+tmp*cmurt(i)
-         temp2=temp2+tmp*chrt( i)
-         temp3=temp3+tmp*ccpr( i)
-      end do
-      vmu0rt(j)=temp1
-      vert(  j)=temp2
-      vcvr(  j)=temp3
-
-      dndtp(  j)=0d0
-      dndtm(  j)=0d0
-   end do
-
-   do i=1,nr
-      !calc M
-      if(exist_M(i)) then
-         tmp =sn
-         do j=1,NumM(i)
-            tmp=tmp+Men(j,i)*n(IndM(j,i))
-         end do
-
-         if(tmp .eq. sn) then
-            vlogM=logsn
-         else
-            vlogM=log(tmp)
-         end if
-      end if
-
-      !calc k
-      vlogk(1)=ABE(1,i)+ABE(2,i)*logT-ABE(3,i)*Tinv
-      vlogk(2)=0d0
-      if(Rstate(i,2) >= 4) vlogk(1)=vlogk(1)+vlogM
-
-      if(Rstate(i,1) .eq. 0) then !bi-direction
-         if(Rstate(i,2) .eq. 1 .or. Rstate(i,2) .eq. 5) then !rev
-            vlogk(2)=cABE(1,i)+cABE(2,i)*logT-cABE(3,i)*Tinv !read cABE
-            if(Rstate(i,2) .eq. 5) vlogk(2)=vlogk(2)+vlogM
-         else !none, low, troe
-            if(Rstate(i,2) .eq. 2 .or. Rstate(i,2) .eq. 3) then!low, troe
-               !Pr
-               logk0  =cABE(1,i)+cABE(2,i)*logT-cABE(3,i)*Tinv
-               logkinf=vlogk(1)
-               log_Pr=logk0-logkinf+vlogM
-               Pr=exp(log_Pr)
-               vlogk(1)=logkinf+log(Pr/(1d0+Pr))
-
-               !Troe
-               if(Rstate(i,2) .eq. 3) then
-                  aa=TROE(1,i)
-                  logFcent=log10((1d0-aa)*exp(-T   *TROE(2,i))&
-                                +aa      *exp(-T   *TROE(3,i))&
-                                +         exp(-Tinv*TROE(4,i)))
-                  cc=-0.4d0-0.67d0*logFcent
-                  nn=0.75d0-1.27d0*logFcent
-                  logPrc=log_Pr*loge210+cc
-                  logF=(1d0+(logPrc/(nn-dd*logPrc))**2)**(-1)*logFcent
-                  vlogk(1)=vlogk(1)+logF/loge210
-               end if
-            end if
-
-            !calc numu0rt
-            temp1=0d0
-            do k=1,NumNu(1,i)
-               temp1=temp1-vmu0rt(IndNu(k,1,i))
-            end do
-            do k=1,NumNu(2,i)
-               temp1=temp1+vmu0rt(IndNu(k,2,i))
-            end do
-
-            vlogk(2)=vlogk(1)-snu(i)*logPRT+temp1
-         end if
-      end if
-
-      !calc r
-      r=exp(vlogk(1))
-      do k=1,NumNu(1,i)
-         r=r*n(IndNu(k,1,i))
-      end do
-      do k=1,NumNu(1,i)
-         itmp=IndNu(k,1,i)
-         dndtm(itmp)=dndtm(itmp)-r
-      end do
-      do k=1,NumNu(2,i)
-         itmp=IndNu(k,2,i)
-         dndtp(itmp)=dndtp(itmp)+r
-      end do
-
-      if(Rstate(i,1) .eq. 0) then
-         r=exp(vlogk(2))
-         do k=1,NumNu(2,i)
-            r=r*n(IndNu(k,2,i))
-         end do
-         do k=1,NumNu(1,i)
-            itmp=IndNu(k,1,i)
-            dndtp(itmp)=dndtp(itmp)+r
-         end do
-         do k=1,NumNu(2,i)
-            itmp=IndNu(k,2,i)
-            dndtm(itmp)=dndtm(itmp)-r
-         end do
-      end if
-   end do
-
-   de=0d0; cv=0d0
-   do j=1,ns
-      de=de+vert(j)*(dndtp(j)+dndtm(j))
-      cv=cv+vcvr(j)*n(   j)
-   end do
-   dndtp(ns+1)=max(-de*T/cv,0d0)
-   dndtm(ns+1)=min(-de*T/cv,0d0)
-end subroutine Fex_var!}}}
-subroutine Jex(neq_outer, tt, n, ML, MU, dndn, nrpd, rpar, ipar)!{{{
-   !variables
-   use const_chem
-   use chem
-   use func_therm
-   implicit none
-   integer         ,intent(in) :: neq_outer   !not used now.
-   double precision,intent(in) :: tt
-   double precision,intent(in) :: n(ns+1)
-   integer         ,intent(in) :: ML          !not used now.
-   integer         ,intent(in) :: MU          !not used now.
-   double precision,intent(out):: dndn(ns+1,ns+1)
-   integer         ,intent(in) :: nrpd        !not used now.
-   double precision,intent(inout):: rpar(*)
-   integer         ,intent(inout):: ipar(*)
-
-   double precision,parameter::dd=0.14d0
-   double precision,parameter::loge210=0.43429448190325!log10(exp(1d0))
-
-   double precision T
-   double precision dndt(ns+1)
-   double precision drdn(ns+1)
-   double precision,dimension(ns)::vmu0rt,vdmu0rt,vert,vcvr,vdcvrdT
-   double precision numu0rt,nudmu0rt,vlogM,vM,dlnkdlnM
-   double precision vlogk(2),dlnkdT(2),r
-   double precision Dr
-   double precision de,cv,dcv,logsn,sn
-   double precision logT,Tinv
-   double precision logkinf,logk0
-   double precision dlnkinfdT,dlnk0dT
-   double precision Pr,dlnPrdT
-   double precision logFcent,logF,Fcent,cc,nn,aa,log_Pr,logPrc,logPRT,dlnFcentdT,dFcentdT
-   double precision temp1,temp2,temp3,temp4,temp5,tmp
-   integer i,j,k,itmp
-   double precision,dimension(7)::cmurt,chrt,ccpr,cdmurt,cdcpr
-   integer          sec(ns)
-
-   T     =n(ns+1)
-   logT  =log(T)
-   Tinv  =1d0/T
-   logPRT=log(pst/Ru)-logT
-   sn    =max(sum(n(1:ns)),1d-300)
-   logsn =log(sn)
-
-   !set thermodynamical values
-   call check_section_number(T,sec)
-   call set_coeff_more(T,logT,cmurt,chrt,ccpr,cdmurt,cdcpr)
-   do j=1,ns
-      temp1= 0d0
-      temp2= 0d0
-      temp3=-1d0
-      temp4=-1d0
-      temp5= 0d0
-      do i=1,7
-         tmp=coeff(i,sec(j),j)
-         temp1=temp1+tmp* cmurt(i)
-         temp2=temp2+tmp*cdmurt(i)
-         temp3=temp3+tmp*  chrt(i)
-         temp4=temp4+tmp*  ccpr(i)
-         temp5=temp5+tmp* cdcpr(i)
-      end do
-      vmu0rt( j)=temp1
-      vdmu0rt(j)=temp2
-      vert(   j)=temp3
-      vcvr(   j)=temp4
-      vdcvrdT(j)=temp5
-
-      dndt(j)=0d0
-      do i=1,ns+1
-         dndn(j,i)=0d0
-      end do
-   end do
-
-   do i=1,nr
-      !calc M
-      if(exist_M(i)) then
-         tmp =sn
-         do j=1,NumM(i)
-            tmp=tmp+Men(j,i)*n(IndM(j,i))
-         end do
-
-         vM   =tmp
-         if(tmp .eq. sn) then
-            vlogM=logsn
-         else
-            vlogM=log(tmp)
-         end if
-      end if
-
-      !set k
-      vlogk (1)= ABE(1,i)+ABE(2,i)*logT-ABE(3,i)*Tinv
-      dlnkdT(1)=(ABE(2,i)+ABE(3,i)*Tinv)*Tinv
-      vlogk (2)=0d0
-      dlnkdT(2)=0d0
-      if(Rstate(i,2) >= 4) then
-         vlogk(1)=vlogk(1)+vlogM
-         dlnkdlnM=1d0
-      end if
-
-      if(Rstate(i,1) .eq. 0) then !bi-direction
-         if(Rstate(i,2) .eq. 1 .or. Rstate(i,2) .eq. 5) then !rev
-            vlogk (2)=cABE(1,i)+cABE(2,i)*logT-cABE(3,i)*Tinv !read cABE
-            dlnkdT(2)=(cABE(2,i)+cABE(3,i)*Tinv)*Tinv
-            if(Rstate(i,2) .eq. 5) vlogk(2)=vlogk(2)+vlogM
-         else !none, low, troe
-            if(Rstate(i,2) .eq. 2 .or. Rstate(i,2) .eq. 3) then!low, troe
-               !Pr
-               logk0  =cABE(1,i)+cABE(2,i)*logT-cABE(3,i)*Tinv
-               dlnk0dT=(cABE(2,i)+cABE(3,i)*Tinv)*Tinv
-               logkinf=vlogk(1)
-               dlnkinfdT=dlnkdT(1)
-               log_Pr=logk0-logkinf+vlogM
-               Pr=exp(log_Pr)
-               vlogk (1)=logkinf+log(Pr/(1d0+Pr))
-               dlnkdT(1)=(dlnk0dT+Pr*dlnkinfdT)/(1d0+Pr)
-               dlnkdlnM=1d0/(1d0+Pr)
-
-               !Troe
-               if(Rstate(i,2) .eq. 3) then
-                  dlnPrdT=dlnk0dT-dlnkinfdT
-                  aa=TROE(1,i)
-                  Fcent   = (1d0-aa)          *exp(-T*TROE(2,i))&
-                           +aa                *exp(-T*TROE(3,i))&
-                           +                   exp(-TROE(4,i)*Tinv)
-                  dFcentdT=-(1d0-aa)*TROE(2,i)*exp(-T*TROE(2,i))&
-                           -aa*TROE(3,i)      *exp(-T*TROE(3,i))&
-                           +TROE(4,i)*Tinv**2 *exp(-TROE(4,i)*Tinv)
-                  dlnFcentdT=dFcentdT/Fcent
-                  logFcent=log10(Fcent)
-                  cc=-0.4d0-0.67d0*logFcent
-                  nn=0.75d0-1.27d0*logFcent
-                  logPrc=log_Pr*loge210+cc
-                  temp1=logPrc/(nn-dd*logPrc)
-                  temp2=(1d0+temp1**2)**(-1)
-                  logF=temp2*logFcent
-                  vlogk( 1)=vlogk( 1)+logF/loge210
-                  dlnkdT(1)=dlnkdT(1)&
-                           +temp2*(-2d0*logF*temp1/(nn-dd*logPrc)**2 &
-                                   *(nn*dlnPrdT+(1.27d0*logPrc-0.67d0*nn)*dlnFcentdT)&         
-                                   +dlnFcentdT)                                                
-                  dlnkdlnM =dlnkdlnM-2d0*temp2*logF*temp1/(nn-dd*logPrc)**2*nn
-               end if
-            end if
-
-            !set vnumu0rt
-            numu0rt =0d0
-            nudmu0rt=0d0
-            do k=1,NumNu(1,i)
-               itmp=IndNu(k,1,i)
-               numu0rt =numu0rt - vmu0rt(itmp)
-               nudmu0rt=nudmu0rt-vdmu0rt(itmp)
-            end do
-            do k=1,NumNu(2,i)
-               itmp=IndNu(k,2,i)
-               numu0rt =numu0rt + vmu0rt(itmp)
-               nudmu0rt=nudmu0rt+vdmu0rt(itmp)
-            end do
-
-            vlogk (2)=vlogk (1)-snu(i)*logPRT+numu0rt
-            dlnkdT(2)=dlnkdT(1)+snu(i)*Tinv  +nudmu0rt
-         end if
-      end if
-
-      !!!!!! set r and drdn !!!!!!
-      !initialize
-      do k=1,ns
-         drdn(k)=0d0
-      end do
-      !forward
-      r=exp(vlogk(1))
-      do k=1,NumNu(1,i)
-         r=r*n(IndNu(k,1,i))
-      end do
-      Dr        =          r
-      drdn(ns+1)=dlnkdT(1)*r
-      do k=1,NumNu(1,i)
-         itmp=IndNu(k,1,i)
-         drdn(itmp)=drdn(itmp)+r/n(itmp)
-      end do
-
-      !reverse
-      if(Rstate(i,1) .eq. 0) then
-         r=exp(vlogk(2))
-         do k=1,NumNu(2,i)
-            r=r*n(IndNu(k,2,i))
-         end do
-         Dr        =Dr        -r
-         drdn(ns+1)=drdn(ns+1)-r*dlnkdT(2)
-         do k=1,NumNu(2,i)
-            itmp=IndNu(k,2,i)
-            drdn(itmp)=drdn(itmp)-r/n(itmp)
-         end do
-      end if
-
-      !about M
-      if(exist_M(i)) then
-         temp1=Dr*dlnkdlnM/vM
-         do k=1,ns
-            drdn(k)=drdn(k)+temp1
-         end do
-         do k=1,NumM(i)
-            itmp=IndM(k,i)
-            drdn(itmp)=drdn(itmp)+temp1*Men(k,i)
-         end do
-      end if
-
-      !calc dndt,dndn
-      do k=1,NumNu(1,i)
-         itmp=IndNu(k,1,i)
-         dndt(itmp)=dndt(itmp)-Dr
-         do j=1,ns+1
-            dndn(itmp,j)=dndn(itmp,j)-drdn(j)
-         end do
-      end do
-
-      do k=1,NumNu(2,i)
-         itmp=IndNu(k,2,i)
-         dndt(itmp)=dndt(itmp)+Dr
-         do j=1,ns+1
-            dndn(itmp,j)=dndn(itmp,j)+drdn(j)
-         end do
-      end do
-   end do !!!!!! END OF I LOOP !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
-   !set dTdt and dTdT
-   de=0d0; cv=0d0; dcv=0d0
-   temp1=0d0;temp2=0d0
-   do j=1,ns
-      temp1=temp1+   vert(j)*dndn(j,ns+1)
-      de   =de   +   vert(j)*dndt(j)
-      dcv  =dcv  +   vcvr(j)*dndt(j)
-      cv   =cv   +   vcvr(j)*   n(j)
-      temp2=temp2+vdcvrdT(j)*   n(j)
-   end do
-   dndt(ns+1)=-de*T/cv
-   dndn(ns+1,ns+1)=-(T*temp1+dcv+dndt(ns+1)*temp2)/cv
-
-   !dTdn
-   do j=1,ns
-      temp1=0d0
-      do k=1,ns
-         temp1=temp1+vert(k)*dndn(k,j)
-      end do
-      dndn(ns+1,j)=-(T*temp1+dndt(ns+1)*vcvr(j))/cv
-   end do
-
-   !do j=1,ns+1
-   !   do i=1,ns+1
-   !      if(isNaN(dndn(i,j))) then
-   !         print *,i,j,"NaN!"
-   !         call exit(1)
-   !      end if
-   !   end do
-   !end do
-end subroutine Jex!}}}
-
 subroutine reaction(T,vrho,tout,flag)!{{{
    use const_chem
    use chem
@@ -2646,6 +1367,8 @@ subroutine reaction_cont(T,tt,tout,vrho,n,istate,RWORK,IWORK,atol,flag)!{{{
       n(ns+1) = T
       !atol    = 0d0 !cannot use to stiff problem
       atol    = atol_user
+      IWORK   = 0
+      RWORK   = 0d0
       IWORK(7)= 1
    end if
 
@@ -2796,52 +1519,6 @@ subroutine reaction_one_steps(T,vrho,mode,outarr,flag)!{{{
    end if
    flag=.true.
 end subroutine reaction_one_steps!}}}
-
-subroutine plot_time_history(T,vrho,tout,Nloop)!{{{
-   use const_chem
-   implicit none
-   double precision,intent(inout)::T
-   double precision,intent(inout)::vrho(ns)
-   double precision,intent(in)   ::tout
-   integer,         intent(inout)::Nloop
-
-   double precision tt,to
-   double precision n(ns+1)
-   double precision RWORK(LRW)
-   integer          IWORK(LIW)
-   integer          istate,i
-   double precision atol
-   logical          flag
-
-   tt    =0d0
-   istate=1
-
-   open(22,file="plt.dat")
-   write(22,'(2es15.7)') tt,T
-   do i=1,Nloop
-      to=dble(i)/dble(Nloop)*tout
-      call reaction_cont(T,tt,to,vrho,n,istate,RWORK,IWORK,atol,flag)
-      if(.not.flag) stop "Calculation failed at plot_time_history."
-      write(22,'(2es15.7)') tt,T
-   end do
-   close(22)
-end subroutine plot_time_history!}}}
-
-subroutine calc_Tign_Teq(Tini,vrhoini,tign,Teq,flag)!{{{
-   use const_chem
-   implicit none
-   double precision,intent(in)::Tini
-   double precision,intent(in)::vrhoini(ns)
-   double precision,intent(out)::tign
-   double precision,intent(out)::Teq
-   logical         ,intent(out)::flag
-
-   double precision Tref(2)
-
-   call reaction_one_steps(Tini,vrhoini,0,Tref,flag)
-   tign=Tref(1)
-   Teq =Tref(2)
-end subroutine calc_Tign_Teq!}}}
 
 ! cold flow
 subroutine calc_T(vrho,rho,E, T, kappa,MWave,DHi,vhi,mu)!{{{
