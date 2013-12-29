@@ -74,6 +74,7 @@ subroutine read_controlinp(T,vrho,dt,tout,outspc,Noutspc)
       if(.not. flag) stop "Calculation failed at ignition time determination."
       tout=Tref(1)*1.5d0
       dt  =tout*1d-3
+      print '(a,es15.7)',"Ignition Time(s)=",Tref(1)
    end if
    if(dt<0d0) stop "Negative time step."
 
