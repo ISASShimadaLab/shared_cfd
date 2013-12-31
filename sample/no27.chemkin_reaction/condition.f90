@@ -39,7 +39,7 @@ subroutine set_BC(step)
    integer i,j,plane
 
    double precision vhit(max_ns),wt(dimw)
-   double precision delta,p,v
+   double precision delta,p,v,deltastep
 
    integer,parameter::DLength=dimw+nY !for MPI Communication
 
@@ -100,29 +100,22 @@ subroutine set_BC(step)
             end do
       
             !non-slip wall
+            deltastep=max(0d0,min((dble(step)-2d4)/5d4,1d0))
             do i=max(nxs(plane),55),nxe(plane)
-               !delta=abs(x(i,0,plane)-0.1d0)/0.01d0
-               !if(x(i,0,plane)<1d0) then
-               !   !T=(1500d0-300d0)*(1d0-delta)**2+300d0
-               !   !v=(1d0  -0.02d0)*(1d0-delta)**2+0.02d0
-               !   !p=w(4,i,1,plane)
-               !   p=1d5
-               !   T=300d0
-               !   v=0.02d0
-               !   call calc_boundary(p,T,1d0, wt,vhit)
-               !   print '(20es9.1)',wt
-               !   print '(20es9.1)',wf
-               !   print '(20es9.1)',wf-wt
-               !   print '(20es9.1)',vhif
-               !   print '(20es9.1)',vhit
-               !   print '(20es9.1)',vhit-vhif
-               !   stop
-               !   w(     :,i,0,plane)=wt
-               !   w(     2,i,0,plane)=-w(2,i,1,plane)
-               !   w(     3,i,0,plane)=v*2d0-w(3,i,1,plane)
-               !   w(indxht,i,0,plane)=wt(indxht)+0.5d0*(w(2,i,0,plane)**2+w(3,i,0,plane)**2)
-               !   vhi(:,i,-1,plane) = vhit
-               !else
+               delta=abs(x(i,0,plane)-0.1d0)/0.01d0
+               if(x(i,0,plane)<1d0) then
+                  p=w(4,i,1,plane)
+                  T=deltastep*(1500d0-300d0)*(1d0-delta)**2+300d0
+                  v=deltastep*(1d0  -0.02d0)*(1d0-delta)**2+0.02d0
+                  !T=300d0
+                  !v=0.02d0
+                  call calc_boundary(p,T,1d0, wt,vhit)
+                  w(     :,i,0,plane)=wt
+                  w(     2,i,0,plane)=-w(2,i,1,plane)
+                  w(     3,i,0,plane)=v*2d0-w(3,i,1,plane)
+                  w(indxht,i,0,plane)=wt(indxht)+0.5d0*(w(2,i,0,plane)**2+w(3,i,0,plane)**2)
+                  vhi(:,   i,0,plane)=vhit
+               else
                   w(     :,i,0,plane)= wf
                   w(     1,i,0,plane)= w(4,i,1,plane)*MWf/(R_uni*Tf)
                   w(     2,i,0,plane)=-w(2,i,1,plane)
@@ -130,7 +123,7 @@ subroutine set_BC(step)
                   w(     4,i,0,plane)= w(4,i,1,plane)
                   w(indxht,i,0,plane)= wf(indxht)+0.5d0*(w(2,i,0,plane)**2+w(3,i,0,plane)**2)
                   vhi(:,   i,0,plane)= vhif
-               !end if
+               end if
 
                w(:,  i,-1,plane) =  w(:,  i,0,plane)
                vhi(:,i,-1,plane) =  vhi(:,i,0,plane)
