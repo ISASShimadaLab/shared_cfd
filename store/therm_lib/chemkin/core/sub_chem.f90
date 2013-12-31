@@ -865,7 +865,7 @@ contains
       character(*),intent(in)::str
       integer i
    
-      do i=1,ns_tocalc
+      do i=1,ns
          if(trim(SYM_SPC(i)) .eq. trim(str)) then
             search_species=i
             return
