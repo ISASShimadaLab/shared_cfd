@@ -1033,23 +1033,6 @@ subroutine init_therm!{{{
    call set_trans_data
    call read_fo_composition
 end subroutine init_therm!}}}
-subroutine calc_vrho(p,T,deg, rho,vrho,E)!{{{
-   use const_chem
-   use chem
-   use chem_var
-   use func_therm
-   implicit none
-   double precision,intent(in)::p
-   double precision,intent(in)::T
-   double precision,intent(in)::deg
-   double precision,intent(out)::rho
-   double precision,intent(out)::vrho(ns)
-   double precision,intent(out)::E
-
-   vrho = rhof * deg + rhoo*(1d0-deg)
-
-   call rho_rel2abs(p,T, vrho, rho,E)
-end subroutine calc_vrho!}}}
 subroutine rho_rel2abs(p,T, vrho, rho,E)!{{{
    use const_chem
    use chem

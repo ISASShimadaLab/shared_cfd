@@ -45,7 +45,7 @@ end subroutine set_thermo_prop!}}}
 subroutine calc_boundary(p,T,deg, wt,vhi)!{{{
    use grbl_prmtr
    use prmtr
-   use const_chem
+   use chem_var
    implicit none
    double precision,intent(in)::p
    double precision,intent(inout)::T
@@ -58,7 +58,8 @@ subroutine calc_boundary(p,T,deg, wt,vhi)!{{{
    double precision rho,E,MWave
    integer j
 
-   call calc_vrho(p,T,deg, rho,vrho,E)
+   vrho=vrhof*deg+vrhoo*(1d0-deg)
+   call rho_rel2abs(p,T, vrho, rho,E)
    call calc_T(vrho,rho,E, T, wt(indxg),MWave,DHi,vhi,wt(indxMu))
 
    !set wt

@@ -1,13 +1,15 @@
 #Control parameters for chemistry
 Oxidizer Pressure(Pa)   : 1.e5
-Oxidizer Temperature(K) : 1200.
+Oxidizer Temperature(K) : 300.
 Oxygen Composition(mole ratio):
-O2 2
+N2 10
+O2 1
 end
 Fuel Pressure(Pa)       : 1.e5
-Fuel Temperature(K)     : 1200.
+Fuel Temperature(K)     : 300.
 Fuel Composition(mole ratio):
-CH4 1
+N2 10
+H2 2
 end
 Relative Torelance VODE : 1.e-8
 Absolute Torelance VODE : 1.e-20
