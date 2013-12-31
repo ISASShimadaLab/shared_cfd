@@ -14,34 +14,28 @@ subroutine set_IC
    u  =0.603d0
    v  =0d0
 
-   q_temp(1:nY)=vrhof(1:nY)
+   q_temp=qf
    q_temp(nY+1)=rhof*u
    q_temp(nY+2)=rhof*v
-   q_temp(nY+3)=rhof*(Ef+0.5d0*(u**2+v**2))
-
+   q_temp(nY+3)=q_temp(nY+3)+0.5d0*rhof*(u**2+v**2)
    do plane=nps,npe
       do i=nxs(plane),min(nxe(plane),ni(plane)/2)
          do j=nys(plane),nye(plane)
             q(:,    i,j,plane)=q_temp
-            w(4,    i,j,plane)=1d5
-            w(indxg,i,j,plane)=kappaf
-            w(indxR,i,j,plane)=R_uni/MWf
+            w(:,    i,j,plane)=wf
          end do
      end do
    end do
 
-   q_temp(1:nY)=vrhoo(1:nY)
+   q_temp=qo
    q_temp(nY+1)=rhoo*u
    q_temp(nY+2)=rhoo*v
-   q_temp(nY+3)=rhoo*(Eo+0.5d0*(u**2+v**2))
-
+   q_temp(nY+3)=q_temp(nY+3)+0.5d0*rhoo*(u**2+v**2)
    do plane=nps,npe
       do i=max(ni(plane)/2+1,nxs(plane)),nxe(plane)
          do j=nys(plane),nye(plane)
             q(:,    i,j,plane)=q_temp
-            w(4,    i,j,plane)=1d5
-            w(indxg,i,j,plane)=kappao
-            w(indxR,i,j,plane)=R_uni/MWo
+            w(:,    i,j,plane)=wo
          end do
       end do
    end do
@@ -69,18 +63,12 @@ subroutine set_BC(step)
          if(gx(plane) .eq. 1) then
             !i=1/2
             do j=max(    1,nys(plane)),min(nye(plane),   49)
+               w(     :,0,j,plane)=wf
                w(     1,0,j,plane)=w(4,1,j,plane)*MWf/(R_uni*Tf)
                w(     2,0,j,plane)=0.603d0
                w(     3,0,j,plane)=0d0
                w(     4,0,j,plane)=w(4,1,j,plane)
-
-               w(4+1:4+nY,0,j,plane)=vwf(1:nY)
-
-               w(indxg, 0,j,plane)=kappaf
-               w(indxht,0,j,plane)=Ef+R_uni/MWf*Tf+0.5d0*(w(2,0,j,plane)**2+w(3,0,j,plane)**2)
-               w(indxR, 0,j,plane)=R_uni/MWf
-               w(indxMu,0,j,plane)=muf
-               vhi(:,   0,j,plane)=vhif
+               w(indxht,0,j,plane)=wf(indxht)+0.5d0*(w(2,0,j,plane)**2+w(3,0,j,plane)**2)
 
                w(:,  -1,j,plane) = w(:,  0,j,plane)
                vhi(:,-1,j,plane) = vhi(:,0,j,plane)

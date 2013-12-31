@@ -1,12 +1,3 @@
-!init_package
-subroutine init_therm!{{{
-   call read_chemkin_parameter
-   call set_reac_and_therm_data
-   call set_trans_data
-   call check_chem_and_flow
-   call read_fo_composition
-end subroutine init_therm!}}}
-
 !data consistency check between flow and chemistry
 subroutine check_chem_and_flow!{{{
    use grbl_prmtr

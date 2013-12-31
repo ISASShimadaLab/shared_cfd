@@ -218,6 +218,7 @@ def checkout_flow():
 		raw2pro("checkout/thermal_model.raw.f90","checkout/thermal_model.f90",fromto)
 	elif(val == 1 or val == 2):
 		engage("therm_lib/chemkin/core","checkout",arr_engage)
+		engage("therm_lib/chemkin/uvhp/uv","checkout",arr_engage)
 		if(val == 1) :
 			print "\tCold Flow using chemical kinetics database is selected."
 			engage("therm_lib/chemkin/flow/cold","checkout",arr_engage)
