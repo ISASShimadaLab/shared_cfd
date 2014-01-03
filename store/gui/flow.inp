@@ -32,9 +32,9 @@ viscosity         :
   #non-viscous flow(0)/viscous flow(1)
 
 thermal model
-Ideal Gas,Cold Flow by chemical kinetics D.B.,Chemical Kinetics Model,Flame Sheet Model,Perfect Equilibrium Model
+Ideal Gas,Cold Flow by chemkin D.B.,Chemical Kinetics Model,Flame Sheet Model,Perfect Equilibrium Model,Cold Flow by NASA D.B.
 thermal model     : 
-  #Ideal Gas(0)/Cold flow using chemical kinetics database(1) / Chemical Kinetics Model(2) / Flame Sheet Model(3) / Perfect Equilibrium Model(4)
+  #Ideal Gas(0)/Cold flow using chemkin D.B.(1)/Chemical Kinetics Model(2)/Flame Sheet Model(3)/Perfect Equilibrium Model(4)/Cold flow using NASA D.B.(5)
 
 ------------------------ NG list ----------------------------------
 -1,-1, 0, 4,-1,-1,-1
