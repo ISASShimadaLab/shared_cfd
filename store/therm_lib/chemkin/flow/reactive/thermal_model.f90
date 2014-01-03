@@ -54,12 +54,13 @@ subroutine proceed_reaction!{{{
       do j=nys(plane),nye(plane)
          do i=nxs(plane),nxe(plane)
             T=w(4,i,j,plane)/w(1,i,j,plane)/w(indxR,i,j,plane)
-            if(T>1500d0 .or. (w(5,i,j,plane)<1d0-1d-11 .and. T>700d0)) then
-               call reaction(T,q(1:nY,i,j,plane),dt_grbl)
+            !if(T>1500d0 .or. (w(5,i,j,plane)<1d0-1d-11 .and. T>700d0)) then
+               !call reaction(T,q(1:nY,i,j,plane),dt_grbl)
+               call reaction_chemeq2(T,q(1:nY,i,j,plane),dt_grbl)
             !   write(myid+100,'(2(i4.4,x),2(es15.7,x),i1,x,i3.3)') i,j,x(i,j),r(i,j),1,myid
             !else
             !   write(myid+100,'(2(i4.4,x),2(es15.7,x),i1,x,i3.3)') i,j,x(i,j),r(i,j),0,myid
-            end if
+            !end if
          end do
       end do
       !$omp end parallel do
@@ -325,7 +326,7 @@ end subroutine distribute_reaction!}}}
 subroutine calc_boundary(p,T,deg, wt,vhi)!{{{
    use grbl_prmtr
    use prmtr
-   use const_chem
+   use chem_var
    implicit none
    double precision,intent(in)::p
    double precision,intent(inout)::T
@@ -338,7 +339,8 @@ subroutine calc_boundary(p,T,deg, wt,vhi)!{{{
    double precision rho,E,MWave
    integer j
 
-   call calc_vrho(p,T,deg, rho,vrho,E)
+   vrho=vrhof*deg+vrhoo*(1d0-deg)
+   call rho_rel2abs(p,T, vrho, rho,E)
    call calc_T(vrho,rho,E, T, wt(indxg),MWave,DHi,vhi,wt(indxMu))
 
    !set wt

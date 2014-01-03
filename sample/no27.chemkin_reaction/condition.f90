@@ -39,7 +39,7 @@ subroutine set_BC(step)
    integer i,j,plane
 
    double precision vhit(max_ns),wt(dimw)
-   double precision delta,p,v,deltastep
+   double precision delta,p,v,deltastep,Yf
 
    integer,parameter::DLength=dimw+nY !for MPI Communication
 
@@ -100,16 +100,18 @@ subroutine set_BC(step)
             end do
       
             !non-slip wall
-            deltastep=max(0d0,min(dble(step)/5d4,1d0))
+            deltastep=max(0d0,min(dble(step)/5d3,1d0))
             do i=max(nxs(plane),55),nxe(plane)
                delta=abs(x(i,0,plane)-0.1d0)/0.01d0
                if(delta<1d0) then
+                  delta=deltastep*(1d0-delta**2)
                   p=w(4,i,1,plane)
-                  T=deltastep*(1500d0-300d0)*(1d0-delta**2)+300d0
-                  v=deltastep*(1d0  -0.02d0)*(1d0-delta**2)+0.02d0
+                  T =delta*(1500d0-300d0 )+300d0
+                  v =delta*(1d0   -0.02d0)+0.02d0
+                  Yf=delta*(0.5d0 -1d0   )+1d0
                   !T=300d0
                   !v=0.02d0
-                  call calc_boundary(p,T,1d0, wt,vhit)
+                  call calc_boundary(p,T,Yf, wt,vhit)
                   w(     :,i,0,plane)=wt
                   w(     2,i,0,plane)=-w(2,i,1,plane)
                   w(     3,i,0,plane)=v*2d0-w(3,i,1,plane)
