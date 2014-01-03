@@ -100,13 +100,13 @@ subroutine set_BC(step)
             end do
       
             !non-slip wall
-            deltastep=max(0d0,min((dble(step)-2d4)/5d4,1d0))
+            deltastep=max(0d0,min(dble(step)/5d4,1d0))
             do i=max(nxs(plane),55),nxe(plane)
                delta=abs(x(i,0,plane)-0.1d0)/0.01d0
-               if(x(i,0,plane)<1d0) then
+               if(delta<1d0) then
                   p=w(4,i,1,plane)
-                  T=deltastep*(1500d0-300d0)*(1d0-delta)**2+300d0
-                  v=deltastep*(1d0  -0.02d0)*(1d0-delta)**2+0.02d0
+                  T=deltastep*(1500d0-300d0)*(1d0-delta**2)+300d0
+                  v=deltastep*(1d0  -0.02d0)*(1d0-delta**2)+0.02d0
                   !T=300d0
                   !v=0.02d0
                   call calc_boundary(p,T,1d0, wt,vhit)
