@@ -1,0 +1,7 @@
+
+
+
+
+付録
+	preconの導出
+	dual time stepのスキームの導出
