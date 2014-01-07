@@ -7,29 +7,7 @@ subroutine set_IC
    implicit none
    integer i,j,plane
    do plane=nps,npe
-      do i=nxs(plane),min(nxe(plane),263)
-         do j=nys(plane),nye(plane)
-            q(:,i,j,plane) = qo
-            w(:,i,j,plane) = wo
-            q(nY+1,i,j,plane) = rhoo*0.603d0
-            q(nY+3,i,j,plane) = qo(nY+3)+0.5d0*rhoo*0.603d0**2
-         end do
-      end do
-   end do
-
-   do plane=nps,npe
-      do i=max(264,nxs(plane)),min(nxe(plane),452)
-         do j=nys(plane),nye(plane)
-            q(:,i,j,plane) = qf
-            w(:,i,j,plane) = wf
-            q(nY+1,i,j,plane) = rhof*0.603d0
-            q(nY+3,i,j,plane) = qf(nY+3)+0.5d0*rhof*0.603d0**2
-         end do
-      end do
-   end do
-
-   do plane=nps,npe
-      do i=max(453,nxs(plane)),nxe(plane)
+      do i=nxs(plane),nxe(plane)
          do j=nys(plane),nye(plane)
             q(:,i,j,plane) = qo
             w(:,i,j,plane) = wo
@@ -52,6 +30,9 @@ subroutine set_BC(step)
 
    integer,parameter::DLength=dimw+nY !for MPI Communication
    integer,parameter::MaxMPIcomm = 0
+
+   double precision wt(dimw)
+   double precision vhit(nV)
 
    call section_exchange
    call MPI_COMMUNICATIONS_CUT_LINE
@@ -114,6 +95,8 @@ subroutine set_BC(step)
                vhi(:,i,-1,plane) = vhi(:,i, 0,plane)
             end do
             do i=max(  264,nxs(plane)),min(nxe(plane),  452)
+               !call YPT2w(max(0d0,min((dble(step)-61000d0)/5d3,1d0)),1d5,300d0,wt,vhit)
+
                w(:,      i, 0,plane) = wf
                w(2,      i, 0,plane) =-w(2,  i, 1,plane)
                w(3,      i, 0,plane) =-w(3,  i, 1,plane)+2d0*2d-2

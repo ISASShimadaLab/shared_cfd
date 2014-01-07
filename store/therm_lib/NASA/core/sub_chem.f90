@@ -975,6 +975,109 @@ subroutine flame_sheet_hp(Y,H, T, MWave,kappa,mu,DHi,Yv,vhi)!{{{
    end do
    mu = mu * 1d-7
 end subroutine flame_sheet_hp!}}}
+subroutine flame_sheet_PTgiven(Y,T, E,MWave,kappa,mu,Yv,vhi)!{{{
+   use chem
+   use chem_var
+   use func_therm
+   implicit none
+   double precision,intent(in) ::Y(2)
+   double precision,intent(in) ::T
+   double precision,intent(out)::E
+   double precision,intent(out)::MWave
+   double precision,intent(out)::kappa
+   double precision,intent(out)::mu
+   double precision,intent(out)::Yv(3)
+   double precision,intent(out)::vhi(3)
+
+   double precision Yf,Yo,Yp
+   double precision n(  ns)
+   double precision muN(ns)
+
+   integer secN,sect
+   double precision denom
+   double precision cprnow,cvrnow,ERTnow,logT,sn,phi
+   double precision,dimension(9)::vThrt,vTcpr
+   double precision,dimension(4)::vTmu
+   double precision MWi,MWj
+   double precision,dimension(ns)::vhi_s
+
+   double precision tmp,tmp2
+   integer i,j,k
+
+   !set n
+   Yo = Y(2)-of*Y(1)
+   if(Yo>0d0) then
+      Yf=0d0
+      Yp=Y(1)*(1d0+of)
+   else
+      Yf=-Yo/of
+      Yo=0d0
+      Yp=Y(2)*(1d0+1d0/of)
+   end if
+   n=Yo*no+Yf*nf+Yp*np !mole/kg
+   Yv(1)=Yf
+   Yv(2)=Yo
+   Yv(3)=Yp
+
+   sn=sum(n,1)
+   MWave=1d3/sn !(g/kg)/(mole/kg)=g/mole
+
+   !calc T
+   logT=log(T)
+   ERTnow=0d0;cvrnow=0d0
+   call calc_vThrt( T,logT,vThrt)
+   call calc_vTcpr( T,     vTcpr)
+   do i=1,ns
+      call check_section_number(i,T,secN)
+      tmp =-1;tmp2=-1
+      do j=1,9
+         tmp  = tmp +co(j,secN,i)*vThrt(j)
+         tmp2 = tmp2+co(j,secN,i)*vTcpr(j)
+      end do
+      ERTnow = ERTnow + tmp *n(i)
+      cvrnow = cvrnow + tmp2*n(i)
+   end do
+   E=ERTnow*Ru*T
+
+   !calc kappa
+   cprnow= cvrnow+sn
+   kappa=1d0+sn/cvrnow
+
+   !calc DHi and vhi
+   do i=1,ns
+      call check_section_number(i,T,secN)
+      tmp= 0d0
+      do j=1,9
+         tmp =tmp +co(j,secN,i)*vThrt(j)
+      end do
+      vhi_s(i)=1d0*tmp
+   end do
+   tmp=Ru*T
+   vhi(1)=dot_product(nf,vhi_s)*tmp
+   vhi(2)=dot_product(no,vhi_s)*tmp
+   vhi(3)=dot_product(np,vhi_s)*tmp
+
+   !calc mu
+   call calc_vTmu(T,logT,vTmu)
+   do i=1,nt
+      call check_section_number_trans(i,T,sect)
+      muN(i)=exp(dot_product(trans(:,sect,i),vTmu))
+   end do
+
+   mu = 0d0
+   do i=1,nt
+      denom = 0d0
+      MWi=MW(tr2th(i))
+      do j=1,nt
+         MWj=MW(tr2th(j))
+         phi = 0.25d0*(1d0+sqrt(muN(i)/muN(j))*(MWj/MWi)**0.25d0 )**2 &
+                     *sqrt(2d0*MWj/(MWi+MWj))
+         denom = denom + n(tr2th(j)) * phi
+      end do
+      mu = mu + n(tr2th(i)) * muN(i) / denom
+   end do
+   mu = mu * 1d-7
+end subroutine flame_sheet_PTgiven!}}}
 
 !cea
 subroutine init_pack_cea(flag)!{{{

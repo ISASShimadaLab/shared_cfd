@@ -43,14 +43,14 @@ subroutine calc_next_step_RK2_second
       
             q(:,i,j,plane)=qp(:,i,j,plane)+DT_LOCAL_GLOBAL/Vol(i,j,plane)*vol_dqdt
             do k=1,nY
-               if(q(k,i,j,plane)<0d0) then
-                  print *,"Error:Negative partial density"
-                  print '(a)',"(i,j)="
-                  print '(2i3)',i,j
-                  print '(a)',"q="
-                  print '(100es11.3)',q(:,i,j,plane)
-                  call exit(1)
-               end if
+               q(k,i,j,plane)=max(q(k,i,j,plane),1d-40)
+               !if(q(k,i,j,plane)<0d0) then
+               !   print *,"Error:Negative partial density"
+               !   print '(a)',"(i,j)="
+               !   print '(2i4)',i,j
+               !   print '(a)',"q="
+               !   print '(100es11.3)',q(:,i,j,plane)
+               !end if
             end do
          end do
       end do
