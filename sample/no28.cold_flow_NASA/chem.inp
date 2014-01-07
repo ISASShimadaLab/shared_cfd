@@ -1,0 +1,10 @@
+elements
+ N H O
+end
+species
+ H2 N2 O2
+end
+thermo
+end
+reactions cal/mole  moles
+end

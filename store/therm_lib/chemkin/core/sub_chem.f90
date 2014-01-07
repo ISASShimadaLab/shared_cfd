@@ -1681,18 +1681,17 @@ subroutine calc_dTdt(T,vrho,dTdt)!{{{
 end subroutine calc_dTdt!}}}
 
 !chemeq2
-subroutine reaction_chemeq2(T,vrho,dt,tout)!{{{
+subroutine reaction_chemeq2(T,vrho,tout)!{{{
    use const_chem
    use chem
    implicit none
    double precision,intent(in)::T
    double precision,intent(inout)::vrho(ns)
-   double precision,intent(in)::dt
    double precision,intent(in)::tout
 
    double precision n(ns+1)
-   double precision tt,to
-   integer num_recalc,i,j,nloop
+   double precision tt
+   integer j
 
    !vrho to n
    do j=1,ns
@@ -1703,16 +1702,8 @@ subroutine reaction_chemeq2(T,vrho,dt,tout)!{{{
    if(T    < 0d0) stop "negative temperature"
    if(tout < 0d0) stop "negative dt"
 
-   !set parameters
-   n(ns+1) = T
-   tt=0d0;to=0d0
-
-   nloop=tout/dt
-   do i=1,nloop
-      to=to+dt
-      if(i .eq. nloop) to=tout
-      call chemeq2(n,tt,to,atol_user,rtol_user)
-   end do
+   n(ns+1)=T;tt=0d0
+   call chemeq2(n,tt,tout,atol_user,rtol_user)
 
    !n to vrho
    do j=1,ns
@@ -1821,7 +1812,7 @@ subroutine chemeq2(y,tt,tout,atol,rtol)!{{{
          if(counter>10d0) stop "not converted at CHEMEQ2"
       end do
       tt=tt+dt
-      write(20,'(2es15.7,es9.1,i5)') tt,y(ns+1),dt,countersum
+      !write(20,'(2es15.7,es9.1,i5)') tt,y(ns+1),dt,countersum
       if(tout <= tt) exit
       dt=dt*sqrt(ratio)
    end do

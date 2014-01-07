@@ -1,0 +1,1 @@
+thermalmodel=thermal_model.o sub_chem.o mod_chem.o func_chem.o LU.o
