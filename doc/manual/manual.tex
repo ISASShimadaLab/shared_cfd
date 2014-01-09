@@ -171,7 +171,7 @@ MUSCLを用いる場合、以下の項目をcontrol.inpで設定する必要が�
 \subsection{store/time\_step}%{{{
 global time stepまたはlocal time stepが設定される。ファイルはset\_dt.f90。またこのどちらかを選ぶことにより、checkout.pyのDT\_GLOBAL\_LOCALがdt\_mat(i,j,plane)またはdt\_grblが設定され、時間積分スキームの該当する部分で置き換えられる。
 %}}}
-\subsection{store/time\_scheme}
+\subsection{store/time\_scheme}%{{{
 時間スキームの選択。main.main.raw.f90やmain.main.point\_implicit.f90,時間積分サブルーチン(time\_...f90)が入っており、主ループ(時間積分ループ)の中身を定義する。
 \begin{itemize}
 \item euler...オイラー陽解法.
@@ -185,29 +185,27 @@ global time stepまたはlocal time stepが設定される。ファイルはset\
 \end{itemize}
 
 \paragraph{NR,precon,dualで用いられるパラメータについて}%{{{
-これらのスキームでは以下のパラメータを用いて
+これらのスキームでは以下のパラメータをcontrol.inpで定義する。ただし、$\omega$は内部反復の緩和係数である。
+\begin{itemize}
+\item InternalLoop CFL tau...疑似時間ステップのcfl数
+\item InternalLoop Omega Max...最大緩和係数。以下$\omega_{\max}$とする。
+\item InternalLoop Omega Min...最小緩和係数.これを割り込む$\omega$が設定されると、計算を中止する。
+\item InternalLoop Dqrate Max...各気体グループの密度の内部反復あたり変化割合の最大値.以下$Dq_{\max}$とする。
+\item InternalLoop ResRateWarn...内部反復が収束していないことを標準出力に投げる最小エネルギー残渣比
+\item InternalLoop ResRateErr...計算を中止する最小エネルギー残渣比
+\item InternalLoop OutOmega...ファイルinternal\_res.datに緩和係数$\omega$の履歴を出すか。
+\item InternalLoop Max Number...内部ループ数(固定)
+\end{itemize}
+これらのスキームの内部ループで、保存量$q$は緩和係数$\omega$をかけられた$\Delta q$により更新される。$\omega$は以下のように定義される。
+\begin{equation}
+\omega = \min(\omega_{\max} ,\frac{Dq_{\max}\rho_i}{\Delta \rho_i})
+\end{equation}
+ただし$i=1...$nYである。これにより、$\rho_i$の一内部反復での変化は$Dq_{\max}$以下に抑えられる。
+この定義であると、$\omega$が小さくなりすぎることがある。それを補足するのが"最小緩和係数"のパラメータである。
 
+内部ループの発散は'InternalLoop Omega Min', 'InternalLoop ResRateWarn', 'InternalLoop ResRateErr'で補足されることとなる。ここでエネルギー残渣比は(最後の内部反復でのエネルギー残渣)/(最初の内部反復でのエネルギー残渣)と定義している。なお、NR, precon, dualの時間スキームでは、基本コンセプトは"内部反復が収束"することに基づいているので、エネルギー残渣比が十分小さくならない場合はコンセプト自体が崩壊している。よって、その場合これらのスキームは使うべきではない。(これを見落としている研究は大変多く、私は悲しい。)
 
-#For Internal Loop Control
-InternalLoop CFL tau    : 1.e-2
-InternalLoop Omega Max  : 1.e-1
-InternalLoop Omega Min  : 1.e-3
-InternalLoop Dqrate Max : 1.e-2
-InternalLoop ResRateWarn: 1.e-5
-InternalLoop ResRateErr : 1.e-3
-InternalLoop OutOmega   : true
-InternalLoop Max Number : 60
-
-	At internal step of this scheme, Delta q is added with relaxation factor. This factor is set as to the change of densities of each species do not exceed some percentage of the densities itself each.  This amount is 'InternalLoop Dqrate Max'. So if it is 1.e-2 as the example, the percentage is 1\%.
-	The other parameter which controls the relaxation factor is 'InternalLoop Omega Max'. This parameter determines the maximum value of relaxation factor. So if it is 1.e-1, the relaxation factor is 0.1 or less. (if it is less than 0.1, the value is determined from 'InternalLoop Dqrate Max'.)
-
-	In some calculation, the time scheme above does not suite and the calculation diverges. This divergence can be catch by 'InternalLoop Omega Min', 'InternalLoop ResRateWarn' and 'InternalLoop ResRateErr'.
-	'InternalLoop Omega Min' shows the lower limit of relaxation factor. If the relation factor calculated by 'InternalLoop Dqrate Max' is very small, we had better to use small time steps. So if the relaxation factor is smaller than 'InternalLoop Omega Min', the program stops.
-	Even the relaxation factor is large, if the internal loop does not converge, the concept of this scheme collapses. This can be catch by 'InternalLoop ResRateWarn' and 'InternalLoop ResRateErr'. These factors watch the energy residuals rate of (last internal step)/(first internal step) and warn if the rate exceeds 'InternalLoop ResRateWarn', stops the program if the rate exceeds 'InternalLoop ResRateErr'.
-
-	'InternalLoop CFL tau' is cfl number to tau at dual time step scheme. 'InternalLoop Max Number' is the number of internal loop.
-
-* how to adjust the parameters
+\subparagraph{パラメータ調整方法}
 	To adjust the parameters, if you set 'InternalLoop OutOmega' to true, you can get 'internal\_res.dat'. (For fast calculation, please set it false.) This file records internal step number at 1st column, the relaxation factor calculated by Dqrate (not modified by Omega Max) at 2nd column, and the residuals rate of (current internal step)/(first internal step) at 3rd column. I will show some criteria to change the parameters from this record.
 Increase 'InternalLoop Max Number', when the residual rate decrease exponentially but does not reach the 'InternalLoop ResRateErr' because of the shortage of the number of internal loop.
 Decrease 'InternalLoop Max Number', when the residual rate reaches the limit at the step number far less than the 'InternalLoop Max Number'.
@@ -217,7 +215,7 @@ Increase 'InternalLoop Dqrate Max', when the convergence of internal loop is ver
 Decrease 'InternalLoop Dqrate Max', when the omega does not increase exponentially and the relaxation factor is determined by Dqrate Max at first step.
 	These do not have theoretical reasons. They depend on my experiences. So they may be wrong. Please try various parameters.
 
-* standards of parameters
+\subparagraph{パラメータの目安}
 0.1 @ Omega Max...If it works well, 0.8 or 0.9 is also OK, I have used 0.01 also in dual time step scheme.
 0.001 @ Omega Min... Any calculations below this limit have never yielded proper answers. I think this limit should be fixed.
 0.01 @ Dqrate Max... To be honest, this parameter works only when multi species are used. I have used 0.001 in this value in dual time step scheme. In my experiences, 0.1 was too big.
@@ -227,7 +225,7 @@ Decrease 'InternalLoop Dqrate Max', when the omega does not increase exponential
 
 
 %}}}
-
+%}}}
 
 \subsection{store/viscosity}%{{{
 non-viscous
