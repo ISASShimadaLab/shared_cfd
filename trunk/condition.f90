@@ -98,8 +98,10 @@ subroutine set_BC(step)
                !call YPT2w(max(0d0,min((dble(step)-61000d0)/5d3,1d0)),1d5,300d0,wt,vhit)
 
                w(:,      i, 0,plane) = wf
-               w(2,      i, 0,plane) =-w(2,  i, 1,plane)
-               w(3,      i, 0,plane) =-w(3,  i, 1,plane)+2d0*2d-2
+               w(1,      i, 0,plane) = w(4,i,1,plane)/(R_uni/MWf*Tf)
+               w(2,      i, 0,plane) =-w(2,i,1,plane)
+               w(3,      i, 0,plane) =-w(3,i,1,plane)+2d0*2d-2
+               w(4,      i, 0,plane) = w(4,i,1,plane)
                w(indxht, i, 0,plane) = wf(indxht)+0.5d0*(w(2,i,0,plane)**2+w(3,i,0,plane)**2)
                vhi(:,    i, 0,plane) = vhif
 

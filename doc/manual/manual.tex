@@ -1,0 +1,262 @@
+\documentclass{jsarticle}
+\begin{document}
+%
+%%title{{{
+%\title{SHIMADA LAB. CODE\\MANUAL}
+%\author{山中翔太}
+%\maketitle
+%
+%\tableofcontents
+%\newpage
+%%}}}
+%
+%%tutorial {{{
+%\part{チュートリアル}
+%\section{はじめに}
+%
+%\newpage
+%%}}}
+%
+%details{{{
+\part{各機能の説明}
+\section{ライブラリ生成アルゴリズムについて}%{{{
+本プログラムは基本的に「ライブラリ生成プログラム」となる。
+よって、各種パラメータ設定ファイルに加えて、流体計算の場合は"condition.f90"というファイルで直接初期条件と境界条件を設定しなければならない。これらのファイルは"raw"というサフィックス付きでディレクトリにコピーされる。
+
+GUIインターフェースであるGUI.pyは、checkout.pyを動かすためのinputファイル(checkout.inp, checkout\_model.inp, checkout\_chem.inp)を生成し、checkout.pyを実行するプログラムであり、主動作はGUI.pyを用いた場合でも全てcheckout.pyが受け持つ。
+
+checkout.pyはinputファイルに基づき、各種ライブラリを生成するプログラムである。基本的にライブラリの生成は、該当ファイルをディレクトリからコピーすることによって行い、ある特定のファイルを除いてはfortranソースファイル自体をcheckout.pyが編集することはない。コピーされるファイルは全て"store"のサブディレクトリ内に入っており、checkout.pyまたはユーザーによって編集が加えられるファイルには".raw."というサフィックスがつけられている。なお、checkout.py内でそのソースファイルの編集が終了する、つまりそれ以上ユーザーによる編集が不必要になったファイルからは自動的に".raw."サフィックスが取り除かれ、そのままコンパイルにかけられるようになる。
+\subsection{ディレクトリ構造}
+基本的に類似する機能を持つファイルがまとめられている。例えばオイラー陽解法とLU-SGS法は"time\_scheme"ディレクトリ内に"euler","lu-sgs"としてそれぞれ格納されている。また化学計算と流体計算は基本的に同一ライブラリを用いることになっている。以下、全てのディレクトリについて説明を行う。
+%}}}
+
+\section{流体コード}%{{{
+checkout.pyから呼び出された"store/checkout/checkout\_flow.py"によって生成される。生成されたファイルは"checkout"ディレクトリ内に生成される。
+\subsection{自動生成ファイル}%{{{
+流体コードで自動生成されるファイルは、checkout.pyで選択されたディレクトリ内にある"部分的なファイル"をつなげることで生成される。自動生成されるファイル及びその"部分的なファイル"は以下のとおりである。
+\begin{itemize}
+\item main.f90...主プログラムがかかれたソースとなる。主ループもここで回される。以下の順にファイルの内容が追記されていく。
+\begin{itemize}
+\item main.top.f90..."program main"からモジュールのインポートまで。
+\item main.head.f90...共通して利用する変数の定義。
+\item main.variable.f90...それぞれのスキームで特有に利用される変数の定義。
+\item main.part\_init.f90...変数の初期化。グリッドの読み込みやそのバイナリファイルの生成や幾何ヤコビアンの生成、熱力学ライブラリが必要とされる場合にはその初期化も行われる。
+\item main.body.raw.f90...初期化。restart.binがある場合はそれを用い、ない場合は初期化サブルーチンを用いて初期化を行う。また主ループを回す変数も初期化される。part\_primitiveという文字列がファイル内に記されており、後述する文字列に置き換えられる。主ループの開始まで記述してある。
+\item main.main.raw.f90, main.main.point\_implicit.f90...
+主ループ内部を記述しており、時間スキームのディレクトリ内に格納されている。
+part\_point\_implicit, part\_primitive, part\_mainという文字列がファイル内に記されており、それぞれ以下の文字列に置き換えられる
+part\_point\_implicitに文字列が存在する場合main.main.point\_implicit.f90、存在しない場合main.main.raw.f90が使われる。
+なお、point implicitなスキームを受け付けない時間積分法(ex.Dual Time Step)にはmain.main.point\_implicit.f90は存在せず、無理やり使おうとする場合コンパイルエラーが起きる。
+\begin{itemize}
+\item part\_point\_implicit...point implicitに計算される部分がここに入る。現状、化学生成項の時間積分を進めるサブルーチンがここに入りうる。main.part\_point\_implicit.f90にかかれた文字列に置き換えられる。
+\item main.part\_primitive.f90...時間刻みの計算やデータアウトプット前にすべき処理、具体的には基本量の計算及び境界条件の設定をするサブルーチンがここに入る。main.part\_primitive.f90にかかれた文字列に置き換えられる。
+\item main.part\_main.f90...高次精度化や対流項及び拡散項の計算、時間積分に必要な場合にはそれらの保存量ヤコビアンが計算される。main.part\_main.f90にかかれた文字列に置き換えられる。
+\end{itemize}
+\item main.foot.f90...主ループの終了及びMPI関数の終了処理、"end program main"を記述してある。
+\end{itemize}
+\item Makefile...Makefile. 以下の順にファイルの内容が追記されていく。
+\begin{itemize}
+\item Makefile.head...コンパイラに何を使うのか定義する。アーキテクチャ(PCかスーパーコンピュータ)によって変更される。
+\item Makefile.var ...各種変数の定義
+\item Makefile.main...各オブジェクトファイル作成ルール
+\item Makefile.foot...プログラムの最終的なコンパイル部分及びcleanの定義
+\end{itemize}
+\item control.raw.inp...cflの定義やファイル出力間隔の定義など。使用する場合、MUSCLのパラメータもここで入力される。control.part.inpに記された内容が入力される。
+\end{itemize}
+%}}}
+\subsection{store/core}%{{{
+どのような場合にも使用されるファイルがまとめられてある。上記自動生成ファイルのための各種ファイルの他、以下のファイルが存在する。
+\begin{itemize}
+\item check\_convergence.f90...収束判定及び途中経過ファイル,restartファイルの生成を行っている。
+\item init.vi...vim用初期化ファイル。これを読み込むと、RUNコマンドで./mainを走らせることができる。
+\item inout.f90...restartファイル読み書きや途中経過ファイル書き込み。
+\item n\_grid.raw.f90...重要なパラメータの定義。以下の文字列はcheckout.pyで置き換えられる。
+\begin{itemize}
+\item NPLANE...multi-blockでblockの数。muti-blockでない場合1.
+\item NumI...それぞれの面でのi方向セル数
+\item NumJ...それぞれの面でのj方向セル数
+\item NIMAX...i方向セル数最大値
+\item NJMAX...j方向セル数最大値
+\item NumY...rhoの数.ex)理想気体:1, flame sheet,完全平衡モデル:2, 素反応モデル:化学種数
+\item NV...拡散で空間微分をとるべき次元数.flame sheetで3,完全平衡モデルで化学種数.
+\item GridFileName...plot3dで記述されたグリッドファイルの場所.
+\end{itemize}
+また以下の文字列はICやBCの設定に使える。
+\begin{itemize}
+\item dimq ... q(後述)の次元
+\item dimw ... w(後述)の次元
+\item indxg ... wに於ける比熱比のインデックス
+\item indxht ... wに於ける質量あたり全エンタルピー(J/kg)のインデックス
+\item indxR ... wに於ける質量あたり気体定数(J/kg/K)のインデックス
+\item indxMu ... wに於ける粘性係数(Pa*s)のインデックス
+\end{itemize}
+\item prmtr.f90...piやモルあたりの気体定数の定義.
+\item read\_control.f90...control.inpの読み込み.全計算に共通する部分に限る。
+\item scheme.f90...流束項評価サブルーチン。現在はSLAUのみ。
+\item variable.f90...一般的に使われる変数がまとめられてある。
+\begin{itemize}
+\item q ... 保存量.
+\begin{itemize}
+\item インデックス1からnY : それぞれの気体グループ(理想気体なら全化学種、flame sheetか完全平衡モデルなら燃料と酸化剤、素反応モデルならそれぞれの化学種)の密度(kg/m\^3)
+\item インデックスnY+1 : x方向運動量(kg*m/s)
+\item インデックスnY+2 : y方向運動量(kg*m/s)
+\item インデックスnY+3 : 全エネルギー(J/m\^3)
+\end{itemize}
+\item qp ... 前ステップのq
+\item qpp ... 全ステップのqp
+\item w ... 基本量
+\begin{itemize}
+\item インデックス1 : 全化学種の密度の和(kg/m\^3).
+\item インデックス2 : x方向速度(m/s).
+\item インデックス3 : y方向速度(m/s).
+\item インデックス4 : 圧力(Pa)
+\item インデックス5 ... nY+4 : それぞれの気体グループの質量分率
+\item インデックスnY+5(=indxg @n\_grid.f90) : 比熱比
+\item インデックスnY+6(=indxht@n\_grid.f90) : 全エンタルピー(J/kg)
+\item インデックスnY+7(=indxR @n\_grid.f90) : 気体定数(J/kg/K)
+\item インデックスnY+8(=indxMu@n\_grid.f90) : 粘性係数(Pa*s)
+\end{itemize}
+\item vhi ...それぞれの気体グループの生成熱を含む内部エンタルピー(J/kg)
+\item wHli,wHri, wHlj, wHrj ... 高次精度化で予測されたw( ex. MUSCL).'l'は'left'、'r'は'right'、'i'はi方向に+1/2を足した位置、'j'はj方向に1/2を足した位置。例えば、wHli(:,2,3)は$w_{2+\frac 1 2,3}$の左側の値を表す。
+\item TGi, TGj ... それぞれi方向j方向の流束項TG. TGの定義については嶋田テキストのSection 9参照. 
+これらの値も1/2だけセル中心からずれた場所の値であり、ずれ方はwHと同じ。
+\item TGvi, TGvj ... 粘性項.
+\item Vol ... 軸対称問題ではそれぞれのセルの体積、二次元問題では面積。
+\item dsi, dsj ... i方向j方向にそれぞれ垂直なセル辺の長さ。軸対称問題ではさらに半径がかけられる。これもセル中心から1/2だけずれた場所の値。
+\item vni, vnj ... それぞれdsi, dsjで示された辺の直交正規ベクトル(絶対値1).向きはi,j正の向き。これもセル中心から1/2だけずれた場所の値。
+\item xh, rh ... メッシュ格子点の座標.これもセル中心から1/2だけずれた場所の値。
+\item x, r ... セル中心の座標.
+\item dt\_mat ... local time stepのそれぞれのセルでの$\Delta t$
+\item dt\_grbl ... global time stepの$\Delta t$.(スペルミスったので'r'です。)
+\end{itemize}
+\end{itemize}
+また全ての計算において、以下の値をcontrol.inpで設定する必要がある。
+\begin{itemize}
+\item Max Step Number...計算を再開してからの最大ステップ数.
+\item convergent RMS...収束とするエネルギー残渣.
+\item CFL Number...Courant–Friedrichs–Lewy数.
+\item File Output Period...ファイル出力周期.
+\end{itemize}
+%}}}
+\subsection{store/architecture}%{{{
+アーキテクチャ依存のサブルーチン.
+サブディレクトリはPCとSCでそれぞれPCとスーパーコンピュータに関するファイルがある.
+SCにはmod\_mpi.f90、PCにはmod\_mpi\_dummy.f90が使われる。
+スーパーコンピュータの場合はgrid\_separation.inpからそれぞれのプロセッサが受け持つグリッドの範囲を計算し、変数を初期化する.
+PCの場合はMPI関数のダミー関数を入れている。どちらの場合も以下のように受け持つブロックの範囲,i方向の範囲,j方向の範囲が定義される。
+\begin{itemize}
+\item ブロックの範囲...npsからnpe
+\item ブロックplaneのi方向の範囲...nxs(plane)からnxe(plane)
+\item ブロックplaneのj方向の範囲...nys(plane)からnye(plane)
+\end{itemize}
+パソコンの場合、nps=1, npe=Nplaneである。
+%}}}
+\subsection{store/dim}%{{{
+軸対称流か二次元流かを選ぶものである。サブディレクトリは2dとq2dで、それぞれ以下のファイルが含まれている。
+\begin{itemize}
+\item store/dim/2d...geometry.f90とinit\_Sq.f90
+\item store/dim/q2d...geometry.f90とSq.f90
+\end{itemize}
+Sqは軸対称流のとき式変形の際ソース項に出てくる値を定義しており、二次元流では0である。init\_Sq.f90とSq.f90はそれぞれSqに関する処理を行っている。
+geometry.f90にはplot3dで記述されたグリッドファイルの読み込み及び可視化用バイナリファイルの生成、幾何ヤコビアンやセルの面積を計算するルーチンがまとめられている。
+%}}}
+\subsection{store/high\_order}%{{{
+高次精度化を行うルーチンである。サブディレクトリはmusclとupwindであり、それぞれMUSCLスキームと風上差分が入っている。
+MUSCLを用いる場合、以下の項目をcontrol.inpで設定する必要がある。
+\begin{itemize}
+\item MUSCL ON(1)/OFF(0)...MUSCLのon/off切り替え。1でon, 0でoff.その他の値は受け付けない。
+\item MUSCL Precision Order...MUSCLのオーダー調整。2と3のみ受けつけ、2の場合は$\kappa =-1$, 3の場合は$\kappa=\frac 1 3$にMUSCLのパラメータが設定される。
+\end{itemize}
+%}}}
+\subsection{store/time\_step}%{{{
+global time stepまたはlocal time stepが設定される。ファイルはset\_dt.f90。またこのどちらかを選ぶことにより、checkout.pyのDT\_GLOBAL\_LOCALがdt\_mat(i,j,plane)またはdt\_grblが設定され、時間積分スキームの該当する部分で置き換えられる。
+%}}}
+\subsection{store/time\_scheme}%{{{
+時間スキームの選択。main.main.raw.f90やmain.main.point\_implicit.f90,時間積分サブルーチン(time\_...f90)が入っており、主ループ(時間積分ループ)の中身を定義する。
+\begin{itemize}
+\item euler...オイラー陽解法.
+\item RK2...ルンゲ=クッタ2次精度.
+\item LU-SGS...LU-SGSで実装したオイラー陰解法.上記の他sch\_lusgs.f90, var\_lusgs.f90でLU-SGS法を行う。
+\item NR...Newton-Raphson法.同様にLU-SGS法を使う.後述するパラメータを用いる.上記の他sch\_NR.f90, var\_NR.f90でLU-SGS法を行う。
+\item precon...前処理法を用いたNewton-Raphson法.同様にLU-SGS法を使う.上記の他sch\_precon.f90, var\_precon.f90でLU-SGS法を行う。
+仮時間ステップにも前処理行列をかけている.後述するパラメータを用いる.
+\item dual...Dual Time Step.同様にLU-SGS法を使う.後述するパラメータを用いる.上記の他sch\_dual.f90, var\_dual.f90でLU-SGS法を行う。
+\item preconLU-SGS...前処理法をオイラー陰解法(LU-SGS)で実装している。上記の他sch\_precon.f90, var\_precon.f90でLU-SGS法を行う。
+\end{itemize}
+
+\paragraph{NR,precon,dualで用いられるパラメータについて}%{{{
+これらのスキームでは以下のパラメータをcontrol.inpで定義する。ただし、$\omega$は内部反復の緩和係数である。
+\begin{itemize}
+\item InternalLoop CFL tau...疑似時間ステップのcfl数
+\item InternalLoop Omega Max...最大緩和係数。以下$\omega_{\max}$とする。
+\item InternalLoop Omega Min...最小緩和係数.これを割り込む$\omega$が設定されると、計算を中止する。
+\item InternalLoop Dqrate Max...各気体グループの密度の内部反復あたり変化割合の最大値.以下$Dq_{\max}$とする。
+\item InternalLoop ResRateWarn...内部反復が収束していないことを標準出力に投げる最小エネルギー残渣比
+\item InternalLoop ResRateErr...計算を中止する最小エネルギー残渣比
+\item InternalLoop OutOmega...ファイルinternal\_res.datに緩和係数$\omega$の履歴を出すか。
+\item InternalLoop Max Number...内部ループ数(固定)
+\end{itemize}
+これらのスキームの内部ループで、保存量$q$は緩和係数$\omega$をかけられた$\Delta q$により更新される。$\omega$は以下のように定義される。
+\begin{equation}
+\omega = \min(\omega_{\max} ,\frac{Dq_{\max}\rho_i}{\Delta \rho_i})
+\end{equation}
+ただし$i=1...$nYである。これにより、$\rho_i$の一内部反復での変化は$Dq_{\max}$以下に抑えられる。
+この定義であると、$\omega$が小さくなりすぎることがある。それを補足するのが"最小緩和係数"のパラメータである。
+
+内部ループの発散は'InternalLoop Omega Min', 'InternalLoop ResRateWarn', 'InternalLoop ResRateErr'で補足されることとなる。ここでエネルギー残渣比は(最後の内部反復でのエネルギー残渣)/(最初の内部反復でのエネルギー残渣)と定義している。なお、NR, precon, dualの時間スキームでは、基本コンセプトは"内部反復が収束"することに基づいているので、エネルギー残渣比が十分小さくならない場合はコンセプト自体が崩壊している。よって、その場合これらのスキームは使うべきではない。(これを見落としている研究は大変多く、私は悲しい。)
+
+\subparagraph{パラメータ調整方法}
+	To adjust the parameters, if you set 'InternalLoop OutOmega' to true, you can get 'internal\_res.dat'. (For fast calculation, please set it false.) This file records internal step number at 1st column, the relaxation factor calculated by Dqrate (not modified by Omega Max) at 2nd column, and the residuals rate of (current internal step)/(first internal step) at 3rd column. I will show some criteria to change the parameters from this record.
+Increase 'InternalLoop Max Number', when the residual rate decrease exponentially but does not reach the 'InternalLoop ResRateErr' because of the shortage of the number of internal loop.
+Decrease 'InternalLoop Max Number', when the residual rate reaches the limit at the step number far less than the 'InternalLoop Max Number'.
+Increase 'InternalLoop Omega Max', when the convergence of internal loop is very slow compared with the standard below, and the relaxation factor is controlled mainly by this factor.
+Decrease 'InternalLoop Omega Max',  when the omega does not increase exponentially and the relaxation factor is determined by Omega Max at first internal step. This situation occurs when the Delta q of internal step is too large and becomes poor estimation and is not controlled by Dqrate, so at first step the updated q becomes too poor to be modified by other internal steps.
+Increase 'InternalLoop Dqrate Max', when the convergence of internal loop is very slow and the relaxation factor is controlled mainly by this factor.
+Decrease 'InternalLoop Dqrate Max', when the omega does not increase exponentially and the relaxation factor is determined by Dqrate Max at first step.
+	These do not have theoretical reasons. They depend on my experiences. So they may be wrong. Please try various parameters.
+
+\subparagraph{パラメータの目安}
+0.1 @ Omega Max...If it works well, 0.8 or 0.9 is also OK, I have used 0.01 also in dual time step scheme.
+0.001 @ Omega Min... Any calculations below this limit have never yielded proper answers. I think this limit should be fixed.
+0.01 @ Dqrate Max... To be honest, this parameter works only when multi species are used. I have used 0.001 in this value in dual time step scheme. In my experiences, 0.1 was too big.
+1.e-5 @ ResRateWarn and 1.e-3 @ ResRateErr … I think you should decrease ResRate at least three order of magnitude. So I propose that 1.e-3 @ ResRateErr is fixed. Because ResRateWarn yields only warnings, you can select a value you want for this parameter.
+60 @ Max Number … This number is used when multi species problems are calculated. In my experiences, 20 is sufficient at ideal gas problems. I have used 100 when I calculated multi species problems with Dual Time Step schemes.
+
+
+
+%}}}
+%}}}
+
+\subsection{store/viscosity}%{{{
+non-viscous
+viscous
+%}}}
+
+\subsection{store/therm\_lib}%{{{
+NASA
+chemkin
+ideal
+%}}}
+
+\subsection{store/cond}%{{{
+core
+no-nV
+with-nV
+%}}}
+%}}}
+
+
+\section{NASA熱力学データベース自動生成}
+\section{化学コード}
+%}}}
+
+%各々に対応表(星取表)
+%
+%\newpage
+%
+%\appendix
+%\section{サンプル集}
+%\section{前処理法の導出}
+%\section{Dual Time Stepスキームの導出}
+%
+\end{document}

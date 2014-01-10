@@ -99,8 +99,6 @@ program main
          call center_to_grid(plane,v_mat(:,:,plane))
          call center_to_grid(plane,p_mat(:,:,plane))
          call center_to_grid(plane,gmma(:,:,plane))
-         call center_to_grid(plane,u_mat(:,:,plane))
-         call center_to_grid(plane,v_mat(:,:,plane))
          call center_to_grid(plane,T_mat(:,:,plane))
          call center_to_grid(plane,MW_mat(:,:,plane))
          call center_to_grid(plane,ei_mat(:,:,plane))
@@ -111,6 +109,7 @@ program main
          end do
          call center_to_grid(plane,w_res(:,:,plane))
       end do
+
 
       do plane = 1,Nplane
          !output file open
