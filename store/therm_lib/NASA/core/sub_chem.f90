@@ -806,8 +806,8 @@ subroutine flame_sheet(Y,E, T, MWave,kappa,mu,DHi,Yv,vhi)!{{{
       do j=1,9
          tmp =tmp +co(j,secN,i)*vThrt(j)
       end do
-      DHi_s(i)=1d0*(kappa-(kappa-1d0)*tmp)
-      vhi_s(i)=1d0*tmp
+      DHi_s(i)=(kappa-(kappa-1d0)*tmp)
+      vhi_s(i)=tmp
    end do
    tmp=Ru*T
    DHi(1)=dot_product(nf,DHi_s)*tmp
@@ -943,8 +943,8 @@ subroutine flame_sheet_hp(Y,H, T, MWave,kappa,mu,DHi,Yv,vhi)!{{{
       do j=1,9
          tmp =tmp +co(j,secN,i)*vThrt(j)
       end do
-      DHi_s(i)=1d0*(kappa-(kappa-1d0)*tmp)
-      vhi_s(i)=1d0*tmp
+      DHi_s(i)=(kappa-(kappa-1d0)*tmp)
+      vhi_s(i)=tmp
    end do
    tmp=Ru*T
    DHi(1)=dot_product(nf,DHi_s)*tmp

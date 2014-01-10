@@ -1,0 +1,1 @@
+command! TEX !cd doc/manual;mtex;cd ../../

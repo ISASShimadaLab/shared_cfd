@@ -90,7 +90,7 @@ part\_point\_implicitに文字列が存在する場合main.main.point\_implicit.
 \item indxR ... wに於ける質量あたり気体定数(J/kg/K)のインデックス
 \item indxMu ... wに於ける粘性係数(Pa*s)のインデックス
 \end{itemize}
-\item prmtr.f90...piやモルあたりの気体定数の定義.
+\item prmtr.f90...piやモルあたりの気体定数"R\_uni"の定義.
 \item read\_control.f90...control.inpの読み込み.全計算に共通する部分に限る。
 \item scheme.f90...流束項評価サブルーチン。現在はSLAUのみ。
 \item variable.f90...一般的に使われる変数がまとめられてある。
@@ -183,6 +183,7 @@ global time stepまたはlocal time stepが設定される。ファイルはset\
 \item dual...Dual Time Step.同様にLU-SGS法を使う.後述するパラメータを用いる.上記の他sch\_dual.f90, var\_dual.f90でLU-SGS法を行う。
 \item preconLU-SGS...前処理法をオイラー陰解法(LU-SGS)で実装している。上記の他sch\_precon.f90, var\_precon.f90でLU-SGS法を行う。
 \end{itemize}
+なお、LU-SGSからpreconLU-SGSには"2d"と"q2d"というディレクトリがそれぞれあるが、それぞれ二次元流、軸対称流のコードが収められている。
 
 \paragraph{NR,precon,dualで用いられるパラメータについて}%{{{
 これらのスキームでは以下のパラメータをcontrol.inpで定義する。ただし、$\omega$は内部反復の緩和係数である。
@@ -235,14 +236,211 @@ $\omega$が指数的に増加せず、一回目の内部反復でDqrateにより
 %}}}
 %}}}
 \subsection{store/viscosity}%{{{
-non-viscous
-viscous
+non-viscousとviscousというディレクトリがあり、viscousにはその中にwith-nVとno-nV、さらにそれぞれに"2d"と"q2d"というディレクトリが収められている。
+non-viscousが非粘性流、viscousが粘性流である。
+2dとq2dの違いはtime\_schemeと同じ。
+
+with-nVとno-nVについて、化学モデルには"単純に$\rho_i$の空間微分でエンタルピー拡散を扱えるもの"とそうでないものがあり、それぞれがwith-nVとno-nVに対応している。
+with-nVの場合、"Yv"という"質量拡散によるエンタルピー拡散を考える際考慮しなければならない気体グループの質量分率"が熱力学ライブラリから生成される。
+例えば、一段総括反応の場合、化学組成は"反応物としての"燃料と酸化剤の質量のみを追いかければいいが、質量拡散によるエンタルピー拡散を計算する場合"生成物としての"燃料、酸化剤、生成物それぞれの質量分率を計算せねばならず、with-nVが使用される。
+
+ファイルはsch\_viscous.f90である。プラントル数Prとシュミット数Scはここで名前付き定数として共に1に定義してあるので、条件を変えたい場合はここを変更するとよい。
+%}}}
+\subsection{store/therm\_lib}%{{{
+therm\_lib内には必ずthermal\_mode.f90が入っており、set\_thermo\_propというサブルーチンにより、前ステップに計算された
+\begin{quotation}
+圧力、気体定数、保存量
+\end{quotation}
+から
+\begin{quotation}
+温度の推定値、質量あたり内部エネルギー、各気体グループの質量分率
+\end{quotation}
+を計算し、そこから現ステップでの
+\begin{quotation}
+圧力、比熱比、質量あたり全エンタルピー、粘性係数、気体定数、各化学種のエンタルピーvhi、各化学種の修正生成熱DHi
+\end{quotation}
+を計算する。
+また、viscosityの節でも述べたとおり、一部熱力学ライブラリではエンタルピー拡散の計算のためにYvも計算する。
+(圧縮性流体ではエネルギー保存であるためエンタルピーは圧力依存となる。圧力は温度で変わり、温度は熱力学ライブラリで変わるため、全エンタルピーも基本量としている。)
+これら出力結果は基本量wの配列に格納される。
+
+化学ライブラリには大きくわけて理想気体,NASAデータベースを用いるもの,chemkinファイルを用いるものにわけられ、それぞれディレクトリideal,NASA,chemkinに対応する。
+NASAデータベースを用いる計算は凍結流、一段総括反応、完全平衡モデルがつかえ、
+chemkinファイルを用いる計算は凍結流、素反応モデルが使える。
+
+\paragraph{vhiとDHiの定義}%{{{
+それぞれのライブラリ詳細の説明を行う前に、vhiとDHiの説明をする。
+
+vhiはエンタルピー拡散の計算に使われ、次元はnV(Yvの次元と同じ.Yvを使わない場合はnY)である。
+それぞれの気体グループの生成エネルギーを含む単位質量あたりの内部エンタルピーである。
+拡散の計算に使われるため、vhiに関しては境界での値が必要となる。よって、適切な境界条件を設定しなければならない。
+
+DHiは修正生成熱であり、陰解法や前処理法に用いる流束の保存量でのヤコビアンを求めると出てくる。定義としては以下のとおり。
+\begin{equation}
+DHi_i=\kappa R_i T-(\kappa-1)vhi_i
+\end{equation}
+ただし、$\kappa$は混合ガス全体の平均比熱比、$R_i$はその気体グループの質量あたりの気体定数(=(一般気体定数)/(平均分子量)).
+
+$DHi_i$は理想気体では0であるが、実在気体では有限の値を持つ。また、陰解法を許さない熱力学モデルでは、これは0にセットされている。
 %}}}
 
-\subsection{store/therm\_lib}%{{{
-NASA
-chemkin
-ideal
+\subsubsection{store/therm\_lib/ideal}%{{{
+\begin{center}
+\begin{tabular}{cccc}\hline
+特有モジュール & nY & nV & with-nV or no-nV\\\hline
+gas            &  1 &  1 & no-nV\\
+\hline
+\end{tabular}
+\end{center}
+
+理想気体。ファイルはthermal\_model.f90のみである。粘性係数は動粘性係数一定の場合にのみ現在対応している。質量あたり気体定数R\_gas、比熱比kappa\_gas、動粘性係数nu\_gasは"module gas"をインポートすれば使用可能であり、checkout.pyでそれぞれ1.4,287,1.6e-5に定義されるが、thermal\_model.f90の該当部分を直接編集すれば任意の値に変更可能である。境界条件設定時にはぜひ"module gas"をインポートして上記の名前付き定数を使っていただきたい。
+
+保存量、基本量やvhiは以下のように表される。ただし、$\rho,u,v,p$は密度、x,y方向速度、圧力である。
+\begin{verbatim}
+q(1)=rho
+q(2)=rho*u
+q(3)=rho*v
+q(4)=p/(kappa_gas-1d0)
+
+w(1)=rho
+w(2)=u
+w(3)=v
+w(4)=p
+w(5)=1d0
+w(indxg )=kappa_gas
+w(indxht)=kappa_gas/(kappa_gas-1d0)*p/rho+0.5d0*(u**2+v**2)
+w(indxR )=R_gas
+w(indxMu)=rho*nu_gas
+
+vhi(1)=kappa_gas/(kappa_gas-1d0)*p/rho
+DHi(1)=0d0
+\end{verbatim}
+%}}}
+\subsubsection{store/therm\_lib/NASA}%{{{
+
+\begin{center}
+\begin{tabular}{cccc}\hline
+特有モジュール               & nY &            nV & with-nV or no-nV\\\hline
+const\_chem, chem, chem\_var &  2 &  モデルによる & with-nV\\
+\hline
+\end{tabular}
+\end{center}
+
+NASA-CEA用に公開されたデータベースを用いた熱力学モデル集。凍結流と一段総括反応(flame sheet)、完全平衡モデルを用意している。
+
+気体グループは2つであり、ライブラリでは一つ目に燃料、二つ目に酸化剤を当てている。
+
+全てのモデルで使用される熱力学モデルはcore内に格納されており、以下のファイルがある。
+\begin{itemize}
+\item LU.f90...LU分解で線形連立方程式を解くモジュール.完全平衡モデルで利用されている。
+\item thermo.inp...NASA-CEA内に格納されている熱力学データ.
+\item trans.inp...NASA-CEA内に格納されている熱輸送データ.
+\item func\_chem.f90...熱力学関数多項式の係数を返す関数ライブラリ.
+\item mod\_chem.raw.f90...NASAデータベースを用いた計算に必要なモジュール.(上述特有モジュール)変数後述.
+\item sub\_chem.f90...mod\_chem内の変数初期化やinputファイル読み込み、上述反応モデルの全てのコア部のサブルーチン.
+\end{itemize}
+
+\paragraph{mod\_chem.f90の変数について}
+\subparagraph{const\_chem}定数と重要な値(化学種数)を格納している.
+
+\begin{itemize}
+\item ne     = NE !the number of elements
+\item max\_ns = NS !the maximum number of species
+\item Ru         = 8.3144621d0 !universal gas constant
+\item pst        = 1d5         !standard state pressure
+\item omega      = 0.5d0       !relaxation factor
+\item eps        = 1d-9        !epsilon for convergence
+\item initial\_eps= 1d-5        !epsilon to stabilize calculation
+\item Y\_eps      = 1d-6        !epsilon for reduction determination
+\item TSIZE      = 1d-11       !epsilon for calc E or H
+\item TTSIZE     = 1d-14       !epsilon for calc n
+\item ns
+\item nt
+\end{itemize}
+test
+\begin{verbatim}
+module chem
+   use const\_chem
+   implicit none
+   integer         ,dimension(max\_ns)::num\_sctn
+   double precision,dimension(max\_ns)::MW
+   double precision,dimension(2,6,max\_ns)::Trange
+   double precision,dimension(9,6,max\_ns)::co
+
+   character*2 ,dimension(ne)::SYM\_ELM
+   character*18,dimension(max\_ns)::SYM\_SPC
+
+   !for trans
+   double precision trans(4,3,max\_ns),Trange\_trans(2,3,max\_ns)
+   character*18     species\_name\_trans(max\_ns)
+   integer         ,dimension(max\_ns)::num\_sctn\_trans
+   integer         ,dimension(max\_ns)::tr2th
+
+   double precision,dimension(ne,max\_ns)::Ac
+end module chem
+\end{verbatim}
+
+test
+\begin{verbatim}
+module chem\_var
+   use grbl\_prmtr
+   use const\_chem
+   implicit none
+   double precision n\_save(max\_ns,nimax,njmax,Nplane)
+
+   double precision qf(dimq),wf(dimw)
+   double precision rhof,pf,Tf,Ef,Hf,MWf,kappaf,muf
+   double precision Yvf(nV),vhif(nV)
+   double precision b0f(ne+2)
+   double precision nf(max\_ns)
+   double precision nfini(max\_ns)
+   integer          nef
+   integer          elistf(ne+2)
+   integer          nelistf(ne+2)
+   double precision maskf(max\_ns)
+   double precision maskbf(ne+2)
+
+   double precision qo(dimq),wo(dimw)
+   double precision rhoo,po,To,Eo,Ho,MWo,kappao,muo
+   double precision Yvo(nV),vhio(nV)
+   double precision b0o(ne+2)
+   double precision no(max\_ns)
+   double precision noini(max\_ns)
+   integer          neo
+   integer          elisto(ne+2)
+   integer          nelisto(ne+2)
+   double precision masko(max\_ns)
+   double precision maskbo(ne+2)
+
+   !for flame sheet model
+   double precision np(max\_ns)
+   double precision of
+end module chem\_var
+\end{verbatim}
+
+最後に、境界条件での入力に関して。例えば酸化剤のみのセルで条件を入力する場合、保存量、基本量やvhiは以下のように表される。ただし、$u,v$は密度、x,y方向速度、圧力である。
+DHiについてはset\_thermo\_propで直接入力されるため、手作業で入力されることはない。
+\begin{verbatim}
+q(1)=rhoo
+q(2)=rhoo*u
+q(3)=rhoo*v
+q(4)=rhoo*Eo
+
+w(1)=rhoo
+w(2)=u
+w(3)=v
+w(4)=po
+w(5)=0d0
+w(6)=1d0
+w(indxg )=kappao
+w(indxht)=Ho+0.5d0*(u**2+v**2)
+w(indxR )=R_uni/MWo
+w(indxMu)=muo
+
+vhi=vhio
+\end{verbatim}
+燃料では\verb|w(5)=1d0;w(6)=0d0|になる。
+%}}}
 %}}}
 
 \subsection{store/cond}%{{{
