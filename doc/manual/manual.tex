@@ -206,27 +206,34 @@ global time stepまたはlocal time stepが設定される。ファイルはset\
 内部ループの発散は'InternalLoop Omega Min', 'InternalLoop ResRateWarn', 'InternalLoop ResRateErr'で補足されることとなる。ここでエネルギー残渣比は(最後の内部反復でのエネルギー残渣)/(最初の内部反復でのエネルギー残渣)と定義している。なお、NR, precon, dualの時間スキームでは、基本コンセプトは"内部反復が収束"することに基づいているので、エネルギー残渣比が十分小さくならない場合はコンセプト自体が崩壊している。よって、その場合これらのスキームは使うべきではない。(これを見落としている研究は大変多く、私は悲しい。)
 
 \subparagraph{パラメータ調整方法}
-	To adjust the parameters, if you set 'InternalLoop OutOmega' to true, you can get 'internal\_res.dat'. (For fast calculation, please set it false.) This file records internal step number at 1st column, the relaxation factor calculated by Dqrate (not modified by Omega Max) at 2nd column, and the residuals rate of (current internal step)/(first internal step) at 3rd column. I will show some criteria to change the parameters from this record.
-Increase 'InternalLoop Max Number', when the residual rate decrease exponentially but does not reach the 'InternalLoop ResRateErr' because of the shortage of the number of internal loop.
-Decrease 'InternalLoop Max Number', when the residual rate reaches the limit at the step number far less than the 'InternalLoop Max Number'.
-Increase 'InternalLoop Omega Max', when the convergence of internal loop is very slow compared with the standard below, and the relaxation factor is controlled mainly by this factor.
-Decrease 'InternalLoop Omega Max',  when the omega does not increase exponentially and the relaxation factor is determined by Omega Max at first internal step. This situation occurs when the Delta q of internal step is too large and becomes poor estimation and is not controlled by Dqrate, so at first step the updated q becomes too poor to be modified by other internal steps.
-Increase 'InternalLoop Dqrate Max', when the convergence of internal loop is very slow and the relaxation factor is controlled mainly by this factor.
-Decrease 'InternalLoop Dqrate Max', when the omega does not increase exponentially and the relaxation factor is determined by Dqrate Max at first step.
-	These do not have theoretical reasons. They depend on my experiences. So they may be wrong. Please try various parameters.
+パラメータ調整には"internal\_res.dat"が使える。これは"InternalLoop OutOmega"を"true"にセットすることで得られる。
+(このファイル出力は時間がかかるので、本計算のときには効率向上のため"false"にすべき。)
+このファイルには1列目に内部反復数、2列目にDqrateにより計算された$\omega$($\omega_{\max}$で修正する前)、3列目にエネルギー残渣比が記録されている。
+以下にこれらの出力を使ってパラメータを調節する手段の一つを記す。
+\begin{itemize}
+\item \textbf{'InternalLoop Max Number'を増やす}...内部反復数が小さいことが原因で、エネルギー残渣比が指数的に減少しているのに'InternalLoop ResRateErr'に達していないとき。
+\item \textbf{'InternalLoop Max Number'を減らす}...'InternalLoop Max Number'に比べ遥かに少ない内部反復数で'InternalLoop ResRateErr'に達しているとき。
+\item \textbf{'InternalLoop Omega Max'を増やす}...下記の目安に比べ内部反復の収束が遥かに遅く、$\omega_{\max}$により$\omega$が主に決まっているとき。
+\item \textbf{'InternalLoop Omega Max'を減らす}...Dqrateにより決定された$\omega$('internal\_res.dat'の第二列目に記録された$\omega$)が指数的に増加せず、一回目の内部反復の$\omega$が$\omega _{\max}$により決定されている場合。
+この状況は$\omega\Delta q$があまりにも大きすぎて、一回目の内部反復における$q$の推測値が悪くなりすぎ、そのためその後のステップで正しい値に修正できなくなった場合に起こる。
+\item \textbf{'InternalLoop Dqrate Max'を増やす}...
+内部反復の収束が遅く、$\omega$がDqrateによって主に決定されている場合。
+\item \textbf{'InternalLoop Dqrate Max'を減らす}...
+$\omega$が指数的に増加せず、一回目の内部反復でDqrateにより$\omega$が決定されている場合。
+この状況も$\omega\Delta q$があまりにも大きすぎて、一回目の内部反復における$q$の推測値が悪くなりすぎ、そのためその後のステップで正しい値に修正できなくなった場合に起こる。
+\end{itemize}
+これらの手段は理論的なものではなく、私の経験によるものである。よって間違っている可能性もある。他の方法も試してください。
 
 \subparagraph{パラメータの目安}
-0.1 @ Omega Max...If it works well, 0.8 or 0.9 is also OK, I have used 0.01 also in dual time step scheme.
-0.001 @ Omega Min... Any calculations below this limit have never yielded proper answers. I think this limit should be fixed.
-0.01 @ Dqrate Max... To be honest, this parameter works only when multi species are used. I have used 0.001 in this value in dual time step scheme. In my experiences, 0.1 was too big.
-1.e-5 @ ResRateWarn and 1.e-3 @ ResRateErr … I think you should decrease ResRate at least three order of magnitude. So I propose that 1.e-3 @ ResRateErr is fixed. Because ResRateWarn yields only warnings, you can select a value you want for this parameter.
-60 @ Max Number … This number is used when multi species problems are calculated. In my experiences, 20 is sufficient at ideal gas problems. I have used 100 when I calculated multi species problems with Dual Time Step schemes.
-
-
-
+\begin{itemize}
+\item \textbf{0.1 @ Omega Max}...もしこれで動く場合、0.8や0.9も可能な場合もある。Dual Time Stepでは0.01を使わざるを得なかった場合もある。
+\item \textbf{0.001 @ Omega Min}...この値を下回り正しい解を出した計算に出会ったことはない。このパラメータは固定すべきであると思う。
+\item \textbf{0.01 @ Dqrate Max}...現実問題このパラメータは多分子流にのみ使われうる。Dual Time Stepでは0.001を使わざるを得なかった場合もある。経験上0.1は大きすぎる。
+\item \textbf{1.e-5 @ ResRateWarn, 1.e-3 @ ResRateErr}...経験上、エネルギー残渣比は3オーダーは下げなければ正しい解を出さない。よって1e-3は固定すべきだと考える。ResRateWarnは警告メッセージを出すだけであるので、好みの値を用いてよい。
+\item \textbf{60 @ Max Number}...理想気体では経験上20で十分。多分子流をDual Time Stepで解いたとき、100必要だった場合もあった。
+\end{itemize}
 %}}}
 %}}}
-
 \subsection{store/viscosity}%{{{
 non-viscous
 viscous
