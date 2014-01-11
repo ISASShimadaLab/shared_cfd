@@ -342,89 +342,80 @@ NASA-CEA用に公開されたデータベースを用いた熱力学モデル集
 
 \paragraph{mod\_chem.f90の変数について}
 \subparagraph{const\_chem}定数と重要な値(化学種数)を格納している.
+\begin{itemize}
+\item ne...原子種数
+\item max\_ns...最大化学種数
+\item Ru...一般気体定数(prmtr.f90と同じ値ではあるが、化学ライブラリのみで0次元を行うときのために定義している。)
+\item pst=1d5...標準状態の圧力
+\item omega=0.5d0...一段総括反応モデルで用いられる緩和係数
+\item eps=1d-9...収束計算に用いる微小量.基準値がこれ以下になればよい.
+\item initial\_eps=1d-5...完全平衡モデルで係数行列の行列式が0にならないようにそれぞれの化学種量初期値に加える微小量
+\item Y\_eps=1d-6...完全平衡モデルで使用。燃料または酸化剤の質量分率がこれ以下の場合、存在しえない原子種に関する拘束条件を計算から排除する.
+\item TSIZE=1d-11...完全平衡モデルで使用。EとHを計算する際、物質量がこれ以下の場合その分子がもつエネルギーやエンタルピーは計算しない。
+\item TTSIZE=1d-14...完全平衡モデルで使用。各原子の量に関する拘束条件を計算するとき、物質量がこれ以下の分子は計算にいれない。
+\item ns...化学種数.
+\item nt...粘性係数の計算に使われる化学種数。化学組成の計算をする際に使われる化学種の内、trans.inpに含まれる化学種の数となる。
+\end{itemize}
+
+\subparagraph{chem}計算のコアとなるデータ.
+\begin{itemize}
+\item num\_sctn...それぞれの化学種の熱力学関数多項式の区間の数.最大値6.
+\item MW...それぞれの化学種の分子量
+\item Trange...ぞれぞれの区間の始めとおわりの温度.例えば化学種iのj番目の区間はTrange(1,j,i)KからTrange(2,j,i)Kまで.
+\item co...それぞれの区間の熱力学関数の多項式の係数.例えば化学種iのj番目の区間の多項式の係数はco(1:9,j,i).
+\item SYM\_ELM...それぞれの原子種の記号。(HEやH,Oなど)
+\item SYM\_SPC...それぞれの化学種の記号。(CO2やH2Oなど)
+\item trans...輸送係数の多項式の係数。熱力学関数のcoに対応。
+\item Trange\_trans...輸送係数の区間の数。熱力学関数のTrangeに対応。
+\item species\_name\_trans...熱力学関数のSYM\_SPCに対応
+\item num\_sctn\_trans...熱力学関数のnum\_sctnに対応
+\item tr2th...輸送係数のインデックスを熱力学関数のインデックスの変換するもの。
+例えばH2Oのインデックスが輸送係数ではi、熱力学係数がj(このときspecies\_name\_trans(i)とSYM\_SPC(j)は共に'H2O'である。)の場合、
+tr2th(i)=jである。
+\item Ac...それぞれの化学種に含まれる原子の数.例えば原子H,C,Oのインデックスがそれぞれ1,2,3、分子H2Oのインデックスが1の場合、Ac(1,1)=2,Ac(2,1)=0,Ac(3,1)=1である。
+\end{itemize}
+
+\subparagraph{chem\_var}境界条件で使うための燃料,酸化剤のそれぞれの各種値、及びそれぞれのセルの前ステップでの化学組成の記録。
 
 \begin{itemize}
-\item ne     = NE !the number of elements
-\item max\_ns = NS !the maximum number of species
-\item Ru         = 8.3144621d0 !universal gas constant
-\item pst        = 1d5         !standard state pressure
-\item omega      = 0.5d0       !relaxation factor
-\item eps        = 1d-9        !epsilon for convergence
-\item initial\_eps= 1d-5        !epsilon to stabilize calculation
-\item Y\_eps      = 1d-6        !epsilon for reduction determination
-\item TSIZE      = 1d-11       !epsilon for calc E or H
-\item TTSIZE     = 1d-14       !epsilon for calc n
-\item ns
-\item nt
+\item n\_save(max\_ns,nimax,njmax,Nplane)
+\item qf(dimq),wf(dimw)
+\item rhof,pf,Tf,Ef,Hf,MWf,kappaf,muf
+\item Yvf(nV),vhif(nV)
+\item b0f(ne+2)
+\item nf(max\_ns)
+\item nfini(max\_ns)
+\item nef
+\item elistf(ne+2)
+\item nelistf(ne+2)
+\item maskf(max\_ns)
+\item maskbf(ne+2)
+\item 
+\item qo(dimq),wo(dimw)
+\item rhoo,po,To,Eo,Ho,MWo,kappao,muo
+\item Yvo(nV),vhio(nV)
+\item b0o(ne+2)
+\item no(max\_ns)
+\item noini(max\_ns)
+\item neo
+\item elisto(ne+2)
+\item nelisto(ne+2)
+\item masko(max\_ns)
+\item maskbo(ne+2)
+\item 
+\item model
+\item np(max\_ns)
+\item of
 \end{itemize}
-test
-\begin{verbatim}
-module chem
-   use const\_chem
-   implicit none
-   integer         ,dimension(max\_ns)::num\_sctn
-   double precision,dimension(max\_ns)::MW
-   double precision,dimension(2,6,max\_ns)::Trange
-   double precision,dimension(9,6,max\_ns)::co
-
-   character*2 ,dimension(ne)::SYM\_ELM
-   character*18,dimension(max\_ns)::SYM\_SPC
-
-   !for trans
-   double precision trans(4,3,max\_ns),Trange\_trans(2,3,max\_ns)
-   character*18     species\_name\_trans(max\_ns)
-   integer         ,dimension(max\_ns)::num\_sctn\_trans
-   integer         ,dimension(max\_ns)::tr2th
-
-   double precision,dimension(ne,max\_ns)::Ac
-end module chem
-\end{verbatim}
-
-test
-\begin{verbatim}
-module chem\_var
-   use grbl\_prmtr
-   use const\_chem
-   implicit none
-   double precision n\_save(max\_ns,nimax,njmax,Nplane)
-
-   double precision qf(dimq),wf(dimw)
-   double precision rhof,pf,Tf,Ef,Hf,MWf,kappaf,muf
-   double precision Yvf(nV),vhif(nV)
-   double precision b0f(ne+2)
-   double precision nf(max\_ns)
-   double precision nfini(max\_ns)
-   integer          nef
-   integer          elistf(ne+2)
-   integer          nelistf(ne+2)
-   double precision maskf(max\_ns)
-   double precision maskbf(ne+2)
-
-   double precision qo(dimq),wo(dimw)
-   double precision rhoo,po,To,Eo,Ho,MWo,kappao,muo
-   double precision Yvo(nV),vhio(nV)
-   double precision b0o(ne+2)
-   double precision no(max\_ns)
-   double precision noini(max\_ns)
-   integer          neo
-   integer          elisto(ne+2)
-   integer          nelisto(ne+2)
-   double precision masko(max\_ns)
-   double precision maskbo(ne+2)
-
-   !for flame sheet model
-   double precision np(max\_ns)
-   double precision of
-end module chem\_var
-\end{verbatim}
 
 最後に、境界条件での入力に関して。例えば酸化剤のみのセルで条件を入力する場合、保存量、基本量やvhiは以下のように表される。ただし、$u,v$は密度、x,y方向速度、圧力である。
 DHiについてはset\_thermo\_propで直接入力されるため、手作業で入力されることはない。
 \begin{verbatim}
-q(1)=rhoo
-q(2)=rhoo*u
-q(3)=rhoo*v
-q(4)=rhoo*Eo
+q(1)=0d0
+q(2)=rhoo
+q(3)=rhoo*u
+q(4)=rhoo*v
+q(5)=rhoo*Eo
 
 w(1)=rhoo
 w(2)=u
@@ -439,7 +430,7 @@ w(indxMu)=muo
 
 vhi=vhio
 \end{verbatim}
-燃料では\verb|w(5)=1d0;w(6)=0d0|になる。
+燃料では\verb|q(1)=rhof;q(2)=0d0;w(5)=1d0;w(6)=0d0|になる。
 %}}}
 %}}}
 

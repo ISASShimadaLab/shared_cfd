@@ -85,7 +85,8 @@ subroutine set_BC(step)
                w(:,  i,-1,plane) = w(:,  i, 0,plane)
                vhi(:,i,-1,plane) = vhi(:,i, 0,plane)
             end do
-            do i=max(   70,nxs(plane)),min(nxe(plane),  263)
+            !do i=max(   70,nxs(plane)),min(nxe(plane),  263)
+            do i=max(   70,nxs(plane)),min(nxe(plane),  521)
                w(:,  i, 0,plane) = w(:,  i, 1,plane)
                w(2,  i, 0,plane) =-w(2,  i, 1,plane)
                w(3,  i, 0,plane) =-w(3,  i, 1,plane)
@@ -95,7 +96,7 @@ subroutine set_BC(step)
                vhi(:,i,-1,plane) = vhi(:,i, 0,plane)
             end do
             do i=max(  264,nxs(plane)),min(nxe(plane),  452)
-               !call YPT2w(max(0d0,min((dble(step)-61000d0)/5d3,1d0)),1d5,300d0,wt,vhit)
+               !call YPT2w(max(0d0,min((dble(step)-22000d0)/5d3,1d0)),w(4,i,1,plane),300d0,wt,vhit)
 
                w(:,      i, 0,plane) = wf
                w(1,      i, 0,plane) = w(4,i,1,plane)/(R_uni/MWf*Tf)
