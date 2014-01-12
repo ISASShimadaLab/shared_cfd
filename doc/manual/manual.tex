@@ -17,19 +17,18 @@
 %\newpage
 %%}}}
 %
-%details{{{
+%details
 \part{各機能の説明}
 \section{ライブラリ生成アルゴリズムについて}%{{{
 本プログラムは基本的に「ライブラリ生成プログラム」となる。
 よって、各種パラメータ設定ファイルに加えて、流体計算の場合は"condition.f90"というファイルで直接初期条件と境界条件を設定しなければならない。これらのファイルは"raw"というサフィックス付きでディレクトリにコピーされる。
 
-GUIインターフェースであるGUI.pyは、checkout.pyを動かすためのinputファイル(checkout.inp, checkout\_model.inp, checkout\_chem.inp)を生成し、checkout.pyを実行するプログラムであり、主動作はGUI.pyを用いた場合でも全てcheckout.pyが受け持つ。
+GUIインターフェースであるGUI.pyは、checkout.pyを動かすためのinputファイル(checkout.inp, checkout\_model.inp, checkout\_chem.inp)を生成し、checkout.pyを実行するプログラムであり、主動作はGUI.pyを用いた場合でも多くをcheckout.pyが受け持つ。
 
 checkout.pyはinputファイルに基づき、各種ライブラリを生成するプログラムである。基本的にライブラリの生成は、該当ファイルをディレクトリからコピーすることによって行い、ある特定のファイルを除いてはfortranソースファイル自体をcheckout.pyが編集することはない。コピーされるファイルは全て"store"のサブディレクトリ内に入っており、checkout.pyまたはユーザーによって編集が加えられるファイルには".raw."というサフィックスがつけられている。なお、checkout.py内でそのソースファイルの編集が終了する、つまりそれ以上ユーザーによる編集が不必要になったファイルからは自動的に".raw."サフィックスが取り除かれ、そのままコンパイルにかけられるようになる。
 \subsection{ディレクトリ構造}
 基本的に類似する機能を持つファイルがまとめられている。例えばオイラー陽解法とLU-SGS法は"time\_scheme"ディレクトリ内に"euler","lu-sgs"としてそれぞれ格納されている。また化学計算と流体計算は基本的に同一ライブラリを用いることになっている。以下、全てのディレクトリについて説明を行う。
 %}}}
-
 \section{流体コード}%{{{
 checkout.pyから呼び出された"store/checkout/checkout\_flow.py"によって生成される。生成されたファイルは"checkout"ディレクトリ内に生成される。
 \subsection{自動生成ファイル}%{{{
@@ -287,8 +286,16 @@ $DHi_i$は理想気体では0であるが、実在気体では有限の値を持
 \subsubsection{store/therm\_lib/ideal}%{{{
 \begin{center}
 \begin{tabular}{cccc}\hline
-特有モジュール & nY & nV & with-nV or no-nV\\\hline
+特有モジュール & nY & nV & with-nV or no-nV\\\hline \hline
 gas            &  1 &  1 & no-nV\\
+\hline
+\end{tabular}
+\end{center}
+
+\begin{center}
+\begin{tabular}{c||c}\hline
+使用可能時間ステップ & global, local\\
+使用可能時間スキーム & euler, RK2, LU-SGS, NR, precon, dual, preconLU-SGS\\
 \hline
 \end{tabular}
 \end{center}
@@ -317,15 +324,15 @@ DHi(1)=0d0
 \end{verbatim}
 %}}}
 \subsubsection{store/therm\_lib/NASA}%{{{
-
 \begin{center}
 \begin{tabular}{cccc}\hline
-特有モジュール               & nY &            nV & with-nV or no-nV\\\hline
+特有モジュール               & nY &            nV & with-nV or no-nV\\\hline \hline
 const\_chem, chem, chem\_var &  2 &  モデルによる & with-nV\\
 \hline
 \end{tabular}
 \end{center}
 
+%共通事項{{{
 NASA-CEA用に公開されたデータベースを用いた熱力学モデル集。凍結流と一段総括反応(flame sheet)、完全平衡モデルを用意している。
 
 気体グループは2つであり、ライブラリでは一つ目に燃料、二つ目に酸化剤を当てている。
@@ -340,7 +347,7 @@ NASA-CEA用に公開されたデータベースを用いた熱力学モデル集
 \item sub\_chem.f90...mod\_chem内の変数初期化やinputファイル読み込み、上述反応モデルの全てのコア部のサブルーチン.
 \end{itemize}
 
-\paragraph{mod\_chem.f90の変数について}
+\paragraph{mod\_chem.f90の変数について}%{{{
 \subparagraph{const\_chem}定数と重要な値(化学種数)を格納している.
 \begin{itemize}
 \item ne...原子種数
@@ -366,7 +373,7 @@ NASA-CEA用に公開されたデータベースを用いた熱力学モデル集
 \item SYM\_ELM...それぞれの原子種の記号。(HEやH,Oなど)
 \item SYM\_SPC...それぞれの化学種の記号。(CO2やH2Oなど)
 \item trans...輸送係数の多項式の係数。熱力学関数のcoに対応。
-\item Trange\_trans...輸送係数の区間の数。熱力学関数のTrangeに対応。
+\item Trange\_trans...輸送係数の区間の端の値。熱力学関数のTrangeに対応。
 \item species\_name\_trans...熱力学関数のSYM\_SPCに対応
 \item num\_sctn\_trans...熱力学関数のnum\_sctnに対応
 \item tr2th...輸送係数のインデックスを熱力学関数のインデックスの変換するもの。
@@ -376,39 +383,28 @@ tr2th(i)=jである。
 \end{itemize}
 
 \subparagraph{chem\_var}境界条件で使うための燃料,酸化剤のそれぞれの各種値、及びそれぞれのセルの前ステップでの化学組成の記録。
-
 \begin{itemize}
-\item n\_save(max\_ns,nimax,njmax,Nplane)
-\item qf(dimq),wf(dimw)
-\item rhof,pf,Tf,Ef,Hf,MWf,kappaf,muf
-\item Yvf(nV),vhif(nV)
-\item b0f(ne+2)
-\item nf(max\_ns)
-\item nfini(max\_ns)
-\item nef
-\item elistf(ne+2)
-\item nelistf(ne+2)
-\item maskf(max\_ns)
-\item maskbf(ne+2)
-\item 
-\item qo(dimq),wo(dimw)
-\item rhoo,po,To,Eo,Ho,MWo,kappao,muo
-\item Yvo(nV),vhio(nV)
-\item b0o(ne+2)
-\item no(max\_ns)
-\item noini(max\_ns)
-\item neo
-\item elisto(ne+2)
-\item nelisto(ne+2)
-\item masko(max\_ns)
-\item maskbo(ne+2)
-\item 
-\item model
-\item np(max\_ns)
-\item of
+\item n\_save...完全平衡モデルで使用。各セルの前ステップでの組成。これを初期値に使うことで、反復回数が減る。
+\item qf,wf...それぞれ燃料の速度が0のときの保存量、基本量。
+\item rhof,pf,Tf,Ef,Hf,MWf,kappaf,muf...それぞれ燃料の密度、圧力、温度、質量あたり内部エネルギー、質量あたり内部エンタルピー、分子量、比熱比、粘性係数
+\item Yvf,vhif...それぞれ燃料のYf,vhi
+\item b0f...完全平衡モデルで使用。燃料の単位質量あたりそれぞれの原子物質量.
+\item nf...完全平衡モデルで使用。燃料単体に完全平衡モデルを用いたときの組成
+\item nfini...燃料単体の反応前の組成
+\item nef...完全平衡モデルで使用。燃料に含まれる原子種数.
+\item elistf...完全平衡モデルで使用。燃料に含まれる原子種のインデックス.
+\item nelistf...完全平衡モデルで使用。燃料に含まれない原子種のインデックス.
+\item maskf...完全平衡モデルで使用。各化学種で、存在しうるものが1、しえないものに0が入っている。
+\item maskbf...完全平衡モデルで使用。拘束条件で、使用するものに1、しないものに0が入っている。
+\item np...一段総括反応モデルで使用。生成物の組成。
+\item of...当量でのo/f
 \end{itemize}
+また、上記には燃料のみ記してあるが、"f"を"o"に変えれば酸化剤のそれぞれを表すことになる。
+%}}}
 
-最後に、境界条件での入力に関して。例えば酸化剤のみのセルで条件を入力する場合、保存量、基本量やvhiは以下のように表される。ただし、$u,v$は密度、x,y方向速度、圧力である。
+\paragraph{境界条件での入力について}%{{{
+
+境界条件での入力に関して。例えば酸化剤のみのセルで条件を入力する場合、保存量、基本量やvhiは以下のように表される。ただし、$u,v$はx,y方向速度である。
 DHiについてはset\_thermo\_propで直接入力されるため、手作業で入力されることはない。
 \begin{verbatim}
 q(1)=0d0
@@ -430,7 +426,403 @@ w(indxMu)=muo
 
 vhi=vhio
 \end{verbatim}
-燃料では\verb|q(1)=rhof;q(2)=0d0;w(5)=1d0;w(6)=0d0|になる。
+燃料では"o"を"f"に変える他、\verb|q(1)=rhof;q(2)=0d0;w(5)=1d0;w(6)=0d0|になる。
+%}}}
+
+\hspace{1em}
+
+以下、凍結流と一段総括反応(flame sheet)、完全平衡モデルについてそれぞれ説明する。
+%}}}
+
+\paragraph{凍結流モデル}%{{{
+\begin{center}
+\begin{tabular}{c||c}\hline
+使用可能時間ステップ & global, local\\
+使用可能時間スキーム & euler, RK2, LU-SGS, NR, precon, dual, preconLU-SGS\\
+\hline
+\end{tabular}
+\end{center}
+凍結流モデルでは、酸化剤と燃料の混合は扱うが、その反応は考えない。つまり、酸化剤と燃料は混合されたところで反応しない。よって凍結流となる。
+凍結流モデルには、GUI.pyで一段総括反応モデルを選ぶと得られるchem.inpとcontrol\_chem.raw.inpを用いる。
+control\_chem.raw.inpは適切な修正をした後に名前をcontrol\_chem.inpとし、chem.inpと共に実行ファイルがあるディレクトリ直下に入れなければならない。
+control\_chem.inpの中身は以下のようになっている。
+\begin{verbatim}
+#Control parameters for chemistry
+Oxidizer Pressure(Pa)   : 1.e5
+Oxidizer Temperature(K) : 300.
+Oxygen Composition(mole ratio):
+N2 4
+O2 1
+end
+Fuel Pressure(Pa)       : 1.e5
+Fuel Temperature(K)     : 300.
+Fuel Composition(mole ratio):
+H2 1
+end
+Products Composition(mole ratio):
+H2O 2
+end
+\end{verbatim}
+"Products Composition"以下の行は一段総括反応のときのみ使用するのでここでは説明しない。凍結流モデルにこのインプットファイルを使った場合、これらは無視される。
+
+酸化剤と燃料はそれぞれの圧力と温度、そのモル比での組成を入力する必要がある。圧力と温度はそれぞれ単位Pa,Kで入力する。
+このインプットファイルではそれぞれ1.e5、300.となっている。
+
+組成は"化学種名 モル分率"の順で一化学種に一行用いて入力し、最後の行には"end"のみの行を入力する。モル分率の和が1である必要はない。
+このインプットファイルでは、酸化剤にN2:O2=4:1の混合気体(空気)、燃料にH2純粋気体を用いることとなっている。
+
+ファイルはthermal\_model.f90のみである。メインの計算はsub\_chem.f90内のcold\_flowが行うこととなる。
+また、nV=2である.
+%}}}
+\paragraph{一段総括反応モデル}%{{{
+\begin{center}
+\begin{tabular}{c||c}\hline
+使用可能時間ステップ & global, local\\
+使用可能時間スキーム & euler, RK2\\
+\hline
+\end{tabular}
+\end{center}
+store/therm\_lib/NASA/flame\_sheet内に格納されており、flow, mono, plotがある。
+monoとplotは0次元計算用のライブラリであり、流体計算にはflowのみが使われる。
+
+flowには自動生成ファイル用のファイル以外にはthermal\_model.f90のみが存在する。
+これは実質的にはsub\_chem.f90のflame\_sheetを呼び出すためだけのルーチンとなり、
+メインの計算はflame\_sheetが行うこととなる。
+
+一段総括反応モデルでは組成は自由エネルギーが最小になるように決まる。
+一段総括反応モデルには、GUI.pyで完全平衡モデルを選ぶと得られるchem.inpとcontrol\_chem.raw.inpを用いる。
+control\_chem.raw.inpは適切な修正をした後に名前をcontrol\_chem.inpとし、chem.inpと共に実行ファイルがあるディレクトリ直下に入れなければならない。
+control\_chem.inpの中身は例えば以下のようになっている。
+\begin{verbatim}
+#Control parameters for chemistry
+Oxidizer Pressure(Pa)   : 1.e5
+Oxidizer Temperature(K) : 300.
+Oxygen Composition(mole ratio):
+N2 4
+O2 1
+end
+Fuel Pressure(Pa)       : 1.e5
+Fuel Temperature(K)     : 300.
+Fuel Composition(mole ratio):
+H2 2
+end
+Products Composition(mole ratio):
+N2  4
+H2O 2
+end
+\end{verbatim}
+酸化剤と燃料はそれぞれの圧力と温度、そのモル比での組成を入力する必要がある。
+圧力と温度はそれぞれ単位Pa,Kで入力する。
+このインプットファイルではそれぞれ1.e5、300.となっている。
+生成物はそのモル比での組成のみ入力する。
+
+組成は"化学種名 モル分率"の順で一化学種に一行用いて入力し、最後の行には"end"のみの行を入力する。
+このインプットファイルでは、酸化剤にN2:O2=4:1の混合気体(空気)、燃料にH2純粋気体を用いることとなっている。
+モル分率の和が1である必要はないが、酸化剤、燃料、生成物の量の分母は一致させなければならない。
+つまり、このファイルで生成物の組成を"N2 2","H2O 1"としてはならない。
+このような入力を行うと、反応式の右辺と左辺の原子の数が釣り合わないことを感知し、以下のようなエラーメッセージを出す仕様となっている。
+\begin{verbatim}
+ERROR: The amount of element: H
+ERROR: does not balance between reactants and products.
+ERROR: Please modify 'control_chem.inp'.
+\end{verbatim}
+できるだけ化学反応式のそれぞれの化学種の係数をそのまま入力するようにすること。
+
+また境界条件において、燃料だけ、酸化剤だけではなく、その間、または入力した以外の圧力、温度を持つ組成を欲しい場合がある。
+その際は、thermal\_model.f90にある\verb|YPT2w(Yf,p,T,wt,vhit)|(入力=Yf:燃料質量分率,p:圧力,T:温度)(出力=wt:速度0での基本量w,vhit:vhi)を使う.
+これ以外の境界条件が欲しい場合(ほとんどの研究ではこのような場合に出くわす)は自分で作成すること。
+
+また、nV=3であり、Yv(1),Yv(2),Yv(3)にはそれぞれ反応後の燃料、酸化剤、生成物の質量分率が入る。
+%}}}
+\paragraph{完全平衡モデル}%{{{
+\begin{center}
+\begin{tabular}{c||c}\hline
+使用可能時間ステップ & global, local\\
+使用可能時間スキーム & euler, RK2\\
+\hline
+\end{tabular}
+\end{center}
+store/therm\_lib/NASA/cea内に格納されており、このディレクトリにはflow, mono, plot, reductionがある。
+mono, plot, reductionは0次元計算用のライブラリであり、流体計算にはflowのみが使われる。
+
+flowには自動生成ファイル用のファイル以外にはthermal\_model.f90のみが存在する。
+これは実質的にはsub\_chem.f90のceaを呼び出すためだけのルーチンとなり、
+メインの計算はceaが行うこととなる。
+
+完全平衡モデルでは酸化剤と燃料はどちらかがなくなるまで反応を行う。組成は酸化剤と燃料の相対的な量で決まる。
+完全平衡モデルには、GUI.pyで一段総括反応モデル(flame sheet model)を選ぶと得られるchem.inpとcontrol\_chem.raw.inpを用いる。
+control\_chem.raw.inpは適切な修正をした後に名前をcontrol\_chem.inpとし、chem.inpと共に実行ファイルがあるディレクトリ直下に入れなければならない。
+control\_chem.inpの中身は例えば以下のようになっている。
+\begin{verbatim}
+#Control parameters for chemistry
+Oxidizer Pressure(Pa)   : 1.e5
+Oxidizer Temperature(K) : 300.
+Oxygen Composition(mole ratio):
+N2 4
+O2 1
+end
+Fuel Pressure(Pa)       : 1.e5
+Fuel Temperature(K)     : 300.
+Fuel Composition(mole ratio):
+H2 2
+end
+\end{verbatim}
+酸化剤と燃料はそれぞれの圧力と温度、そのモル比での組成を入力する必要がある。
+圧力と温度はそれぞれ単位Pa,Kで入力する。
+このインプットファイルではそれぞれ1.e5、300.となっている。
+一段総括反応モデルとは異なり生成物の組成を入力することはない。
+これは、生成物の組成は自由エネルギー最小という条件から求まるためである。
+
+組成は"化学種名 モル分率"の順で一化学種に一行用いて入力し、最後の行には"end"のみの行を入力する。
+このインプットファイルでは、酸化剤にN2:O2=4:1の混合気体(空気)、燃料にH2純粋気体を用いることとなっている。
+
+計算のアルゴリズムには基本的にNASA-CEAと同じものが使われる。
+特に、緩和係数は一段総括反応モデルのような固定ではなく、様々なパラメータの増減をみた値となっている。
+また、ほぼ燃料または酸化剤の場合、係数行列に逆行列がなくなる場合がある。
+これは、存在しない原子の量に関する拘束条件が、収束近くなると係数がすべて0になるからである。
+よって、これらのときにその拘束条件を削除するアルゴリズムを実装しており、その際、nef,elistf,nelistf,maskf,maskbfなどの配列が使われる。
+
+また、nV=nsであり、Yvにはそれぞれの化学種の質量分率が入る。
+
+また、chem.inpには使用する原子種と化学種のリストが入る。よって、この化学種のリストを変更すれば、簡略化モデルとなる。この簡略化については0次元化学計算の章で言及する。
+%}}}
+%}}}
+\subsubsection{store/therm\_lib/chemkin}%{{{
+\begin{center}
+\begin{tabular}{cccc}\hline
+特有モジュール               &       nY & nV & with-nV or no-nV\\\hline \hline
+const\_chem, chem, chem\_var & 化学種数 & nY & no-nV\\
+\hline
+\end{tabular}
+\end{center}
+
+%共通事項{{{
+"thermo all"を用いたthermo.inpを必要としない形式のchemkin.inpの使用を前提とした熱力学ライブラリである。
+凍結流と素反応モデルを用意している。
+
+気体グループは一つ一つが単一の化学種に対応する。つまり、$\rho _i$の次元は化学種数となる。
+
+全てのモデルで使用される熱力学モデルはcore内に格納されており、以下のファイルがある。
+\begin{itemize}
+\item MW.inp...それぞれの原子の名前と原子量の一覧
+\item trans.inp...NASA-CEA内に格納されている熱輸送データ.
+\item dvode.f...odepackのパッケージの一つであるdvode.fに修正を加えたもの
+\item mod\_chem.raw.f90...chem.inpを用いた計算に必要なモジュール.(上述特有モジュール)変数後述.
+\item sub\_chem.f90...mod\_chem内の変数初期化やinputファイル読み込み、上述反応モデルの全てのコア部のサブルーチン.
+NASAデータベースでのfunc\_chem.f90の内容も統一して格納している.
+\end{itemize}
+
+なお、control\_chem.inpについて、NASAデータベースを用いた場合にはモデル作成時に生成するようにしているが、
+chemkin.inpの場合、テンプレートを"control\_chem.raw.inp"を他のファイルと同じ場所に生成するようにしている。
+
+\paragraph{dvode.fに加えた修正について}%{{{
+dvode.fはOpenMPに直接用いるとエラーを起こす。これは、common文に含まれる変数がプロセッサ間で共有されてしまうからである。
+そのため、本ライブラリに含むdvode.fにはthreadprivate属性を付け加えている。
+
+また、警告メッセージを標準出力に出力すると標準出力がそれで埋め尽くされてしまうので、標準出力への警告出力も抑制してある。
+%}}}
+
+\paragraph{mod\_chem.f90の変数について}%{{{
+\subparagraph{const\_chem}定数と重要な値(化学種数)を格納している.
+\begin{itemize}
+\item erg2cal=1d0/4.184e7...ergからcalへの単位変換に用いる定数.ergの値にかけるとcalになる
+\item cal2erg=1d0/erg2cal...calからergへの単位変換に用いる定数。
+\item b2Pa=0.1d0...baryeからPaへの単位変換に用いる定数。
+\item Pa2b=1d0/b2Pa...Paからbaryeへの単位変換に用いる定数。
+\item Ru=8.3144621d7...cgs単位系での気体定数。
+\item invRc=1d0/(1.987e0)...cal/(mol*K)で表した気体定数の逆数.活性化エネルギーに対して用いる。
+\item pst=1.01325d6...単位系dyn/cm\^2での標準状態圧力
+\item logPR=-4.407418526701446...=ln(Pst/Ru)
+\item n\_eps = 1d-40...n(mol/cm\^3)に用いる微小量.初期値がこれ以下である場合、この値にして計算を回す。
+\item rtol\_user,atol\_user...それぞれユーザー定義の相対許容誤差、絶対許容誤差
+\item isColdFlow...凍結流の計算でtrue、それ以外でfalseが設定される。trueが設定されると、温度計算反復で化学種を反応物に含まれるものしか考慮しなくなる。
+\item max\_ne,ne...最大原子種数及び原子種数
+\item max\_ns,ns...最大化学種数及び化学種数
+\item max\_nr,nr...最大素反応数及び素反応数
+\item num\_reac...反応物で使われている化学種数
+\item LRW=22+9*(max\_ns+1)+2*(max\_ns+1)**2...dvode用に確保する実数型作業用配列の次元
+\item LIW=30+  (max\_ns+1)...dvode用に確保する整数型作業用配列の次元
+\item max\_recalc=50...dvodeでこの回数以上再計算を行う場合、計算を止める。(一回の計算で500回の内部反復をdvodeは行うので、500*50=25,000回の内部反復となる。)
+\end{itemize}
+
+\subparagraph{chem}計算のコアとなるデータ.
+\begin{itemize}
+\item nt...粘性係数の計算に使われる化学種数。化学組成の計算をする際に使われる化学種の内、trans.inpに含まれる化学種の数となる。
+\item ns\_tocalc...isColdFlow=.true.の場合num\_reac, isColdFlow=.false.の場合ns。
+\item SYM\_ELM...それぞれの原子種の記号。(HEやH,Oなど)
+\item SYM\_SPC...それぞれの化学種の記号。(CO2やH2Oなど)
+\item SYM\_RCT...それぞれの素反応の記号。('CH2CO+H=CH3+CO'など)
+\item ES...それぞれの化学種に含まれる原子の数.例えば原子H,C,Oのインデックスがそれぞれ1,2,3、分子H2Oのインデックスが1の場合、ES(1,1)=2,ES(2,1)=0,ES(3,1)=1である。
+\item Tthre...ぞれぞれの区間の始めとおわりの温度.例えば化学種iのj番目の区間はTthre(1,j,i)KからTthre(2,j,i)Kまで.
+\item coeff...それぞれの区間の熱力学関数の多項式の係数.例えば化学種iのj番目の区間の多項式の係数はcoeff(1:7,j,i).
+\item MWs...それぞれの化学種の分子量
+\item invMW...MWsの逆数
+\item Rstate...素反応の分類
+\begin{itemize}
+\item Rstate(1,:)...双方向反応か一方向反応か
+\begin{itemize}
+\item Rstate(1,:)=0:双方向反応('$=$'や'$<=>$'など)
+\item Rstate(1,:)=1:一方向反応('$=>$'で表される反応)
+\end{itemize}
+\item Rstate(2,:)...反応係数のモデル
+\begin{itemize}
+\item Rstate(2,:)=0:逆反応を平衡係数から求める.
+\item Rstate(2,:)=1:双方向の反応係数の係数がそれぞれ存在する(rev)
+\item Rstate(2,:)=2:Lindemann式(low)
+\item Rstate(2,:)=3:TROE式(troe)
+\item Rstate(2,:)=4:第三体が必ず存在する反応(第三体に括弧がつかない反応)で逆反応を平衡係数から求める.
+\item Rstate(2,:)=5:第三体が必ず存在する反応(第三体に括弧がつかない反応)で双方向の反応係数の係数がそれぞれ存在する.
+\end{itemize}
+\end{itemize}
+\item NumNu...右辺左辺それぞれの反応体数(素反応jが2H2O2=2H2O+O2ならNumNu(1,j)=2, NumNu(1,j)=3)
+\item IndNu...右辺左辺それぞれの反応体のインデックス
+(素反応jが2H2O2=2H2O+O2でH2O2,H2O,O2のインデックスがそれぞれ1,2,3なら、
+IndNu(1,1,j)=1; IndNu(2,1,j)=1 ;IndNu(1,2,j)=2; IndNu(2,2,j)=2; IndNu(3,2,j)=3)
+\item snu...snu(j)=NumNu(2,j)-NumNu(1,j)
+\item duplicate...chem.inpでduplicate属性がついているなら.true.、ついていないなら.false.。
+\item exist\_M...第三体を含む反応ならtrue、含まないならfalse
+\item NumM...enhance factorが設定されている場合、それを持つ化学種数(H2O/2/ O2/3/なら2)
+\item IndM...enhance factorをもつ化学種のインデックス(素反応kのenhance factorがH2O/2/ O2/3/かつH2O,O2のインデックスがそれぞれ2,3なら、IndM(1,k)=2;IndM(2,k)=3)
+\item Men...enhance factor から1を引いたもの(素反応kのenhance factorがH2O/2/ O2/3/なら、Men(1,k)=1;Men(2,k)=2)
+\item ABE...反応係数$k=AT^\beta \exp(-E/RT)$のとき、ABE(1)=$\ln A$, ABE(2)=$\beta$, ABE(3)=$E/R$.
+\item cABE...revやlowのABE
+\item TROE...troeフォームの係数. 
+TROE(1)=$a$, TROE(2)=$1/T^{***}$, TROE(3)=$1/T^{*}$, TROE(4)=$T^{**}$
+\item species\_name\_trans...熱力学関数のSYM\_SPCに対応
+\item Trange\_trans...輸送係数の区間の端の値。熱力学関数のTthreに対応。
+\item trans...輸送係数の多項式の係数。熱力学関数のcoeffに対応。
+\item num\_sctn\_trans...それぞれの化学種の輸送係数関数多項式の区間の数.
+\item tr2th...輸送係数のインデックスを熱力学関数のインデックスの変換するもの。
+例えばH2Oのインデックスが輸送係数ではi、熱力学係数がj(このときspecies\_name\_trans(i)とSYM\_SPC(j)は共に'H2O'である。)の場合、
+tr2th(i)=jである。
+\end{itemize}
+
+\subparagraph{chem\_var}境界条件で使うための燃料,酸化剤のそれぞれの各種値。
+\begin{itemize}
+\item qf,wf...それぞれ燃料の速度が0のときの保存量、基本量。
+\item rhof,pf,Tf,Ef,Hf,MWf,kappaf,muf...それぞれ燃料の密度、圧力、温度、質量あたり内部エネルギー、質量あたり内部エンタルピー、分子量、比熱比、粘性係数
+\item vrhof...qf(1:ns)
+\item vwf...wf(5:ns+4)
+\item vhif...燃料のvhi
+\item of...当量でのo/f.0次元計算のときのみ使用。
+\end{itemize}
+また、上記には燃料のみ記してあるが、"f"を"o"に変えれば酸化剤のそれぞれを表すことになる。
+%}}}
+
+\paragraph{uvhpについて}%{{{
+store/therm\_lib/chemkinにはuvhpというディレクトリがあり、uvとhpというディレクトリがその中に含まれている
+uvとhpというディレクトリにはFJ.f90が含まれており、それぞれuv一定,hp一定条件のサブルーチン群が含まれている。
+圧縮性流体の場合、保存量がuv一定であるため、自動的にuvディレクトリが使用される設定になっている。
+%}}}
+
+\paragraph{境界条件での入力について}%{{{
+境界条件での入力に関して。例えば酸化剤のみのセルで条件を入力する場合、保存量、基本量やvhiは以下のように表される。ただし、$u,v$はx,y方向速度である。
+DHiについてはset\_thermo\_propで直接入力されるため、手作業で入力されることはない。
+\begin{verbatim}
+q(:)=qo
+q(nY+1)=rhoo*u
+q(nY+2)=rhoo*v
+q(nY+3)=qo(nY+3)+0.5d0*rhoo*(u**2+v**2)
+
+w(:)=wo
+w(2)=u
+w(3)=v
+w(indxht)=wo(indxht)+0.5d0*(u**2+v**2)
+vhi=vhio
+\end{verbatim}
+燃料では"o"を"f"に変える。
+%}}}
+
+\hspace{1em}
+
+以下、凍結流と素反応モデルについてそれぞれ説明する。
+%}}}
+
+\paragraph{凍結流モデル}%{{{
+\begin{center}
+\begin{tabular}{c||c}\hline
+使用可能時間ステップ & global, local\\
+使用可能時間スキーム & euler, RK2, LU-SGS, NR, precon, dual, preconLU-SGS\\
+\hline
+\end{tabular}
+\end{center}
+store/therm\_lib/chemkin/flow/coldに格納されている。
+
+凍結流モデルでは、酸化剤と燃料の混合は扱うが、その反応は考えない。つまり、酸化剤と燃料は混合されたところで反応しない。よって凍結流となる。
+凍結流モデルを選んだ流体コードを生成すると、checkoutディレクトリにcontrol\_chem.raw.inpが生成される。
+これは適切な修正をした後に名前をcontrol\_chem.inpとし、chem.inpと共に実行ファイルがあるディレクトリ直下に入れなければならない。
+control\_chem.inpの中身は以下のようになっている。
+\begin{verbatim}
+#Control parameters for chemistry
+Oxidizer Pressure(Pa)   : 1.e5
+Oxidizer Temperature(K) : 1200.
+Oxygen Composition(mole ratio):
+O2 2
+end
+Fuel Pressure(Pa)       : 1.e5
+Fuel Temperature(K)     : 1200.
+Fuel Composition(mole ratio):
+CH4 1
+end
+Relative Torelance VODE : 1.e-8
+Absolute Torelance VODE : 1.e-20
+\end{verbatim}
+酸化剤と燃料はそれぞれの圧力と温度、そのモル比での組成を入力する必要がある。圧力と温度はそれぞれ単位Pa,Kで入力する。
+このインプットファイルではそれぞれ1.e5、1200.となっている。
+
+組成は"化学種名 モル分率"の順で一化学種に一行用いて入力し、最後の行には"end"のみの行を入力する。モル分率の和が1である必要はない。
+このインプットファイルでは、酸化剤にO2純粋気体、燃料にCH4純粋気体を用いることとなっている。
+
+また、VODEに用いる相対許容誤差と絶対許容誤差も定義しなければならない。(凍結流では実際にこの値は使われることはない。)例に載せてある値はSENKINに使われている値である。これらの値は大きくするとそれだけ計算が早くなるが、大きくしすぎると計算が破綻する(発散する)。
+
+境界条件には\verb|calc_boundary(p,T,Yf, wt,vhit)|を用いる。仕様はNASAデータベースで用いられている\verb|YPT2w(Yf,p,T,wt,vhit)|と同様である。
+
+また凍結流の計算では、化学種は反応物に含まれるものしか考慮されない。
+%}}}
+\paragraph{素反応モデル}%{{{
+\begin{center}
+\begin{tabular}{c||c}\hline
+使用可能時間ステップ & global\\
+使用可能時間スキーム & euler, RK2\\
+\hline
+\end{tabular}
+\end{center}
+store/therm\_lib/chemkin/flow/reactiveに格納されている。
+現段階で唯一point implicitを用いる熱力学ライブラリである。
+
+素反応モデルでは、化学種の組成は素反応を直接積分して求める。そのため、最も計算コストが高いが、最も詳細な、熱力学モデルとなる。
+素反応モデルを選んだ流体コードを生成すると、checkoutディレクトリにcontrol\_chem.raw.inpが生成される。
+これは適切な修正をした後に名前をcontrol\_chem.inpとし、chem.inpと共に実行ファイルがあるディレクトリ直下に入れなければならない。
+control\_chem.inpの中身は以下のようになっている。
+\begin{verbatim}
+#Control parameters for chemistry
+Oxidizer Pressure(Pa)   : 1.e5
+Oxidizer Temperature(K) : 1200.
+Oxygen Composition(mole ratio):
+O2 2
+end
+Fuel Pressure(Pa)       : 1.e5
+Fuel Temperature(K)     : 1200.
+Fuel Composition(mole ratio):
+CH4 1
+end
+Relative Torelance VODE : 1.e-8
+Absolute Torelance VODE : 1.e-20
+\end{verbatim}
+酸化剤と燃料はそれぞれの圧力と温度、そのモル比での組成を入力する必要がある。圧力と温度はそれぞれ単位Pa,Kで入力する。
+このインプットファイルではそれぞれ1.e5、1200.となっている。
+
+組成は"化学種名 モル分率"の順で一化学種に一行用いて入力し、最後の行には"end"のみの行を入力する。モル分率の和が1である必要はない。
+このインプットファイルでは、酸化剤にO2純粋気体、燃料にCH4純粋気体を用いることとなっている。
+
+また、VODEに用いる相対許容誤差と絶対許容誤差も定義しなければならない。例に載せてある値はSENKINに使われている値である。これらの値は大きくするとそれだけ計算が早くなるが、大きくしすぎると計算が破綻する(発散する)。
+
+境界条件には\verb|calc_boundary(p,T,Yf, wt,vhit)|を用いる。仕様はNASAデータベースで用いられている\verb|YPT2w(Yf,p,T,wt,vhit)|と同様である。
+
+素反応モデルでは、時間積分ライブラリとしてchemeq2とdvodeが用いられる。
+これらの切り替えは、chemeq2で10回以上の内部反復が行われると、dvodeが呼び出されることとなっている。
+これらの時間積分の前後で、n\_eps以下の化学種の量はすべてn\_epsに置き換えられる。
+%}}}
 %}}}
 %}}}
 
@@ -444,7 +836,6 @@ with-nV
 
 \section{NASA熱力学データベース自動生成}
 \section{化学コード}
-%}}}
 
 %各々に対応表(星取表)
 %
