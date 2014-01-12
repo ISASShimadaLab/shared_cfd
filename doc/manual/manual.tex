@@ -10,15 +10,18 @@
 %\newpage
 %%}}}
 %
-%%tutorial {{{
+%%tutorial
 %\part{チュートリアル}
 %\section{はじめに}
 %
 %\newpage
-%%}}}
 %
+
+
+
 %details
 \part{各機能の説明}
+\newpage
 \section{ライブラリ生成アルゴリズムについて}%{{{
 本プログラムは基本的に「ライブラリ生成プログラム」となる。
 よって、各種パラメータ設定ファイルに加えて、流体計算の場合は"condition.f90"というファイルで直接初期条件と境界条件を設定しなければならない。これらのファイルは"raw"というサフィックス付きでディレクトリにコピーされる。
@@ -29,8 +32,10 @@ checkout.pyはinputファイルに基づき、各種ライブラリを生成す�
 \subsection{ディレクトリ構造}
 基本的に類似する機能を持つファイルがまとめられている。例えばオイラー陽解法とLU-SGS法は"time\_scheme"ディレクトリ内に"euler","lu-sgs"としてそれぞれ格納されている。また化学計算と流体計算は基本的に同一ライブラリを用いることになっている。以下、全てのディレクトリについて説明を行う。
 %}}}
+\newpage
 \section{流体コード}%{{{
-checkout.pyから呼び出された"store/checkout/checkout\_flow.py"によって生成される。生成されたファイルは"checkout"ディレクトリ内に生成される。
+checkout.inpを記入し、checkout.pyを起動すると生成される。
+実処理はcheckout.pyから呼び出された"store/checkout/checkout\_flow.py"によって生成される。生成されたファイルは"checkout"ディレクトリ内に生成される。
 \subsection{自動生成ファイル}%{{{
 流体コードで自動生成されるファイルは、checkout.pyで選択されたディレクトリ内にある"部分的なファイル"をつなげることで生成される。自動生成されるファイル及びその"部分的なファイル"は以下のとおりである。
 \begin{itemize}
@@ -140,15 +145,63 @@ part\_point\_implicitに文字列が存在する場合main.main.point\_implicit.
 \subsection{store/architecture}%{{{
 アーキテクチャ依存のサブルーチン.
 サブディレクトリはPCとSCでそれぞれPCとスーパーコンピュータに関するファイルがある.
+
 SCにはmod\_mpi.f90、PCにはmod\_mpi\_dummy.f90が使われる。
 スーパーコンピュータの場合はgrid\_separation.inpからそれぞれのプロセッサが受け持つグリッドの範囲を計算し、変数を初期化する.
-PCの場合はMPI関数のダミー関数を入れている。どちらの場合も以下のように受け持つブロックの範囲,i方向の範囲,j方向の範囲が定義される。
+また、自動生成されたグリッドの分割の状態は、スーパーコンピュータを選んだ際に生成されるvis\_grid.datを用い、gnuplotで
+\begin{verbatim}
+plot "vis_grid.dat" with lines
+\end{verbatim}
+のコマンドを打つことで確認することができる。
+
+PCの場合はMPI関数のダミー関数を入れている。
+
+どちらの場合も以下のように受け持つブロックの範囲,i方向の範囲,j方向の範囲が定義される。
 \begin{itemize}
 \item ブロックの範囲...npsからnpe
 \item ブロックplaneのi方向の範囲...nxs(plane)からnxe(plane)
 \item ブロックplaneのj方向の範囲...nys(plane)からnye(plane)
 \end{itemize}
 パソコンの場合、nps=1, npe=Nplaneである。
+
+格子ブロックで境界になっているが、ブロック間で共有されており、ユーザーが直接入力する必要のない境界がある。これを本プログラムではcut\_copro*.inp, MPIcomm*.inpを用いて記録している。*はプロセッサ番号で、パソコンでは0である。cut\_copro*.inpは同一コア間でのデータ転送で足る場合、MPIcomm*.inpは異なるコア間でのデータ転送が必要な場合に使われる。よってパソコンの場合MPIcomm*.inpは出力されない。
+
+\subsubsection{スーパーコンピュータ用ユーティリティについて}
+スーパーコンピュータ用にいくつかのユーティリティプログラムが用意されている。
+\paragraph{プロセッサへのグリッド割当について}
+\begin{itemize}
+\item generate\_proc\_grid.py...グリッド分割用ライブラリ。
+基本的には全てのプロセッサが持つグリッドができるだけ均等になるよう分割するが、split\_ratio.pyが存在するとき、そのsplit\_ratio.ratio(plane,cind)を用いて寄せることも可能である。
+\item trim\_balance.py...それぞれのプロセッサの計算負荷を可視化するためのプログラム。
+\end{itemize}
+
+\paragraph{ジョブキューの投入・確認・削除}
+基本的にlargeシステムで実行すること。
+\begin{itemize}
+\item mpirun.sh...\verb|sh mpirun.sh|でジョブキュー投入を行える。check\_and\_throw.pl及びStepJob.pyは内部的にmpirun.shをよんでいる。
+\item check.pl...\verb|perl check.pl|でジョブの動作状況(QUEUED, RUNNING, EXISTING)と現在出力されている最新のファイル名を一秒おきに出力する。
+\item check\_and\_throw.pl...\verb|perl check_and_throw.pl|でcheck.plの動作を行った上、全てのジョブが終了している場合、新たに\verb|sh mpirun.sh|を実行する。
+これを用いると、600秒に限られたデバッグジョブにおいて、ジョブが終わった瞬間に新しいジョブ投げることができるので、半永久的にデバッグジョブを走らせることができる。
+よって、使いっぱなしになると確実にスーパーコンピュータ利用禁止となり卒業できなくなるので、程度を考えて利用すること。
+経験上一時間程度なら怒られない。
+\item StepJob.py...\verb|python StepJob.py|で、ステップジョブを投げられるだけ投げる。つまり、実行時にステップジョブが19投げられている場合、50まで投げられるので、31回\verb|sh mpirun.sh|が実行される。これをcronと組み合わせ、
+\begin{verbatim}
+0 0,6,12,18 * * * cd /large/y/y535/2dcfd/share_code; python StepJob.py
+\end{verbatim}
+のようにしておけば、一々ターミナルを開きスーパーコンピュータにログインすることなしに、自動的に6時間おきに最大数までジョブを予約することができる。また、cronの実行結果はメールで送られるので、現在のステップ数を6時間おきにメールで知ることが可能になる。
+
+cronを利用する際の注意点として、cronはサーバー毎に設定できるらしく、同じmaja.jss.jaxa.jpでもmaja0.jss.jaxa.jp, maja1.jss.jaxa.jpが存在する.よって、crontabを編集する際には、maja0.jss.jaxa.jpなど明示的にどのサーバーを用いるのかを示してログインしなければならない。
+\item qdel.pl...\verb|perl qdel.pl|でqdelコマンドを予約している全てのジョブに投げる、つまり予約している全てのジョブをキャンセルできる。
+実行中のジョブも強制終了させる。
+プログラムが落ちた際や、間違った境界条件を使用していたことに気づいた際に用いる。
+\end{itemize}
+
+\paragraph{データファイルの転送コマンド}
+\begin{itemize}
+\item \verb|make remove| on SC...スーパーコンピュータ上で打つと、標準入力および標準出力、result内の全ての結果を削除する。restart.binは残す。
+\item \verb|make tar| on SC...スーパーコンピュータ上で打つと、RMS.dat, geometry.bin, result/*.binをresult.tar.gzファイルに圧縮する。
+\item \verb|make pull| on postprocess...postprocessディレクトリにおいて、Makefileの変数remoteにresult.tar.gzが存在するディレクトリを指定すると、このコマンドでそのresult.tar.gzをダウンロードし解凍する。
+\end{itemize}
 %}}}
 \subsection{store/dim}%{{{
 軸対称流か二次元流かを選ぶものである。サブディレクトリは2dとq2dで、それぞれ以下のファイルが含まれている。
@@ -333,6 +386,8 @@ const\_chem, chem, chem\_var &  2 &  モデルによる & with-nV\\
 \end{center}
 
 %共通事項{{{
+このモデルを選択する際にはchem.inpが存在しなければならない。
+
 NASA-CEA用に公開されたデータベースを用いた熱力学モデル集。凍結流と一段総括反応(flame sheet)、完全平衡モデルを用意している。
 
 気体グループは2つであり、ライブラリでは一つ目に燃料、二つ目に酸化剤を当てている。
@@ -597,6 +652,8 @@ const\_chem, chem, chem\_var & 化学種数 & nY & no-nV\\
 \end{center}
 
 %共通事項{{{
+このモデルを選択する際にはchem.inpが存在しなければならない。
+
 "thermo all"を用いたthermo.inpを必要としない形式のchemkin.inpの使用を前提とした熱力学ライブラリである。
 凍結流と素反応モデルを用意している。
 
@@ -825,21 +882,93 @@ Absolute Torelance VODE : 1.e-20
 %}}}
 %}}}
 %}}}
-
 \subsection{store/cond}%{{{
-core
-no-nV
-with-nV
+condition.raw.f90の生成を行う。condition.raw.f90生成時には以下のような動作を行っている.
+\subsubsection{store/cond/core}
+\begin{itemize}
+\item mod\_cond.py...以下のプログラムで用いるclassの定義.
+\item gen\_cond.py...主プログラムであり、checkout.pyから呼び出しを受ける.以下のファイルに含まれる関数をドライブする。
+\item read\_plot3d.py...plot3dファイル(*.xという名前を持つグリッドファイル)を読み込み、各ブロックの境界の座標をリスト化する。
+\item set\_cond\_var.py...各ブロックの境界のうち、他のブロックと接触している部分といない部分、つまりユーザーが境界条件を定義する必要がない部分とある部分をそれぞれリスト化する。
+\item fetchMPI.py...grid\_separation.inpからグリッドのプロセッサへの分割線を計算し、ブロック間での境界条件の通信でどのプロセッサがどのプロセッサにどこのデータを送るべきかを計算する。
+\item out\_cond.py...上述計算結果のcondition.raw.f90, cut\_copro*.inp, MPIcomm*.inpへのアウトプット。
+\end{itemize}
+
+\subsubsection{store/cond/no-nV, store/cond/with-nV}
+それぞれno-nV, with-nVに対応する. with-nVではYvのMPI転送が必要となるためファイルが異なる。
+condition.head.f90とcondition.tail.f90というcondition.raw.f90のheadとtailが含まれている。
 %}}}
 %}}}
+\newpage
+\section{NASA熱力学データベース}%{{{
+checkout\_model.inpを記入し、checkout.pyを起動すると生成される。
+実処理はcheckout.pyから呼び出された"store/checkout/checkout\_model.py"によって生成される。
+ファイルはchem.inpとcontrol\_chem.raw.inpがcheckout.pyと同じディレクトリに生成される。
 
+checkout\_model.inpは以下のようになっている。
+\begin{verbatim}
+thermal model:0 #flame sheet of nasa(0) / NASA CEA(1)
+Species Selection:
+CH4 O2
+end
+\end{verbatim}
+thermal modelの部分で一段総括反応(0)または完全平衡モデル(1)を選ぶことができる。
+Species Selectionでは一行に一つの化学種を記録する(スペース空けて一行に複数の化学種を記入してもよい)
+最後には'end'の行を記入する。
 
-\section{NASA熱力学データベース自動生成}
-\section{化学コード}
+なお、GUI.pyでもcheckout\_model.inp生成及びcheckout.py実行ができるが、
+この場合、"Not Selected"の窓内の選択肢を選択し、Ctrl+Fを押すと入力窓が立ち上がり、そこに化学種名を入力すると該当する化学種が検索される。
+選択のとき便利なので利用するとよい。
 
-%各々に対応表(星取表)
-%
-%\newpage
+\paragraph{一段総括反応モデル}
+選択された化学種のみがchem.inpに記録され、またcontrol\_chem.raw.inpには"Production Composition"の欄が生成される。
+
+\paragraph{完全平衡モデル}
+選択された化学種が含む原子を含む全ての化学種がchem.inpに記録され、またcontrol\_chem.raw.inpには"Production Compsition"の欄は生成されない。
+%}}}
+\newpage
+\section{化学コード}%{{{
+checkout\_chem.inpを記入し、checkout.pyを起動すると生成される。
+実処理はcheckout.pyから呼び出された"store/checkout/checkout\_chem\_nasa.py"によって生成される。
+(現在はnasaのみではなく、chemkin用のファイルもこのpythonスクリプトで生成できる。)
+ファイルはディレクトリcheckout\_chemに生成される。
+実行にはchem.inpが必要である。
+
+化学コードでは化学モデルの選択や、uv一定条件かhp一定条件の選択、単一条件か複数条件の選択、更には化学モデルの簡略化までを行うことができる。
+
+化学コードはディレクトリ構造が複雑である。
+
+NASAデータベースを用いるものでは共通の計算を行うファイルが
+\begin{verbatim}
+store/therm_lib/NASA/core
+\end{verbatim}
+にまとめてあり、それぞれの計算の種類によって以下のような構造のディレクトリのいずれかを選ぶこととなる。
+\begin{verbatim}
+store/therm_lib/NASA/{flame_sheet,cea}/{mono,plot,reduction}/{uv,hp}
+\end{verbatim}
+ただし\verb|{a,b,c}|と書いてあるところにはaかbかcが入る。
+後述するように全ての組み合わせが存在するわけではない。
+
+chemkinファイルを用いるものでは共通の計算を行うファイルが
+\begin{verbatim}
+store/therm_lib/chemkin/core
+\end{verbatim}
+にまとめてあり、uv一定条件かhp一定条件かで
+\begin{verbatim}
+store/therm_lib/chemkin/uvhp/{uv,hp}
+\end{verbatim}
+計算の種類によって
+\begin{verbatim}
+store/therm_lib/chemkin/{mono,plot,reduction}
+\end{verbatim}
+を選ぶことになる。
+ただし\verb|{a,b,c}|と書いてあるところにはaかbかcが入る。
+これも後述するように全ての組み合わせが存在するわけではない。
+
+また、chem\_drive
+%}}}
+\newpage
+
 %
 %\appendix
 %\section{サンプル集}
