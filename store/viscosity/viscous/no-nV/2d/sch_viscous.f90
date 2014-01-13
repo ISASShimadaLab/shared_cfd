@@ -82,7 +82,7 @@ subroutine set_TGv!{{{
 
    do plane=nps,npe
       !set Tdeg{{{
-      !$omp parallel do default(none) shared(j,w,Tdeg,nxs,nxe,nys,nye,plane) private(i)
+      !$omp parallel do private(i)
       do j=nys(plane)-1,nye(plane)+1
          do i=nxs(plane)-1,nxe(plane)+1
             Tdeg(i,j)= w(4,i,j,plane)/w(1,i,j,plane)/w(indxR,i,j,plane)

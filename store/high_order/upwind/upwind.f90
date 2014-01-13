@@ -15,7 +15,7 @@ subroutine set_HV(q,qHli,qHri,qHlj,qHrj)
 
   
    do plane = nps,npe
-      !$omp parallel do default(none) private(i) shared(j,q,qHli,qHri,nxs,nxe,nys,nye,plane)
+      !$omp parallel do private(i)
       do j=nys(plane),nye(plane)
          do i=nxs(plane)-1,nxe(plane)
             qHli(:,i,j,plane)=q(1:dimw,i  ,j,plane)
@@ -24,7 +24,7 @@ subroutine set_HV(q,qHli,qHri,qHlj,qHrj)
       end do
       !$omp end parallel do
 
-      !$omp parallel do default(none) private(i) shared(j,q,qHlj,qHrj,nxs,nxe,nys,nye,plane)
+      !$omp parallel do private(i)
       do j=nys(plane)-1,nye(plane)
          do i=nxs(plane),nxe(plane)
             qHlj(:,i,j,plane)=q(1:dimw,i,j  ,plane)

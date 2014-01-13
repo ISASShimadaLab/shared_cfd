@@ -1883,6 +1883,292 @@ subroutine cea_hp(p,Y,H, T,n, MWave,kappa,mu,Yv,vhi,flag_outer)!{{{
    end do
    mu = mu * 1d-7
 end subroutine cea_hp!}}}
+subroutine cea_tp(p,Y,T, n, H,MWave,kappa,mu,Yv,vhi,flag_outer)!{{{
+   use const_chem
+   use func_therm
+   use chem
+   use chem_var
+   implicit none
+   double precision,intent(in)   ::p
+   double precision,intent(in)   ::Y(2)
+   double precision,intent(in)   ::T
+   double precision,intent(inout)::n(max_ns)
+   double precision,intent(out)  ::H
+   double precision,intent(out)  ::MWave
+   double precision,intent(out)  ::kappa
+   double precision,intent(out)  ::mu
+   double precision,intent(out)  ::Yv(max_ns)
+   double precision,intent(out)  ::vhi(max_ns)
+   logical         ,intent(out)  ::flag_outer
+
+   double precision,dimension(ne+2)::b0,b,bd,vpi
+   double precision,dimension(max_ns)::vmurt,vhrt,Dlogn,logn
+   integer,dimension(max_ns)::sec_num
+   double precision,dimension(ne+2,ne+2)::Ad
+   double precision logP,tmp,logT,sn,logsn,Dlogsn,vmurtn,DlogT,b0max,Dnmax,logrhoRu,tinyn,tinytinyn,logtinyn,logtinytinyn
+
+   double precision dh
+
+   integer sect
+   double precision,dimension(max_ns)::muN
+   double precision phi,denom,MWj,MWi
+
+   integer i,j,k,counter
+   logical flag,LUflag,REDUCEflag
+   integer nen,elist(ne+2),nelist(ne+2)
+
+   double precision lambda1,lambda2,omega_var
+
+   double precision,dimension(9)::vTmurt,vTcpr,vThrt
+   double precision,dimension(4)::vTmu
+
+
+   flag_outer=.true.
+   logP = log(p/pst)
+
+   !calc b0 of elements
+   b0= Y(1)*b0f + Y(2)*b0o
+   b0max = maxval(b0(1:ne),1)
+   sn=sum(n(1:ns),1)
+   b0(ne+1)=sn
+
+   if(Y(1)<Y_eps) then
+      REDUCEflag=.true.
+      nen=neo
+      elist =elisto
+      nelist=nelisto
+      n     =n*masko
+   else if(Y(2)<Y_eps) then
+      REDUCEflag=.true.
+      nen=nef
+      elist =elistf
+      nelist=nelistf
+      n     =n*maskf
+   else
+      REDUCEflag=.false.
+   end if
+
+   tinyn        = TSIZE*sn
+   logtinyn     = log(tinyn)
+   tinytinyn    = TTSIZE*sn
+   logtinytinyn = log(tinytinyn)
+
+   !set vhrt
+   logT=log(T)
+   b=0d0
+   b(ne+1) =sn
+   vhrt(1:ns)=0d0
+   logn(1:ns)=logtinyn
+   do j=1,ns
+      call check_section_number(j,T,sec_num(j))
+      if(n(j)>tinyn) then
+         logn(j)  = log(n(j))
+         do i=1,ne
+            b(i) = b(i) + Ac(i,j)*n(j)
+         end do
+      end if
+   end do
+
+   !check convergence
+   flag = .true.
+   do i=1,ne
+      if(b0(i) > eps .and. abs(b0(i)-b(i))>b0max*eps) flag = .false.
+   end do
+
+   if(.not. flag) then
+      counter=1
+      do
+         !set Ad, b and vmurtn
+         b(1:ne)=0d0
+         bd=b0
+         bd(ne+1)=b0(ne+1)-b(ne+1)
+         Ad=0d0
+         call calc_vTmurt(T,logT,vTmurt)
+         do k=1,ns
+            vmurt(k)=dot_product(co(:,sec_num(k),k),vTmurt)+logn(k)-log(b0(ne+1))+logP
+
+            if(n(k)>tinyn) then
+               vmurtn=vmurt(k)*n(k)
+               do i=1,ne
+                  do j=i,ne
+                     Ad(i,j)=Ad(i,j)+Ac(i,k)*Ac(j,k)*n(k)
+                  end do
+                  Ad(i,ne+1)= Ad(i,ne+1)+ Ac(i,k)*        n(k)
+                  b(i)      = b(i)      + Ac(i,k)        *n(k)
+                  bd(i)     = bd(i)     + Ac(i,k)*(vmurtn-n(k))
+               end do
+
+               bd(ne+1)     = bd(ne+1)     + vmurtn
+            end if
+         end do
+         Ad(ne+1,ne+1)= b(ne+1)-b0(ne+1)
+
+         do i=1,ne+1
+            do j=i+1,ne+1
+               Ad(j,i)=Ad(i,j)
+            end do
+         end do
+
+         !calc vpi
+         if(REDUCEflag) then
+            do i=1,nen
+               do j=1,nen
+                  Ad(i,j)=Ad(elist(i),elist(j))
+               end do
+               bd(i)=bd(elist(i))
+            end do
+            call LU(Ad,bd,vpi,nen,LUflag)
+            do i=nen,1,-1
+               vpi(elist(i))=vpi(i)
+            end do
+            do i=1,ne+1-nen
+               vpi(nelist(i))=-1d300
+            end do
+         else
+            call LU(Ad,bd,vpi,ne+1,LUflag)
+         end if
+
+         if(LUflag) then
+            !set new n
+            n=n+initial_eps
+
+            !set new n
+            sn=0d0
+            logn(1:ns) = logtinytinyn
+            do j=1,ns
+               if(n(j)<tinytinyn) then
+                   n(j)    = tinytinyn
+               else
+                   logn(j) = log(n(j))
+               end if
+
+               if(n(j)>tinyn) then
+                   vhrt(j)  = dot_product(co(:,sec_num(j),j),vThrt)
+                   sn       = sn     +        n(j)
+               end if
+            end do
+            b(ne+1) = sn
+            counter=counter+1
+            cycle
+         end if
+
+         !calc Delta
+         Dlogsn=vpi(ne+1)
+         do j=1,ns
+            tmp=0d0
+            do i=1,ne
+               tmp=tmp+Ac(i,j)*vpi(i)
+            end do
+            Dlogn(j)= -vmurt(j)+tmp+Dlogsn
+         end do
+
+         !calc omega_var
+         lambda1=0d0
+         lambda2=1d300
+         logsn  =log(b0(ne+1))
+         do j=1,ns
+            if(logn(j)-logsn>-18.420681d0) then
+               lambda1=max(lambda1,abs(Dlogn(j)))
+            else if(Dlogn(j)>0d0) then
+               lambda2=min(lambda2,abs((-logn(j)+logsn-9.2103404d0)/(Dlogn(j)-Dlogsn)))
+            end if
+         end do
+         lambda1=2d0/max(5d0*abs(Dlogsn),abs(lambda1))
+         omega_var=min(1d0,min(lambda1,lambda2))
+
+         !set new sn
+         b0(ne+1)=b0(ne+1)*exp(omega_var*Dlogsn)
+
+         !set new n
+         sn =0d0
+         Dnmax = 0d0
+         logn(1:ns) = logtinytinyn
+         do j=1,ns
+            !set vhrt
+            n(j)=n(j)*exp(omega_var*Dlogn(j))
+            if(n(j)<tinytinyn) then
+                n(j)    = tinytinyn
+            else
+                logn(j) = log(n(j))
+            end if
+
+            if(n(j)>tinyn) then
+                sn      = sn     +        n(j)
+                tmp = abs(Dlogn(j))*n(j)
+                if(Dnmax < tmp) Dnmax = tmp
+            end if
+         end do
+         b(ne+1) = sn
+
+         !check convergence
+         flag = .true.
+         if(abs(Dnmax)>eps*sn) flag = .false.
+         do i=1,ne
+            if(b0(i) > eps .and. abs(b0(i)-b(i))>b0max*eps)               flag = .false.
+         end do
+         if(abs(Dlogsn)>eps .or. abs(b0(ne+1)-b(ne+1))      >eps*abs(sn)) flag = .false.
+         if(counter>500) flag = .true.
+         if(flag) exit
+
+         counter=counter+1
+      end do
+
+      if(counter>500) then
+         print *,"not converted. at cea_hp"
+         flag_outer=.false.
+      end if
+   end if
+
+   MWave=1d3/sn
+
+   !calc kappa
+   call calc_vTcpr(T,vTcpr)
+   kappa=0d0
+   do i=1,ns
+      if(n(i)>tinyn) then
+         kappa=kappa+n(i)*dot_product(co(:,sec_num(i),i),vTcpr)
+      end if
+   end do
+   kappa=kappa/(kappa-sn)
+
+   !calc H and vhi
+   call calc_vThrt(T,logT,vThrt)
+   H=0d0
+   tmp=Ru*1d3*T
+   do i=1,ns
+      dh= 0d0
+      do j=1,9
+         dh =dh +co(j,sec_num(i),i)*vThrt(j)
+      end do
+      vhi(i)=tmp/MW(i)*dh
+      H     =H+   n(i)*dh
+   end do
+   H=H*Ru*T
+
+   !calc Yv
+   Yv=n*MW*1d-3
+
+   !calc mu
+   call calc_vTmu(T,logT,vTmu)
+   do i=1,nt
+      call check_section_number_trans(i,T,sect)
+      muN(i)=exp(dot_product(trans(:,sect,i),vTmu))
+   end do
+
+   mu = 0d0
+   do i=1,nt
+      denom = 0d0
+      MWi=MW(tr2th(i))
+      do j=1,nt
+         MWj=MW(tr2th(j))
+         phi = 0.25d0*(1d0+sqrt(muN(i)/muN(j))*(MWj/MWi)**0.25d0 )**2 &
+                     *sqrt(2d0*MWj/(MWi+MWj))
+         denom = denom + n(tr2th(j)) * phi
+      end do
+      mu = mu + n(tr2th(i)) * muN(i) / denom
+   end do
+   mu = mu * 1d-7
+end subroutine cea_tp!}}}
 subroutine calcH(T,Y,H)!{{{
    use const_chem
    use func_therm

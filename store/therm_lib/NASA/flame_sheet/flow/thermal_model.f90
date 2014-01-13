@@ -14,6 +14,7 @@ subroutine set_thermo_prop
             T  = w(4,i,j,plane)/(w(1,i,j,plane)*w(indxR,i,j,plane))
             call flame_sheet(w(5:6,i,j,plane),ei, T, MWave,kappa,mu,DHi(:,i,j,plane),Yv(:,i,j,plane),vhi(:,i,j,plane))
 
+            DHi(:,   i,j,plane) = 0d0
             w(4,     i,j,plane) = w(1,i,j,plane)*(R_uni/MWave)*T
             w(indxg, i,j,plane) = kappa
             w(indxht,i,j,plane) = (q(nY+3,i,j,plane)+w(4,i,j,plane))/w(1,i,j,plane)

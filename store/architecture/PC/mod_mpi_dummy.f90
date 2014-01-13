@@ -120,5 +120,5 @@ end subroutine MPI_Reduce
 
 subroutine     chkelapse(resttime)
    integer*8 resttime
-   resttime=1000000000000000
+   resttime=1000000000
 end subroutine chkelapse

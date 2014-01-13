@@ -1,0 +1,19 @@
+elements
+ N
+ H
+ C
+ O
+end
+species
+ CH4
+ N2
+ O2
+ CO2
+ H2O
+ H2
+ CO
+end
+thermo
+end
+reactions cal/mole  moles
+end

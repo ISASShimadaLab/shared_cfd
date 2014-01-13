@@ -48,8 +48,12 @@ subroutine out_bin(step)!{{{
       write(55) step
       write(45) tt
       write(55) tt
-      write(45) ((((q(i,j,k,plane),i=1,dimq),w(indxR,j,k,plane),w(indxg,j,k,plane),w(4,j,k,plane),j=0,ni(plane)+1),k=0,nj(plane)+1),plane=1,Nplane)
-      write(55) ((((q(i,j,k,plane),i=1,dimq),w(indxR,j,k,plane),w(indxg,j,k,plane),w(4,j,k,plane),j=0,ni(plane)+1),k=0,nj(plane)+1),plane=1,Nplane)
+      write(45) ((((q(i,j,k,plane),i=1,dimq),w(indxR,j,k,plane),&
+                   w(indxg,j,k,plane),w(4,j,k,plane),j=0,ni(plane)+1),&
+                   k=0,nj(plane)+1),plane=1,Nplane)
+      write(55) ((((q(i,j,k,plane),i=1,dimq),w(indxR,j,k,plane),&
+                   w(indxg,j,k,plane),w(4,j,k,plane),j=0,ni(plane)+1),&
+                   k=0,nj(plane)+1),plane=1,Nplane)
       close(45)
       close(55)
    else
@@ -90,7 +94,9 @@ subroutine restart_bin(step_res)!{{{
       open(45,file="restart.bin",form="unformatted")
       read(45) step_res
       read(45) tt
-      read(45) ((((q(i,j,k,plane),i=1,dimq),w(indxR,j,k,plane),w(indxg,j,k,plane),w(4,j,k,plane),j=0,ni(plane)+1),k=0,nj(plane)+1),plane=1,Nplane)
+      read(45) ((((q(i,j,k,plane),i=1,dimq),w(indxR,j,k,plane),&
+                   w(indxg,j,k,plane),w(4,j,k,plane),j=0,ni(plane)+1),&
+                   k=0,nj(plane)+1),plane=1,Nplane)
       close(45)
 
       do plane=1,Nplane

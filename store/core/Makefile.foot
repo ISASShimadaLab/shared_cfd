@@ -4,7 +4,7 @@ condition.o: condition.f90 $(core) $(arc) $(dim) $(time_scheme) $(viscous) $(the
 	$(compiler) -c $<
 
 main : main.f90 $(core) $(arc) $(dim) $(time_scheme) $(viscous) $(thermalmodel) $(highorder) condition.o
-	$(compiler) -o $@ $^
+	$(compiler) -o $@ $^ $(complib)
 
 clean: remove
 	rm -rf main *.mod *.o *.dat *.eps *.vtk *.bin temp.* result/*.*

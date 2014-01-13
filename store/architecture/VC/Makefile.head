@@ -1,0 +1,9 @@
+##### SELECT ARCHITECTURE#######################
+#PERSONAL COMPUTER
+arc=mod_mpi_dummy.o
+compiler=sxf90 -C hopt  -P openmp
+#compiler=sxf90 -C debug -P openmp
+#compiler=sxf90 -ftrace -C hopt  -P openmp
+complib=-leremain
+##### END SELECT ARCHITECTURE###################
+

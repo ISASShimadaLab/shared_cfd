@@ -1,5 +1,5 @@
 grid file name    : sample/no00.shock_tube/debug0.x #Grid file name (*.x)
-NumOfProcessors   : 0  #The Maximum Number of Processors @ M-System[Super Computer] / 0 @ Personal Computer
+NumOfProcessors   : -1  #The Maximum Number of Processors @ M-System[Super Computer] / 0 @ Personal Computer
 dimension         : 0  #two dimension(0)/axi-symmetry(1)
 time step         : 0  #global(0)/local(1)
 time scheme       : 0  #Euler(0)/Runge-Kutta two-step(1)/LU-SGS(2)/Newton-Raphson(3)/Pre-Conditioner(4)

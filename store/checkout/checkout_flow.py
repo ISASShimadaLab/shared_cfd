@@ -68,7 +68,10 @@ def checkout_flow():
 	if(val == 0):
 		print "\tPersonal Computer is selected."
 		engage("architecture/PC","checkout",arr_engage)
-	elif(val >= 1):
+	elif(val < 0):
+		print "\tV-System[Super Computer] is selected."
+		engage("architecture/VC","checkout",arr_engage)
+	elif(val > 0):
 		print "\tM-System[Super Computer] is selected."
 		engage("architecture/SC","checkout",arr_engage)
 	

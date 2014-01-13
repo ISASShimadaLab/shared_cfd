@@ -26,3 +26,42 @@ subroutine set_thermo_prop
       !$omp end parallel do
    end do
 end subroutine set_thermo_prop
+
+subroutine YPT2w(Yf,p,T,wt,vhit)
+   use grbl_prmtr
+   use chem
+   use prmtr
+   use chem_var
+   implicit none
+   double precision,intent(in) ::Yf
+   double precision,intent(in) ::p
+   double precision,intent(in) ::T
+   double precision,intent(out)::wt(dimw)
+   double precision,intent(out)::vhit(nY)
+
+   double precision Y(2),H
+   double precision MWave,kappa,mu,rho
+   double precision,dimension(max_ns)::n,Yv
+   logical flag_outer
+
+
+   Y(1)=Yf
+   Y(2)=1d0-Yf
+
+   n=sum(no(1:ns)+nf(1:ns),1)/ns
+   call cea_tp(p,Y,T, n, H,MWave,kappa,mu,Yv,vhit,flag_outer)
+   if(.not.flag_outer) stop "Not converged at YPT2w"
+
+   rho = P/(R_uni/MWave*T)
+   wt(1)=rho
+   wt(2)=0d0
+   wt(3)=0d0
+   wt(4)=p
+   wt(5)=Y(1)
+   wt(6)=Y(2)
+   wt(indxg ) = kappa
+   wt(indxht) = H
+   wt(indxR ) = R_uni/MWave
+   wt(indxMu) = mu
+end subroutine YPT2w
+

@@ -1,6 +1,7 @@
 compiler=ifort -fast -parallel -convert big_endian -assume byterecl
 
-remote=/large/y/y535/2dcfd/share_code
+#remote=maja:/large/y/y535/2dcfd/share_code
+remote=nysa:/large/y/y535/share_code
 directory=../checkout/
 
 #program=postprocess change_num_step flow_history
@@ -32,5 +33,5 @@ clean:
 	rm -rf $(program) *.o *.mod result/* result.tar.gz geometry.bin RMS.dat temp*
 
 pull:
-	scp maja:$(remote)/result.tar.gz .
+	scp $(remote)/result.tar.gz .
 	tar xzvf result.tar.gz

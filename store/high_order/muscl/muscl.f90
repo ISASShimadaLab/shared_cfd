@@ -22,7 +22,7 @@ subroutine set_HV(q,qHli,qHri,qHlj,qHrj)!van albada
    integer i,j,plane
   
    do plane = nps,npe 
-      !$omp parallel do default(none) private(i,Du,Dl,s) shared(j,q,delta_ui,delta_li,nxs,nxe,nys,nye,phi_mus,k_mus,plane)
+      !$omp parallel do private(i,Du,Dl,s)
       do j=nys(plane),nye(plane)
          do i=nxs(plane)-1,nxe(plane)+1
             Du(1:dimw)=q(:,i+1,j,plane)-q(:,i  ,j,plane)
@@ -37,7 +37,7 @@ subroutine set_HV(q,qHli,qHri,qHlj,qHrj)!van albada
       end do
       !$omp end parallel do
 
-      !$omp parallel do default(none) private(i) shared(j,q,delta_ui,delta_li,qHli,qHri,nxs,nxe,nys,nye,phi_mus,k_mus,plane)
+      !$omp parallel do private(i)
       do j=nys(plane),nye(plane)
          do i=nxs(plane)-1,nxe(plane)
             qHli(:,i,j,plane)=q(1:dimw,i  ,j,plane)+phi_mus*0.5d0*delta_ui(1:dimw,i  ,j)
@@ -46,7 +46,7 @@ subroutine set_HV(q,qHli,qHri,qHlj,qHrj)!van albada
       end do
       !$omp end parallel do
 
-      !$omp parallel do default(none) private(i,Du,Dl,s) shared(j,q,delta_uj,delta_lj,nxs,nxe,nys,nye,phi_mus,k_mus,plane)
+      !$omp parallel do private(i,Du,Dl,s)
       do j=nys(plane)-1,nye(plane)+1
          do i=nxs(plane),nxe(plane)
             Du(1:dimw)=q(:,i,j+1,plane)-q(:,i,j  ,plane)
@@ -61,7 +61,7 @@ subroutine set_HV(q,qHli,qHri,qHlj,qHrj)!van albada
       end do
       !$omp end parallel do
 
-      !$omp parallel do default(none) private(i) shared(j,q,delta_uj,delta_lj,qHlj,qHrj,nxs,nxe,nys,nye,phi_mus,k_mus,plane)
+      !$omp parallel do private(i)
       do j=nys(plane)-1,nye(plane)
          do i=nxs(plane),nxe(plane)
             qHlj(:,i,j,plane)=q(1:dimw,i,j  ,plane)+phi_mus*0.5d0*delta_uj(1:dimw,i,j  )
