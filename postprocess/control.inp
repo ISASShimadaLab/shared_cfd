@@ -1,8 +1,8 @@
 #Input File for PostProcessing
 File Read Freq.         : 100000
-From Where              : 300000
+From Where              : 6000000
 Database Place          : 
-OverWrite? Yes(1)/No(0) : 0
+OverWrite? Yes(1)/No(0) : 1
 1st Plane i start index : 0
 1st Plane i end   index : -1
 1st Plane j start index : 0
