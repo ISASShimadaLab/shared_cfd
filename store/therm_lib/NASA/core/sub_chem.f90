@@ -770,7 +770,7 @@ subroutine flame_sheet(Y,E, T, MWave,kappa,mu,DHi,Yv,vhi)!{{{
    T_old = T*0.5d0
    do while(abs(E/Ru-ERTnow*T)>cvrnow*eps*1d-2 .and. abs(T-T_old)>eps .and. k<100)
       T_old =T
-      T     =T+omega*(E/Ru-ERTnow*T)/cvrnow
+      T     =max(T+omega*(E/Ru-ERTnow*T)/cvrnow,100d0)
       logT=log(T)
 
       ERTnow=0d0;cvrnow=0d0
