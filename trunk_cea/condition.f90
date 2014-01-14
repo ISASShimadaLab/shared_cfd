@@ -6,6 +6,7 @@ subroutine set_IC
    use chem_var
    implicit none
    integer i,j,plane
+
    do plane=nps,npe
       do i=nxs(plane),nxe(plane)
          do j=nys(plane),nye(plane)
@@ -49,9 +50,11 @@ subroutine set_BC(step)
                w(2,     0,j,plane) = 0.603d0
                w(indxht,0,j,plane) = w(indxht,0,j,plane) + 0.5d0*0.603d0**2
                vhi(:,   0,j,plane) = vhio
+               Yv(:,    0,j,plane) = Yvo
 
                w(:,    -1,j,plane) = w(:,   0,j,plane)
                vhi(:,  -1,j,plane) = vhi(:, 0,j,plane)
+               Yv(:,   -1,j,plane) = Yv(:,  0,j,plane)
             end do
          end if
 
@@ -61,9 +64,11 @@ subroutine set_BC(step)
                w(:,  ni(plane)+1,j,plane) = w(:,  ni(plane)  ,j,plane)
                w(4,  ni(plane)+1,j,plane) = 1d5
                vhi(:,ni(plane)+1,j,plane) = vhi(:,ni(plane)  ,j,plane)
+               Yv(:, ni(plane)+1,j,plane) = Yv(:, ni(plane)  ,j,plane)
 
                w(:,  ni(plane)+2,j,plane) = w(:,  ni(plane)+1,j,plane)
                vhi(:,ni(plane)+2,j,plane) = vhi(:,ni(plane)+1,j,plane)
+               Yv(:, ni(plane)+2,j,plane) = Yv(:, ni(plane)+1,j,plane)
             end do
          end if
       end select
@@ -81,18 +86,22 @@ subroutine set_BC(step)
                w(:,  i, 0,plane) = w(:,  i, 1,plane)
                w(3,  i, 0,plane) =-w(3,  i, 1,plane)
                vhi(:,i, 0,plane) = vhi(:,i, 1,plane)
+               Yv(:, i, 0,plane) = Yv(:, i, 1,plane)
 
                w(:,  i,-1,plane) = w(:,  i, 0,plane)
                vhi(:,i,-1,plane) = vhi(:,i, 0,plane)
+               Yv(:, i,-1,plane) = Yv(:, i, 0,plane)
             end do
             do i=max(   70,nxs(plane)),min(nxe(plane),  263)
                w(:,  i, 0,plane) = w(:,  i, 1,plane)
                w(2,  i, 0,plane) =-w(2,  i, 1,plane)
                w(3,  i, 0,plane) =-w(3,  i, 1,plane)
                vhi(:,i, 0,plane) = vhi(:,i, 1,plane)
+               Yv(:, i, 0,plane) = Yv(:, i, 1,plane)
 
                w(:,  i,-1,plane) = w(:,  i, 0,plane)
                vhi(:,i,-1,plane) = vhi(:,i, 0,plane)
+               Yv(:, i,-1,plane) = Yv(:, i, 0,plane)
             end do
             do i=max(  264,nxs(plane)),min(nxe(plane),  452)
                !call YPT2w(max(0d0,min((dble(step)-20000d0)/5d3,1d0)),w(4,i,1,plane),300d0,wt,vhit)
@@ -104,18 +113,22 @@ subroutine set_BC(step)
                w(4,      i, 0,plane) = w(4,i,1,plane)
                w(indxht, i, 0,plane) = wf(indxht)+0.5d0*(w(2,i,0,plane)**2+w(3,i,0,plane)**2)
                vhi(:,    i, 0,plane) = vhif
+               Yv(:,     i, 0,plane) = Yvf
 
                w(:,  i,-1,plane) = w(:,  i, 0,plane)
                vhi(:,i,-1,plane) = vhi(:,i, 0,plane)
+               Yv(:, i,-1,plane) = Yv(:, i, 0,plane)
             end do
             do i=max(  453,nxs(plane)),min(nxe(plane),  521)
                w(:,  i, 0,plane) = w(:,  i, 1,plane)
                w(2,  i, 0,plane) =-w(2,  i, 1,plane)
                w(3,  i, 0,plane) =-w(3,  i, 1,plane)
                vhi(:,i, 0,plane) = vhi(:,i, 1,plane)
+               Yv(:, i, 0,plane) = Yv(:, i, 1,plane)
 
                w(:,  i,-1,plane) = w(:,  i, 0,plane)
                vhi(:,i,-1,plane) = vhi(:,i, 0,plane)
+               Yv(:, i,-1,plane) = Yv(:, i, 0,plane)
             end do
          end if
 
@@ -125,18 +138,22 @@ subroutine set_BC(step)
                w(:,  i,nj(plane)+1,plane) = w(:,  i,nj(plane)  ,plane)
                w(3,  i,nj(plane)+1,plane) =-w(3,  i,nj(plane)  ,plane)
                vhi(:,i,nj(plane)+1,plane) = vhi(:,i,nj(plane)  ,plane)
+               Yv(:, i,nj(plane)+1,plane) = Yv(:, i,nj(plane)  ,plane)
 
                w(:,  i,nj(plane)+2,plane) = w(:,  i,nj(plane)+1,plane)
                vhi(:,i,nj(plane)+2,plane) = vhi(:,i,nj(plane)+1,plane)
+               Yv(:, i,nj(plane)+2,plane) = Yv(:, i,nj(plane)+1,plane)
             end do
             do i=max(   70,nxs(plane)),min(nxe(plane),  521)
                w(:,  i,nj(plane)+1,plane) = w(:,  i,nj(plane)  ,plane)
                w(2,  i,nj(plane)+1,plane) =-w(2,  i,nj(plane)  ,plane)
                w(3,  i,nj(plane)+1,plane) =-w(3,  i,nj(plane)  ,plane)
                vhi(:,i,nj(plane)+1,plane) = vhi(:,i,nj(plane)  ,plane)
+               Yv(:, i,nj(plane)+1,plane) = Yv(:, i,nj(plane)  ,plane)
 
                w(:,  i,nj(plane)+2,plane) = w(:,  i,nj(plane)+1,plane)
                vhi(:,i,nj(plane)+2,plane) = vhi(:,i,nj(plane)+1,plane)
+               Yv(:, i,nj(plane)+2,plane) = Yv(:, i,nj(plane)+1,plane)
             end do
          end if
       end select

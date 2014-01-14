@@ -13,7 +13,7 @@ subroutine set_thermo_prop
          do i=nxs(plane),nxe(plane)
             ei = q(nY+3,i,j,plane)/w(1,i,j,plane)-0.5d0*(w(2,i,j,plane)**2+w(3,i,j,plane)**2)
             T  = w(4,i,j,plane)/(w(1,i,j,plane)*w(indxR,i,j,plane))
-            call cea(w(1,i,j,plane),w(5:6,i,j,plane),ei, T,n_save(:,i,j,plane), MWave,kappa,mu,Yv(:,i,j,plane),vhi(:,i,j,plane))
+            call cea(w(1,i,j,plane),w(5:6,i,j,plane),ei, T,n_save(:,i,j,plane), MWave,kappa,mu,Yv(:,i,j,plane),vhi(:,i,j,plane),DHi(:,i,j,plane))
 
             DHi(:,   i,j,plane) = 0d0
             w(4,     i,j,plane) = w(1,i,j,plane)*(R_uni/MWave)*T

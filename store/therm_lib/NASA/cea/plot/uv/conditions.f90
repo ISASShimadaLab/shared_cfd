@@ -119,7 +119,7 @@ end subroutine read_conditions!}}}
 subroutine calcTeq!{{{
 
    double precision p,H,T,Tini, MWave,kappa,mu,rho,E
-   double precision Y(2)
+   double precision Y(2),DHi(2)
    double precision,dimension(max_ns)::n,vhi,Yv
    integer i,j,k
 
@@ -139,7 +139,7 @@ subroutine calcTeq!{{{
                p = list_p(i)
                call calcE_from_p(p,Tini,Y,rho,E)
 
-               call cea(rho,Y,E, T,n, MWave,kappa,mu,Yv,vhi)
+               call cea(rho,Y,E, T,n, MWave,kappa,mu,Yv,vhi,DHi)
                write(55,'(100es15.7)') Tini,p,Y,T,E,MWave,kappa,mu
             end do
             close(55)
@@ -157,7 +157,7 @@ subroutine calcTeq!{{{
                Tini=list_T(i)
                call calcE_from_p(p,Tini,Y,rho,E)
 
-               call cea(rho,Y,E, T,n, MWave,kappa,mu,Yv,vhi)
+               call cea(rho,Y,E, T,n, MWave,kappa,mu,Yv,vhi,DHi)
                write(55,'(100es15.7)') Tini,p,Y,T,E,MWave,kappa,mu
             end do
             close(55)
@@ -175,7 +175,7 @@ subroutine calcTeq!{{{
                Y(2)=1d0-Y(1)
                call calcE_from_p(p,Tini,Y,rho,E)
 
-               call cea(rho,Y,E, T,n, MWave,kappa,mu,Yv,vhi)
+               call cea(rho,Y,E, T,n, MWave,kappa,mu,Yv,vhi,DHi)
                write(55,'(100es15.7)') Tini,p,Y,T,E,MWave,kappa,mu
             end do
             close(55)

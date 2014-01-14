@@ -76,10 +76,27 @@ subroutine set_therm_data!{{{
    character*2      name_elm(5)
    double precision Nelm(5)
    integer,external::search_species
+   integer,external::search_elements
 
    integer i,j,k,l,Nfound
+   double precision tmp,MWe(ne)
 
    if(myid .eq. 0) then
+      open(10,file='MW.inp',status='old')
+      Nfound=0
+      do
+         !first line --- name, comment
+         read(10,'(A2,f10.5)',end=01) sname, tmp
+         j = search_elements(sname)
+         if(j>0) then
+            MWe(j)=tmp
+            Nfound = Nfound+1
+            if(Nfound==ne) exit
+         end if
+      end do
+01    close(10)
+      if(Nfound .ne. ne) stop "Some elements have not found in MW.inp."
+
       open(10,file='thermo.inp',status='old')
       do
          read(10,'(A)') comment
@@ -132,11 +149,25 @@ subroutine set_therm_data!{{{
       if(Nfound .ne. ns) stop "Some species have not found in thermo.inp."
    end if
 
+   call MPI_Bcast(     MWe,      ne, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
    call MPI_Bcast(num_sctn,      ns,          MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
    call MPI_Bcast(      MW,      ns, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
    call MPI_Bcast(  Trange,  ns*6*2, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
    call MPI_Bcast(      co,  ns*6*9, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
    call MPI_Bcast(      Ac,   ne*ns, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
+
+   ! calculate mass fraction of elements in each species.
+   do j=1,ns
+      tmp=0d0
+      do i=1,ne
+         YAc(i,j)=MWe(i)*Ac(i,j)
+         tmp=tmp+YAc(i,j)
+      end do
+      tmp=1d0/tmp
+      do i=1,ne
+         YAc(i,j)=YAc(i,j)*tmp
+      end do
+   end do
 end subroutine set_therm_data!}}}
 subroutine set_trans_data!{{{
    use mod_mpi
@@ -309,6 +340,19 @@ subroutine read_p_composition!{{{
 end subroutine read_p_composition!}}}
 
 ! utilities
+integer function search_elements(str)!{{{
+   use chem
+   character(*),intent(in)::str
+   integer i
+
+   do i=1,ne
+      if(trim(SYM_ELM(i)) .eq. trim(str)) then
+         search_elements=i
+         return
+      end if
+   end do
+   search_elements=-1
+end function search_elements!}}}
 integer function search_species(str)!{{{
    use chem
    character(*),intent(in)::str
@@ -1110,8 +1154,8 @@ subroutine initialize_cea(flag)!{{{
    of = sumo/sumf
 
    !calc ini
-   call calc_ini(pf,Tf, nf, Ef,MWf)
-   call calc_ini(po,To, no, Eo,MWo)
+   call calc_ini(pf,Tf, nf, Ef,MWf,Yfe)
+   call calc_ini(po,To, no, Eo,MWo,Yoe)
    nfini=nf
    noini=no
  
@@ -1172,7 +1216,7 @@ subroutine initialize_cea(flag)!{{{
    rhof=pf/(Ru*1d3/MWf*Tf)
    nf=nf+initial_eps
    if(flag .eq. 'uv') then
-      call cea(rhof,Y,Ef, Tf,nf, MWf,kappaf,muf,Yvf,vhif,flag)
+      call cea(rhof,Y,Ef, Tf,nf, MWf,kappaf,muf,Yvf,vhif,DHif)
       pf=rhof*Ru*1d3/MWf*Tf
       Hf=Ef+pf/rhof
    else
@@ -1187,7 +1231,7 @@ subroutine initialize_cea(flag)!{{{
    rhoo=po/(Ru*1d3/MWo*To)
    no=no+initial_eps
    if(flag .eq. 'uv') then
-      call cea(rhoo,Y,Eo, To,no, MWo,kappao,muo,Yvo,vhio)
+      call cea(rhoo,Y,Eo, To,no, MWo,kappao,muo,Yvo,vhio,DHio)
       po=rhoo*Ru*1d3/MWo*To
       Ho=Eo+po/rhoo
    else
@@ -1201,7 +1245,7 @@ subroutine initialize_cea(flag)!{{{
    sm=sum(no(1:ns)+nf(1:ns),1)/ns
    n_save=sm
 contains
-   subroutine calc_ini(p,T, n, E,MWave)
+   subroutine calc_ini(p,T, n, E,MWave,Yfoe)
       use func_therm
       implicit none
       double precision,intent(in) ::p
@@ -1209,8 +1253,9 @@ contains
       double precision,intent(inout)::n(ns)
       double precision,intent(out)::E
       double precision,intent(out)::MWave
+      double precision,intent(out)::Yfoe(ne)
    
-      integer j,k,nsc
+      integer i,j,k,nsc
       double precision vThrt(9)
       double precision sn,sm,tmp
    
@@ -1233,6 +1278,14 @@ contains
          E=E+tmp*n(j)
       end do
       E=E*Ru*T
+
+      Yfoe=0d0
+      do j=1,ns
+         tmp=n(j)*MW(j)*1d-3
+         do i=1,ne
+            Yfoe(i) =Yfoe(i)+YAc(i,j)*tmp
+         end do
+      end do
    end subroutine calc_ini
    subroutine set_static_qw(p,rho,T,E,kappa,mu,Y,q_local,w_local)
       implicit none
@@ -1264,7 +1317,7 @@ contains
       w_local(indxMu)=mu
    end subroutine set_static_qw
 end subroutine initialize_cea!}}}
-subroutine cea(rho,Y,E, T,n, MWave,kappa,mu,Yv,vhi)!{{{
+subroutine cea(rho,Y,E, T,n, MWave,kappa,mu,Yv,vhi,DHi)!{{{
    use const_chem
    use func_therm
    use chem
@@ -1280,6 +1333,7 @@ subroutine cea(rho,Y,E, T,n, MWave,kappa,mu,Yv,vhi)!{{{
    double precision,intent(out)  ::mu
    double precision,intent(out)  ::Yv(ns)
    double precision,intent(out)  ::vhi(ns)
+   double precision,intent(out)  ::DHi(2)
 
    double precision,dimension(ne+2)::b0,b,bd,vpi
    double precision,dimension(ns)::vmurt,vert,Dlogn,logn
@@ -1287,7 +1341,8 @@ subroutine cea(rho,Y,E, T,n, MWave,kappa,mu,Yv,vhi)!{{{
    double precision,dimension(ne+2,ne+2)::Ad
    double precision tmp,logT,sn,vmurtn,DlogT,b0max,Dnmax,logrhoRu,tinyn,tinytinyn,logtinyn,logtinytinyn
 
-   double precision dh
+   double precision dh,tmp2
+   double precision vhe(ns),MWd(ne)
 
    integer sect
    double precision,dimension(ns)::muN
@@ -1537,16 +1592,30 @@ subroutine cea(rho,Y,E, T,n, MWave,kappa,mu,Yv,vhi)!{{{
    end do
    kappa=kappa/(kappa-sn)
 
-   !calc vhi
-   tmp=Ru*1d3*T
+   !calc vhi and DHi
+   tmp=Ru*T
+   vhe=0d0
+   MWd=0d0
    do i=1,ns
       dh= 0d0
       do j=1,9
          dh =dh +co(j,sec_num(i),i)*vThrt(j)
       end do
-      vhi(i)=tmp/MW(i)*dh
+      vhi( i)=tmp/MW(i)*dh*1d3
+      tmp2   =tmp*n( i)*dh
+      do j=1,ne
+         vhe(j)=vhe(j)+YAc(j,i)*tmp2
+         MWd(j)=MWd(j)+YAc(j,i)*n(i)
+      end do
    end do
-   tmp=Ru*T
+
+   DHi=0d0
+   do i=1,ne
+      tmp =1d0/(Y(1)*Yfe(i)+Y(2)*Yoe(i)+1d-300)&
+          *(kappa*Ru*MWd(i)*T-(kappa-1d0)*vhe(i))
+      DHi(1)=DHi(1)+Yfe(i)*tmp
+      DHi(2)=DHi(2)+Yoe(i)*tmp
+   end do
 
    !calc Yv
    Yv=n*MW*1d-3
