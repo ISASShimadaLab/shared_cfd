@@ -786,7 +786,7 @@ subroutine flame_sheet(Y,E, T, MWave,kappa,mu,DHi,Yv,vhi)!{{{
       Yo=0d0
       Yp=Y(2)*(1d0+1d0/of)
    end if
-   n=Yo*no+Yf*nf+Yp*np !mole/kg
+   n=Yo*noini+Yf*nfini+Yp*np !mole/kg
    Yv(1)=Yf
    Yv(2)=Yo
    Yv(3)=Yp
@@ -2310,3 +2310,308 @@ subroutine calcE(T,Y,E)!{{{
    end do
    E=E*Ru*T
 end subroutine calcE!}}}
+
+!cea and flame sheet hybrid (cfh)
+subroutine init_pack_cfh!{{{
+   call read_cheminp
+   call set_therm_data
+   call set_trans_data
+   call read_fo_composition
+   call read_p_composition
+   call read_cfh_parameters
+
+   call initialize_cfh
+end subroutine init_pack_cfh!}}}
+subroutine read_cfh_parameters!{{{
+   use mod_mpi
+   use chem_var
+   implicit none
+   character*100    buf
+
+   if(myid .eq. 0) then
+      open(8,file="control_chem.inp")
+      do
+         read(8,'(a)') buf
+         if(buf(1:3) .eq. 'end') exit ! oxidizer
+      end do
+      do
+         read(8,'(a)') buf
+         if(buf(1:3) .eq. 'end') exit ! fuel
+      end do
+      do
+         read(8,'(a)') buf
+         if(buf(1:3) .eq. 'end') exit ! products
+      end do
+      read(8,'(25x,es15.7)') Tdiff_cfh
+      read(8,'(25x,i15)')    Dstep_cfh
+      close(8)
+   end if
+
+   !!! MPI COMMUNICATIONS
+   call MPI_Bcast(Tdiff_cfh, ns, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
+   call MPI_Bcast(Dstep_cfh, ns, MPI_INTEGER,          0, MPI_COMM_WORLD, ierr)
+end subroutine read_cfh_parameters!}}}
+subroutine initialize_cfh!{{{
+   use chem
+   use chem_var
+   implicit none
+   double precision sumo,sumf,sm
+   double precision Y(2),DHi(2)
+   double precision,dimension(ne)::ner,nep
+   integer i,j
+   integer nshifto,nshiftf
+   logical flag_cea
+
+   !check balance
+   ner=0d0
+   nep=0d0
+
+   ! calc the amount of each element
+   do j=1,ns
+      do i=1,ne
+         ner(i)=ner(i)+Ac(i,j)*(no(j)+nf(j))
+         nep(i)=nep(i)+Ac(i,j)* np(j)
+      end do
+   end do
+
+   ! check consistency
+   do i=1,ne
+      if(abs((ner(i)-nep(i))/(ner(i)+nep(i)))>1d-3) then
+         print *,"ERROR: The amount of element: ",SYM_ELM(i)
+         print *,"ERROR: does not balance between reactants and products."
+         print *,"ERROR: Please modify 'control_chem.inp'."
+         call exit(1)
+      end if
+   end do
+
+   !set o/f ratio
+   sumo=0d0
+   sumf=0d0
+   do j=1,ns
+      sumo=sumo+MW(j)*no(j)
+      sumf=sumf+MW(j)*nf(j)
+   end do
+   of = sumo/sumf
+
+   !calc ini
+   call calc_ini(pf,Tf, nf, Ef,MWf,Yfe)
+   call calc_ini(po,To, no, Eo,MWo,Yoe)
+   nfini=nf
+   noini=no
+ 
+   ! calc the amount of each element
+   do j=1,ns
+      do i=1,ne
+         b0f(i)=b0f(i)+Ac(i,j)*nf(j)
+         b0o(i)=b0o(i)+Ac(i,j)*no(j)
+      end do
+   end do
+
+   !set shift and mask
+   nshiftf=0
+   nshifto=0
+   maskbf =1d0
+   maskbo =1d0
+   do i=1,ne
+      if(b0f(i) .eq. 0d0) then
+         maskbf(i) = 0d0
+         nshiftf=nshiftf+1
+         nelistf(nshiftf)=i
+      else
+         elistf(i-nshiftf)=i
+      end if
+      if(b0o(i) .eq. 0d0) then
+         maskbo(i) = 0d0
+         nshifto=nshifto+1
+         nelisto(nshifto)=i
+      else
+         elisto(i-nshifto)=i
+      end if
+   end do
+   elisto(ne+1-nshifto)=ne+1
+   elisto(ne+2-nshifto)=ne+2
+   neo=ne+1-nshifto
+   elistf(ne+1-nshiftf)=ne+1
+   elistf(ne+2-nshiftf)=ne+2
+   nef=ne+1-nshiftf
+   do j=1,ns
+      masko(j)=1d0
+      maskf(j)=1d0
+      do i=1,nshifto
+         if(Ac(nelisto(i),j) .ne. 0d0) then
+            masko(j)=0d0
+         end if
+      end do
+      do i=1,nshiftf
+         if(Ac(nelistf(i),j) .ne. 0d0) then
+            maskf(j)=0d0
+         end if
+      end do
+      if(masko(j) .ne. 1d0) masko(j)=1d-100
+      if(maskf(j) .ne. 1d0) maskf(j)=1d-100
+   end do
+
+   !calc n,E
+   Y(1)=1d0;Y(2)=0d0
+   rhof=pf/(Ru*1d3/MWf*Tf)
+   nf=nf+initial_eps
+   call cea(rhof,Y,Ef, Tf,nf, MWf,kappaf,muf,Yvf,vhif,DHif)
+   pf=rhof*Ru*1d3/MWf*Tf
+   Hf=Ef+pf/rhof
+   call set_static_qw(pf,rhof,Tf,Ef,kappaf,muf,Y,qf,wf)
+
+   Y(1)=0d0;Y(2)=1d0
+   rhoo=po/(Ru*1d3/MWo*To)
+   no=no+initial_eps
+   call cea(rhoo,Y,Eo, To,no, MWo,kappao,muo,Yvo,vhio,DHio)
+   po=rhoo*Ru*1d3/MWo*To
+   Ho=Eo+po/rhoo
+   call set_static_qw(po,rhoo,To,Eo,kappao,muo,Y,qo,wo)
+
+   !about products 
+   sm=0d0
+   do j=1,ns
+      sm=sm+np(j)*MW(j)
+   end do
+   if(sm .eq. 0d0) sm=1d-300
+   np=np/sm*1d3 !mole/kg
+
+   !n_save initialization
+   sm=sum(no(1:ns)+nf(1:ns),1)/ns
+   n_save=sm
+
+   !init cfh parameters
+   Ef_cfh=-1d300
+   Eo_cfh=-1d300
+   Yf_cfh= 0d0
+   Yo_cfh= 0d0
+contains
+   subroutine calc_ini(p,T, n, E,MWave,Yfoe)
+      use func_therm
+      implicit none
+      double precision,intent(in) ::p
+      double precision,intent(in) ::T
+      double precision,intent(inout)::n(ns)
+      double precision,intent(out)::E
+      double precision,intent(out)::MWave
+      double precision,intent(out)::Yfoe(ne)
+   
+      integer i,j,k,nsc
+      double precision vThrt(9)
+      double precision sn,sm,tmp
+   
+      sn=0d0
+      sm=0d0
+      do j=1,ns
+         sn=sn+n(j)
+         sm=sm+n(j)*MW(j)
+      end do
+      MWave=sm/sn
+      n=n/sm*1d3 !mole/kg
+   
+      call calc_vThrt(T,log(T),vThrt)
+      do j=1,ns
+         call check_section_number(j,T,nsc)
+         tmp=-1d0
+         do k=1,9
+            tmp=tmp+vThrt(k)*co(k,nsc,j)
+         end do
+         E=E+tmp*n(j)
+      end do
+      E=E*Ru*T
+
+      Yfoe=0d0
+      do j=1,ns
+         tmp=n(j)*MW(j)*1d-3
+         do i=1,ne
+            Yfoe(i) =Yfoe(i)+YAc(i,j)*tmp
+         end do
+      end do
+   end subroutine calc_ini
+   subroutine set_static_qw(p,rho,T,E,kappa,mu,Y,q_local,w_local)
+      implicit none
+      double precision,intent(in)::p
+      double precision,intent(in)::rho
+      double precision,intent(in)::T
+      double precision,intent(in)::E
+      double precision,intent(in)::kappa
+      double precision,intent(in)::mu
+      double precision,intent(in)::Y(nY)
+      double precision,intent(out)::q_local(dimq)
+      double precision,intent(out)::w_local(dimw)
+      integer i
+      do i=1,nY
+         q_local(i)   = Y(i)*rho
+         w_local(i+4) = Y(i)
+      end do
+      q_local(nY+1)=0d0
+      q_local(nY+2)=0d0
+      q_local(nY+3)=rho*E
+
+      w_local(1)=rho
+      w_local(2)=0d0
+      w_local(3)=0d0
+      w_local(4)=p
+      w_local(indxg )=kappa
+      w_local(indxht)=E+p/rho
+      w_local(indxR )=p/(rho*T)
+      w_local(indxMu)=mu
+   end subroutine set_static_qw
+end subroutine initialize_cfh!}}}
+subroutine cfh(rho,Y,E, T,n, MWave,kappa,mu,Yv,vhi,DHi)!{{{
+   use const_chem
+   use chem_var
+   implicit none
+   double precision,intent(in)   ::rho
+   double precision,intent(in)   ::Y(2)
+   double precision,intent(in)   ::E
+   double precision,intent(inout)::T
+   double precision,intent(inout)::n(ns)
+   double precision,intent(out)  ::MWave
+   double precision,intent(out)  ::kappa
+   double precision,intent(out)  ::mu
+   double precision,intent(out)  ::Yv(ns)
+   double precision,intent(out)  ::vhi(ns)
+   double precision,intent(out)  ::DHi(2)
+
+   if( (Y(1)<Yf_cfh .and. E<Ef_cfh) &
+   .or.(Y(2)<Yo_cfh .and. E<Eo_cfh)) then
+      call flame_sheet(Y,E, T, MWave,kappa,mu,DHi,Yv,vhi)
+   else
+     call cea(rho,Y,E, T,n, MWave,kappa,mu,Yv,vhi,DHi)
+   end if
+
+   call calc_cfh_parameters(rho,Y,E, T,n, MWave,kappa,mu,Yv,vhi,DHi)
+end subroutine cfh!}}}
+subroutine calc_cfh_parameters(rho,Y,E, T,n, MWave,kappa,mu,Yv,vhi,DHi)!{{{
+   use chem_var
+   implicit none
+   double precision,intent(in)   ::rho
+   double precision,intent(in)   ::Y(2)
+   double precision,intent(in)   ::E
+   double precision,intent(inout)::T
+   double precision,intent(inout)::n(ns)
+   double precision,intent(out)  ::MWave
+   double precision,intent(out)  ::kappa
+   double precision,intent(out)  ::mu
+   double precision,intent(out)  ::Yv(ns)
+   double precision,intent(out)  ::vhi(ns)
+   double precision,intent(out)  ::DHi(2)
+
+   double precision Tfs,Tcea
+
+   call cea(rho,Y,E, T,n, MWave,kappa,mu,Yv,vhi,DHi)
+   Tcea=T
+   call flame_sheet(Y,E, T, MWave,kappa,mu,DHi,Yv,vhi)
+   Tfs =T
+
+   if(abs(Tfs-Tcea)<Tdiff_cfh) then
+      if(Y(1)<Y(2)) then
+         Yf_cfh=max(Yf_cfh,Y(1))
+         Ef_cfh=max(Ef_cfh,E)
+      else
+         Yo_cfh=max(Yo_cfh,Y(2))
+         Eo_cfh=max(Eo_cfh,E)
+      end if
+   end if
+end subroutine calc_cfh_parameters!}}}
