@@ -1,3 +1,3 @@
 
       call set_w
-      call set_thermo_prop
+      call set_thermo_prop(i)

@@ -73,4 +73,9 @@ module chem_var
    !for flame sheet model
    double precision np(max_ns)
    double precision of
+
+   !for cea and flame sheet hybrid (cfh)
+   double precision Yf_cfh,Yo_cfh
+   double precision Tdiff_cfh
+   integer          Dstep_cfh
 end module chem_var

@@ -11,8 +11,8 @@
       tt = 0d0
       if(myid .eq. 0) print *,"read IC"
    end if
+   i=step_res+1
 part_primitive
    call set_BC(i)
    ! main loop
-   i=step_res+1
    do while(check_convergence(i,step_res))

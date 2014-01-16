@@ -3,7 +3,7 @@ module mod_mpi
    implicit none
    integer nps,npe
    integer,dimension(Nplane)::nxs,nys,nxe,nye
-   integer MPI_LOGICAL,MPI_DOUBLE_PRECISION,MPI_INTEGER,MPI_COMM_WORLD,MPI_SUM,MPI_MIN,MPI_CHARACTER
+   integer MPI_LOGICAL,MPI_DOUBLE_PRECISION,MPI_INTEGER,MPI_COMM_WORLD,MPI_SUM,MPI_MIN,MPI_CHARACTER,MPI_MAX
    integer,dimension(Nplane)::ireq,istatus,ierrs
    integer ierr
    integer,parameter::myid=0

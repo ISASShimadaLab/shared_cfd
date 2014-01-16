@@ -2329,27 +2329,23 @@ subroutine read_cfh_parameters!{{{
    character*100    buf
 
    if(myid .eq. 0) then
-      open(8,file="control_chem.inp")
+      open(8,file="control.inp")
       do
-         read(8,'(a)') buf
-         if(buf(1:3) .eq. 'end') exit ! oxidizer
+         read(8,'(a)',end=99) buf
+         if(buf(1:25) .eq. 'Temp. Diff Limit(K)     :') then
+            read(buf(26:),*) Tdiff_cfh
+         else if(buf(1:25) .eq. 'cfh check freq.         :') then
+            read(buf(26:),*) Dstep_cfh
+            exit
+         end if
       end do
-      do
-         read(8,'(a)') buf
-         if(buf(1:3) .eq. 'end') exit ! fuel
-      end do
-      do
-         read(8,'(a)') buf
-         if(buf(1:3) .eq. 'end') exit ! products
-      end do
-      read(8,'(25x,es15.7)') Tdiff_cfh
-      read(8,'(25x,i15)')    Dstep_cfh
-      close(8)
+
+99    close(8)
    end if
 
    !!! MPI COMMUNICATIONS
-   call MPI_Bcast(Tdiff_cfh, ns, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
-   call MPI_Bcast(Dstep_cfh, ns, MPI_INTEGER,          0, MPI_COMM_WORLD, ierr)
+   call MPI_Bcast(Tdiff_cfh, 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
+   call MPI_Bcast(Dstep_cfh, 1, MPI_INTEGER,          0, MPI_COMM_WORLD, ierr)
 end subroutine read_cfh_parameters!}}}
 subroutine initialize_cfh!{{{
    use chem
@@ -2481,8 +2477,6 @@ subroutine initialize_cfh!{{{
    n_save=sm
 
    !init cfh parameters
-   Ef_cfh=-1d300
-   Eo_cfh=-1d300
    Yf_cfh= 0d0
    Yo_cfh= 0d0
 contains
@@ -2574,16 +2568,13 @@ subroutine cfh(rho,Y,E, T,n, MWave,kappa,mu,Yv,vhi,DHi)!{{{
    double precision,intent(out)  ::vhi(ns)
    double precision,intent(out)  ::DHi(2)
 
-   if( (Y(1)<Yf_cfh .and. E<Ef_cfh) &
-   .or.(Y(2)<Yo_cfh .and. E<Eo_cfh)) then
+   if(Y(1)<Yf_cfh .or. Y(2)<Yo_cfh) then
       call flame_sheet(Y,E, T, MWave,kappa,mu,DHi,Yv,vhi)
    else
-     call cea(rho,Y,E, T,n, MWave,kappa,mu,Yv,vhi,DHi)
+      call cea(rho,Y,E, T,n, MWave,kappa,mu,Yv,vhi,DHi)
    end if
-
-   call calc_cfh_parameters(rho,Y,E, T,n, MWave,kappa,mu,Yv,vhi,DHi)
 end subroutine cfh!}}}
-subroutine calc_cfh_parameters(rho,Y,E, T,n, MWave,kappa,mu,Yv,vhi,DHi)!{{{
+subroutine calc_cfh_parameters(rho,Y,E, T,n, MWave,kappa,mu,Yv,vhi,DHi,flag)!{{{
    use chem_var
    implicit none
    double precision,intent(in)   ::rho
@@ -2597,6 +2588,7 @@ subroutine calc_cfh_parameters(rho,Y,E, T,n, MWave,kappa,mu,Yv,vhi,DHi)!{{{
    double precision,intent(out)  ::Yv(ns)
    double precision,intent(out)  ::vhi(ns)
    double precision,intent(out)  ::DHi(2)
+   logical,         intent(out)  ::flag
 
    double precision Tfs,Tcea
 
@@ -2605,13 +2597,5 @@ subroutine calc_cfh_parameters(rho,Y,E, T,n, MWave,kappa,mu,Yv,vhi,DHi)!{{{
    call flame_sheet(Y,E, T, MWave,kappa,mu,DHi,Yv,vhi)
    Tfs =T
 
-   if(abs(Tfs-Tcea)<Tdiff_cfh) then
-      if(Y(1)<Y(2)) then
-         Yf_cfh=max(Yf_cfh,Y(1))
-         Ef_cfh=max(Ef_cfh,E)
-      else
-         Yo_cfh=max(Yo_cfh,Y(2))
-         Eo_cfh=max(Eo_cfh,E)
-      end if
-   end if
+   flag = abs(Tfs-Tcea)<Tdiff_cfh
 end subroutine calc_cfh_parameters!}}}
