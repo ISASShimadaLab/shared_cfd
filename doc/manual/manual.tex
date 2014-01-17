@@ -17,8 +17,6 @@
 %\newpage
 %
 
-
-
 %details
 \part{各機能の説明}
 \newpage
@@ -927,7 +925,8 @@ Species Selectionでは一行に一つの化学種を記録する(スペース�
 選択された化学種が含む原子を含む全ての化学種がchem.inpに記録され、またcontrol\_chem.raw.inpには"Production Compsition"の欄は生成されない。
 %}}}
 \newpage
-\section{化学コード}%{{{
+\section{0次元化学コード}%{{{
+%introduction{{{
 checkout\_chem.inpを記入し、checkout.pyを起動すると生成される。
 実処理はcheckout.pyから呼び出された"store/checkout/checkout\_chem\_nasa.py"によって生成される。
 (現在はnasaのみではなく、chemkin用のファイルもこのpythonスクリプトで生成できる。)
@@ -935,6 +934,8 @@ checkout\_chem.inpを記入し、checkout.pyを起動すると生成される。
 実行にはchem.inpが必要である。
 
 化学コードでは化学モデルの選択や、uv一定条件かhp一定条件の選択、単一条件か複数条件の選択、更には化学モデルの簡略化までを行うことができる。
+
+\hspace{1em}
 
 化学コードはディレクトリ構造が複雑である。
 
@@ -965,7 +966,79 @@ store/therm_lib/chemkin/{mono,plot,reduction}
 ただし\verb|{a,b,c}|と書いてあるところにはaかbかcが入る。
 これも後述するように全ての組み合わせが存在するわけではない。
 
-また、chem\_drive
+また、chem\_driveの中に、ドライバであるdriver.f90をコンパイルするためのMakefileの部品が存在し、0次元化学コード生成時には必ず用いられる。流体コードのstore/coreにあたる。
+%}}}
+\subsection{store/therm\_lib/NASA}%{{{
+%intro{{{
+NASAデータベースを用いるものでは共通の計算を行うファイルが
+\begin{verbatim}
+store/therm_lib/NASA/core
+\end{verbatim}
+にまとめてあり、それぞれの計算の種類によって以下のような構造のディレクトリのいずれかを選ぶこととなる。
+\begin{verbatim}
+store/therm_lib/NASA/{flame_sheet,cea}/{mono,plot,reduction}/{uv,hp}
+\end{verbatim}
+ただし\verb|{a,b,c}|と書いてあるところにはaかbかcが入る。
+後述するように全ての組み合わせが存在するわけではない。
+%}}}
+\subsubsection{mono}%{{{
+単条件化学計算を行うものであり、出力としては
+\begin{quotation}
+燃料のみ、酸化剤のみ、当量
+\end{quotation}
+の
+\begin{quotation}
+圧力、密度、温度、内部エネルギーまたはエンタルピー、平均分子量、比熱比、粘性係数
+\end{quotation}
+とo/f比を出力する。
+
+control.inpは必要はないが、control\_chem.inpで、そのままのモル分率で混合すると当量になるよう、燃料と酸化剤のそれぞれの化学種の量を設定しなければならない。
+%}}}
+\subsubsection{plot}%{{{
+複数条件の0次元化学計算を行うものであり、出力としては各条件での平衡温度となる。
+
+control.inpは次のような入力になる。
+\begin{verbatim}
+Pressure (Pa)         range and Ntics : 1.e5 1.e6  7
+Temperature (K)       range and Ntics : 300. 300.  1
+mass fraction of fuel range and Ntics :   0.   1. 11
+variable for x axis                   : P # P or T or Yf. Yf is mass fraction of fuel
+\end{verbatim}
+入力は初期圧力、初期温度、燃料質量分率及びそのサンプル数、
+加えてプロット時にx軸とする変数である。
+
+また、プロット時には、ある変数については色をわけ同じファイルに、ある変数についてはファイル自体をわけることにしており、ファイルを分ける変数はx軸とする変数以外でサンプル数が少ない変数が自動的に選ばれる。
+
+上記入力ファイルの場合、x軸を初期圧力、y軸に平衡温度、異なる初期圧力が色分けされた線として、初期温度300Kを固定した一つのグラフが生成される。
+
+ファイルはplot.001.dat, plot.002.dat, plot.003.datが生成され、
+\verb|gnuplot plot.plt|というコマンドを実行するとout.epsというグラフが生成される。
+%}}}
+\subsubsection{reduction}%{{{
+\textbf{定圧定エンタルピー条件の完全平衡モデルの簡略化のみを行うことができる。}
+
+control.inpは次のような入力になる。
+\begin{verbatim}
+Pressure (Pa)         range and Ntics : 1.e5 1.e6 7
+Temperature (K)       range and Ntics : 300. 300.  1
+mass fraction of fuel range and Ntics :   0.   1. 11
+Allowable tolerance of temperature    : 0.05
+\end{verbatim}
+入力は初期圧力、初期温度、燃料質量分率及びそのサンプル数、
+許容する温度誤差(割合)である。上記例であれば、許容温度誤差5\%となる。
+
+
+
+また、プロット時には、ある変数については色をわけ同じファイルに、ある変数についてはファイル自体をわけることにしており、ファイルを分ける変数はx軸とする変数以外でサンプル数が少ない変数が自動的に選ばれる。
+
+上記入力ファイルの場合、x軸を初期圧力、y軸に平衡温度、異なる初期圧力が色分けされた線として、初期温度300Kを固定した一つのグラフが生成される。
+
+ファイルはplot.001.dat, plot.002.dat, plot.003.datが生成され、
+\verb|gnuplot plot.plt|というコマンドを実行するとout.epsというグラフが生成される。
+%}}}
+%}}}
+\subsection{store/therm\_lib/chemkin}%{{{
+%}}}
 %}}}
 \newpage
 
