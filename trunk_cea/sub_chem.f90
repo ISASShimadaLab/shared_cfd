@@ -1335,10 +1335,10 @@ subroutine cea(rho,Y,E, T,n, MWave,kappa,mu,Yv,vhi,DHi)!{{{
    double precision,intent(out)  ::vhi(ns)
    double precision,intent(out)  ::DHi(2)
 
-   double precision,dimension(ne+2)::b0,b,bd,vpi
+   double precision,dimension(ne+2)::b0,b,bd,vpi,bd_old
    double precision,dimension(ns)::vmurt,vert,Dlogn,logn
    integer,dimension(ns)::sec_num
-   double precision,dimension(ne+2,ne+2)::Ad
+   double precision,dimension(ne+2,ne+2)::Ad,Ad_old
    double precision tmp,logT,sn,vmurtn,DlogT,b0max,Dnmax,logrhoRu,tinyn,tinytinyn,logtinyn,logtinytinyn
 
    double precision dh,tmp2
@@ -1454,6 +1454,8 @@ subroutine cea(rho,Y,E, T,n, MWave,kappa,mu,Yv,vhi,DHi)!{{{
          end do
 
          !calc vpi
+         Ad_old=Ad
+         bd_old=bd
          if(REDUCEflag) then
             do i=1,nen
                do j=1,nen
@@ -1494,7 +1496,19 @@ subroutine cea(rho,Y,E, T,n, MWave,kappa,mu,Yv,vhi,DHi)!{{{
                end if
             end do
             sn = sum(n(1:ns),1)
+            cycle
          end if
+
+         do j=1,ne+1
+            if(vpi(j)*0d0 .ne. 0d0) then
+               print *,REDUCEflag,LUflag
+               print '(6es9.1)',Ad_old
+               print '(6es9.1)',bd
+               print '(100es9.1)',vpi
+               print *,"NaN was catched"
+               stop
+            end if
+         end do
 
          !calc Delta
          DlogT=vpi(ne+1)
@@ -1575,8 +1589,9 @@ subroutine cea(rho,Y,E, T,n, MWave,kappa,mu,Yv,vhi,DHi)!{{{
 
       !close(33)
       if(counter>500) then
-         !print *,E,T,Y,REDUCEflag,debugflag
+         print *,E,T,Y,REDUCEflag,debugflag
          print *,"not converted. at cea"
+         stop
       end if
    end if
 
@@ -2552,50 +2567,135 @@ contains
       w_local(indxMu)=mu
    end subroutine set_static_qw
 end subroutine initialize_cfh!}}}
-subroutine cfh(rho,Y,E, T,n, MWave,kappa,mu,Yv,vhi,DHi)!{{{
-   use const_chem
+subroutine flame_sheet_cfh(Y,E, T, MWave,kappa,mu,DHi,Yv,vhi)!{{{
+   use chem
    use chem_var
+   use func_therm
    implicit none
-   double precision,intent(in)   ::rho
    double precision,intent(in)   ::Y(2)
    double precision,intent(in)   ::E
    double precision,intent(inout)::T
-   double precision,intent(inout)::n(ns)
    double precision,intent(out)  ::MWave
    double precision,intent(out)  ::kappa
    double precision,intent(out)  ::mu
-   double precision,intent(out)  ::Yv(ns)
-   double precision,intent(out)  ::vhi(ns)
    double precision,intent(out)  ::DHi(2)
+   double precision,intent(out)  ::Yv( ns)
+   double precision,intent(out)  ::vhi(ns)
 
-   if(Y(1)<Yf_cfh .or. Y(2)<Yo_cfh) then
-      call flame_sheet(Y,E, T, MWave,kappa,mu,DHi,Yv,vhi)
+   double precision Yf,Yo,Yp
+   double precision n(  ns)
+   double precision muN(ns)
+
+   double precision T_old
+
+   integer secN,sect
+   double precision denom
+   double precision cprnow,cvrnow,ERTnow,logT,sn,phi
+   double precision,dimension(9)::vThrt,vTcpr
+   double precision,dimension(4)::vTmu
+   double precision MWi,MWj
+   double precision,dimension(ns)::DHi_s
+
+   double precision tmp,tmp2,dh
+   integer i,j,k
+
+   !set n
+   Yo = Y(2)-of*Y(1)
+   if(Yo>0d0) then
+      Yf=0d0
+      Yp=Y(1)*(1d0+of)
    else
-      call cea(rho,Y,E, T,n, MWave,kappa,mu,Yv,vhi,DHi)
+      Yf=-Yo/of
+      Yo=0d0
+      Yp=Y(2)*(1d0+1d0/of)
    end if
-end subroutine cfh!}}}
-subroutine calc_cfh_parameters(rho,Y,E, T,n, MWave,kappa,mu,Yv,vhi,DHi,flag)!{{{
-   use chem_var
-   implicit none
-   double precision,intent(in)   ::rho
-   double precision,intent(in)   ::Y(2)
-   double precision,intent(in)   ::E
-   double precision,intent(inout)::T
-   double precision,intent(inout)::n(ns)
-   double precision,intent(out)  ::MWave
-   double precision,intent(out)  ::kappa
-   double precision,intent(out)  ::mu
-   double precision,intent(out)  ::Yv(ns)
-   double precision,intent(out)  ::vhi(ns)
-   double precision,intent(out)  ::DHi(2)
-   logical,         intent(out)  ::flag
+   n=Yo*noini+Yf*nfini+Yp*np !mole/kg
+   Yv=n*MW*1d-3
 
-   double precision Tfs,Tcea
+   sn=sum(n,1)
+   MWave=1d3/sn !(g/kg)/(mole/kg)=g/mole
 
-   call cea(rho,Y,E, T,n, MWave,kappa,mu,Yv,vhi,DHi)
-   Tcea=T
-   call flame_sheet(Y,E, T, MWave,kappa,mu,DHi,Yv,vhi)
-   Tfs =T
+   !calc T
+   logT=log(T)
+   ERTnow=0d0;cvrnow=0d0
+   call calc_vThrt( T,logT,vThrt)
+   call calc_vTcpr( T,     vTcpr)
+   do i=1,ns
+      call check_section_number(i,T,secN)
+      tmp =-1;tmp2=-1
+      do j=1,9
+         tmp  = tmp +co(j,secN,i)*vThrt(j)
+         tmp2 = tmp2+co(j,secN,i)*vTcpr(j)
+      end do
+      ERTnow = ERTnow + tmp *n(i)
+      cvrnow = cvrnow + tmp2*n(i)
+   end do
 
-   flag = abs(Tfs-Tcea)<Tdiff_cfh
-end subroutine calc_cfh_parameters!}}}
+   k=0
+   T_old = T*0.5d0
+   do while(abs(E/Ru-ERTnow*T)>cvrnow*eps*1d-2 .and. abs(T-T_old)>eps .and. k<100)
+      T_old =T
+      T     =max(T+omega*(E/Ru-ERTnow*T)/cvrnow,100d0)
+      logT=log(T)
+
+      ERTnow=0d0;cvrnow=0d0
+      call calc_vThrt( T,logT,vThrt)
+      call calc_vTcpr( T,     vTcpr)
+      do i=1,ns
+         call check_section_number(i,T,secN)
+         tmp =-1;tmp2=-1
+         do j=1,9
+            tmp  = tmp +co(j,secN,i)*vThrt(j)
+            tmp2 = tmp2+co(j,secN,i)*vTcpr(j)
+         end do
+         ERTnow = ERTnow + tmp *n(i)
+         cvrnow = cvrnow + tmp2*n(i)
+      end do
+
+      k=k+1
+   end do
+
+   if(k >= 100) then
+      print *, "Not Converted at flame_sheet"
+      !call exit(1)
+   end if
+
+   !calc kappa
+   cprnow= cvrnow+sn
+   kappa=1d0+sn/cvrnow
+
+   !calc DHi and vhi
+   tmp=Ru*T
+   do i=1,ns
+      call check_section_number(i,T,secN)
+      dh= 0d0
+      do j=1,9
+         dh = dh +co(j,secN,i)*vThrt(j)
+      end do
+      DHi_s(i)=kappa-(kappa-1d0)*dh
+      vhi(  i)=tmp/MW(i)*dh*1d3
+   end do
+   DHi(1)=dot_product(nf,DHi_s)*tmp
+   DHi(2)=dot_product(no,DHi_s)*tmp
+
+   !calc mu
+   call calc_vTmu(T,logT,vTmu)
+   do i=1,nt
+      call check_section_number_trans(i,T,sect)
+      muN(i)=exp(dot_product(trans(:,sect,i),vTmu))
+   end do
+
+   mu = 0d0
+   do i=1,nt
+      denom = 0d0
+      MWi=MW(tr2th(i))
+      do j=1,nt
+         MWj=MW(tr2th(j))
+         phi = 0.25d0*(1d0+sqrt(muN(i)/muN(j))*(MWj/MWi)**0.25d0 )**2 &
+                     *sqrt(2d0*MWj/(MWi+MWj))
+         denom = denom + n(tr2th(j)) * phi
+      end do
+      mu = mu + n(tr2th(i)) * muN(i) / denom
+   end do
+   mu = mu * 1d-7
+end subroutine flame_sheet_cfh!}}}
