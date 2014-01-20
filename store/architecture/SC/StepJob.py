@@ -10,6 +10,7 @@ if(len(arr)<2):
 	for line in p.stdout:
 		if "y535" in line:i+=1
 	num=50-i
+	print num," jobs to go"
 else:
 	num=int(arr[1])
 

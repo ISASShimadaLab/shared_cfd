@@ -5,6 +5,6 @@ CFL Number              : 10.
 File Output Period      : 1000
 
 #FOR MUSCL
-MUSCL ON(1)/OFF(0)      : 0
+MUSCL ON(1)/OFF(0)      : 1
 MUSCL Precision Order   : 3
 

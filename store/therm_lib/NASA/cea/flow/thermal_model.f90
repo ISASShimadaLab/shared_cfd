@@ -8,36 +8,13 @@ subroutine set_thermo_prop(step)
    double precision ei,T,MWave,kappa,mu
    integer i,j,plane
 
-   logical flag
+   double precision Tfs,Tcea
    double precision tYf_cfh_ok,tYo_cfh_ok
    double precision tYf_cfh_ng,tYo_cfh_ng
    double precision Nall,Nselect,tNall,tNselect
 
-   double precision Tmat(ni(1),nj(1))
-
    if(mod(step,Dstep_cfh).eq. 0d0) then
-      do plane = nps,npe
-         !$omp parallel do private(i,ei,T,MWave,kappa,mu)
-         do j=nys(plane),nye(plane)
-            do i=nxs(plane),nxe(plane)
-               ei = q(nY+3,i,j,plane)/w(1,i,j,plane)-0.5d0*(w(2,i,j,plane)**2+w(3,i,j,plane)**2)
-               T  = w(4,i,j,plane)/(w(1,i,j,plane)*w(indxR,i,j,plane))
-               call cfh(w(1,i,j,plane),w(5:6,i,j,plane),ei,&
-                        T,n_save(:,i,j,plane),&
-                        MWave,kappa,mu,Yv(:,i,j,plane),vhi(:,i,j,plane),DHi(:,i,j,plane))
-               Tmat(i,j)=T
-
-               DHi(:,   i,j,plane) = 0d0
-               w(4,     i,j,plane) = w(1,i,j,plane)*(R_uni/MWave)*T
-               w(indxg, i,j,plane) = kappa
-               w(indxht,i,j,plane) = (q(nY+3,i,j,plane)+w(4,i,j,plane))/w(1,i,j,plane)
-               w(indxMu,i,j,plane) = mu
-               w(indxR, i,j,plane) = R_uni/MWave
-            end do
-         end do
-         !$omp end parallel do
-      end do
-
+      !!!!!!!!!!!!!!!!!!!!! CHECK THRESHOLDS !!!!!!!!!!!!!!!!!!!!!
       !initialize cfh parameters
       tYf_cfh_ng= 1d0
       tYo_cfh_ng= 1d0
@@ -46,16 +23,25 @@ subroutine set_thermo_prop(step)
       tNall   =0d0
       tNselect=0d0
       do plane = nps,npe
-         !$omp parallel do private(i,ei,T,MWave,kappa,mu,flag) reduction(+:tNall,tNselect) &
+         !$omp parallel do private(i,ei,T,MWave,kappa,mu,Tfs,Tcea) reduction(+:tNall,tNselect) &
          !$omp                            reduction(min:tYf_cfh_ng,tYo_cfh_ng) &
          !$omp                            reduction(max:tYf_cfh_ok,tYo_cfh_ok)
          do j=nys(plane),nye(plane)
             do i=nxs(plane),nxe(plane)
+               w(5,i,j,plane)=min(max(0d0,w(5,i,j,plane)),1d0)
+               w(6,i,j,plane)=min(max(0d0,w(6,i,j,plane)),1d0)
                ei = q(nY+3,i,j,plane)/w(1,i,j,plane)-0.5d0*(w(2,i,j,plane)**2+w(3,i,j,plane)**2)
                T  = w(4,i,j,plane)/(w(1,i,j,plane)*w(indxR,i,j,plane))
-               call calc_cfh_parameters(w(1,i,j,plane),w(5:6,i,j,plane),ei,&
+
+               call flame_sheet_cfh(w(5:6,i,j,plane),ei,&
+                        T,&
+                        MWave,kappa,mu,DHi(:,i,j,plane),Yv(:,i,j,plane),vhi(:,i,j,plane))
+               Tfs =T
+               call cea(w(1,i,j,plane),w(5:6,i,j,plane),ei,&
                         T,n_save(:,i,j,plane),&
-                        MWave,kappa,mu,Yv(:,i,j,plane),vhi(:,i,j,plane),DHi(:,i,j,plane),flag)
+                        MWave,kappa,mu,Yv(:,i,j,plane),vhi(:,i,j,plane),DHi(:,i,j,plane))
+               Tcea=T
+
                DHi(:,   i,j,plane) = 0d0
                w(4,     i,j,plane) = w(1,i,j,plane)*(R_uni/MWave)*T
                w(indxg, i,j,plane) = kappa
@@ -65,7 +51,7 @@ subroutine set_thermo_prop(step)
 
                !calc cfh parameters
                tNall=tNall+1d0
-               if(flag) then
+               if(abs(Tfs-Tcea)<Tdiff_cfh) then
                   tNselect=tNselect+1d0
                   if(w(5,i,j,plane)<0.5d0) then
                      tYf_cfh_ok=max(tYf_cfh_ok,w(5,i,j,plane))
@@ -83,58 +69,42 @@ subroutine set_thermo_prop(step)
          end do
          !$omp end parallel do
       end do
-
      
       !Compute cfl parameters
-      call MPI_Reduce(tNselect, Nselect,1,MPI_DOUBLE_PRECISION, MPI_SUM,0, MPI_COMM_WORLD, ierr)
-      call MPI_Reduce(tNall,    Nall,   1,MPI_DOUBLE_PRECISION, MPI_SUM,0, MPI_COMM_WORLD, ierr)
-      call MPI_Allreduce(tYf_cfh_ok,Yf_cfh,1,MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_WORLD, ierr)
-      call MPI_Allreduce(tYo_cfh_ok,Yo_cfh,1,MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_WORLD, ierr)
+      call MPI_Reduce(tNselect, Nselect,1,MPI_DOUBLE_PRECISION, MPI_SUM,0, MPI_COMM_WORLD,ierr)
+      call MPI_Reduce(tNall,    Nall,   1,MPI_DOUBLE_PRECISION, MPI_SUM,0, MPI_COMM_WORLD,ierr)
+      call MPI_Allreduce(tYf_cfh_ok,Yf_cfh,1,MPI_DOUBLE_PRECISION, MPI_MAX,MPI_COMM_WORLD,ierr)
+      call MPI_Allreduce(tYo_cfh_ok,Yo_cfh,1,MPI_DOUBLE_PRECISION, MPI_MAX,MPI_COMM_WORLD,ierr)
       tYf_cfh_ng=min(tYf_cfh_ng,Yf_cfh)
       tYo_cfh_ng=min(tYo_cfh_ng,Yo_cfh)
-      call MPI_Allreduce(tYf_cfh_ng,Yf_cfh,1,MPI_DOUBLE_PRECISION, MPI_MIN, MPI_COMM_WORLD, ierr)
-      call MPI_Allreduce(tYo_cfh_ng,Yo_cfh,1,MPI_DOUBLE_PRECISION, MPI_MIN, MPI_COMM_WORLD, ierr)
+      call MPI_Allreduce(tYf_cfh_ng,Yf_cfh,1,MPI_DOUBLE_PRECISION, MPI_MIN,MPI_COMM_WORLD,ierr)
+      call MPI_Allreduce(tYo_cfh_ng,Yo_cfh,1,MPI_DOUBLE_PRECISION, MPI_MIN,MPI_COMM_WORLD,ierr)
       if(myid .eq. 0) then
          print '(a,i12,x,a,f8.2,x,2(a,es9.1,x))',"step=",step,&
                                                   "fs/all(%)=",Nselect/Nall*1d2,&
                                                   "Yf_cfh=",Yf_cfh,&
                                                   "Yo_cfh=",Yo_cfh
       end if
-
-      do plane = nps,npe
-         !$omp parallel do private(i,ei,T,MWave,kappa,mu)
-         do j=nys(plane),nye(plane)
-            do i=nxs(plane),nxe(plane)
-               ei = q(nY+3,i,j,plane)/w(1,i,j,plane)-0.5d0*(w(2,i,j,plane)**2+w(3,i,j,plane)**2)
-               T  = w(4,i,j,plane)/(w(1,i,j,plane)*w(indxR,i,j,plane))
-               call cfh(w(1,i,j,plane),w(5:6,i,j,plane),ei,&
-                        T,n_save(:,i,j,plane),&
-                        MWave,kappa,mu,Yv(:,i,j,plane),vhi(:,i,j,plane),DHi(:,i,j,plane))
-               if(abs(Tmat(i,j)-T)>2d0*Tdiff_cfh) then
-                  print *,i,j,Tmat(i,j),T,w(5:6,i,j,plane),ei
-                  stop
-               end if
-
-               DHi(:,   i,j,plane) = 0d0
-               w(4,     i,j,plane) = w(1,i,j,plane)*(R_uni/MWave)*T
-               w(indxg, i,j,plane) = kappa
-               w(indxht,i,j,plane) = (q(nY+3,i,j,plane)+w(4,i,j,plane))/w(1,i,j,plane)
-               w(indxMu,i,j,plane) = mu
-               w(indxR, i,j,plane) = R_uni/MWave
-            end do
-         end do
-         !$omp end parallel do
-      end do
    else
+      !!!!!!!!!!!!!!!!!!!!! NORMAL OPERATION !!!!!!!!!!!!!!!!!!!!!
       do plane = nps,npe
          !$omp parallel do private(i,ei,T,MWave,kappa,mu)
          do j=nys(plane),nye(plane)
             do i=nxs(plane),nxe(plane)
+               w(5,i,j,plane)=min(max(0d0,w(5,i,j,plane)),1d0)
+               w(6,i,j,plane)=min(max(0d0,w(6,i,j,plane)),1d0)
                ei = q(nY+3,i,j,plane)/w(1,i,j,plane)-0.5d0*(w(2,i,j,plane)**2+w(3,i,j,plane)**2)
                T  = w(4,i,j,plane)/(w(1,i,j,plane)*w(indxR,i,j,plane))
-               call cfh(w(1,i,j,plane),w(5:6,i,j,plane),ei,&
-                        T,n_save(:,i,j,plane),&
-                        MWave,kappa,mu,Yv(:,i,j,plane),vhi(:,i,j,plane),DHi(:,i,j,plane))
+
+               if(w(5,i,j,plane)<Yf_cfh .or. w(6,i,j,plane)<Yo_cfh) then
+                  call flame_sheet_cfh(w(5:6,i,j,plane),ei,&
+                        T,&
+                        MWave,kappa,mu,DHi(:,i,j,plane),Yv(:,i,j,plane),vhi(:,i,j,plane))
+               else
+                 call cea(w(1,i,j,plane),w(5:6,i,j,plane),ei,&
+                       T,n_save(:,i,j,plane),&
+                       MWave,kappa,mu,Yv(:,i,j,plane),vhi(:,i,j,plane),DHi(:,i,j,plane))
+               end if
 
                DHi(:,   i,j,plane) = 0d0
                w(4,     i,j,plane) = w(1,i,j,plane)*(R_uni/MWave)*T
