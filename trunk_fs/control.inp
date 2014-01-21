@@ -1,10 +1,13 @@
 #FOR GENERAL PARAMETERS
-Max Step Number         : 1.e5
+Max Step Number         : 1.e6
 convergent RMS          : 1.e-14
-CFL Number              : 10.
+CFL Number              : 0.5
 File Output Period      : 1000
 
 #FOR MUSCL
-MUSCL ON(1)/OFF(0)      : 1
+MUSCL ON(1)/OFF(0)      : 0
 MUSCL Precision Order   : 3
 
+#FOR CFH
+Temp. Diff Limit(K)     : 1.e-3
+cfh check freq.         : 500

@@ -1,8 +1,8 @@
 grid file name    : trunk_fs/BoundaryCombustion_8.x #Grid file name (*.x)
-NumOfProcessors   :0  #The Maximum Number of Processors @ M-System[Super Computer] / 0 @ Personal Computer
+NumOfProcessors   :12  #The Maximum Number of Processors @ M-System[Super Computer] / 0 @ Personal Computer
 dimension         :0  #two dimension(0) / axi-symmetry(1)
 time step         :0  #global(0)/local(1)
-time scheme       :3  #Euler(0)/Runge-Kutta two-step(1)/LU-SGS(2)/Newton-Raphson(3)/Pre-Conditioner(4)/Dual Time Step(5)/Pre-conditioner with LU-SGS(6)
-high order scheme :0  #Up Wind(0)/MUSCL(1)
+time scheme       :1  #Euler(0)/Runge-Kutta two-step(1)/LU-SGS(2)/Newton-Raphson(3)/Pre-Conditioner(4)/Dual Time Step(5)/Pre-conditioner with LU-SGS(6)
+high order scheme :1  #Up Wind(0)/MUSCL(1)
 viscosity         :1  #non-viscous flow(0)/viscous flow(1)
-thermal model     :3  #Ideal Gas(0)/Cold flow using chemkin D.B.(1)/Chemical Kinetics Model(2)/Flame Sheet Model(3)/Perfect Equilibrium Model(4)/Cold flow using NASA D.B.(5)
+thermal model     :4  #Ideal Gas(0)/Cold flow using chemkin D.B.(1)/Chemical Kinetics Model(2)/Flame Sheet Model(3)/Perfect Equilibrium Model(4)/Cold flow using NASA D.B.(5)

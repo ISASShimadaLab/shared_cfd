@@ -2,7 +2,7 @@ elements
  N H C O
 end
 species
- H2O CO2 CH4 N2 O2
+ H2O CO2 CH4 N2 O2 CO H2
 end
 thermo
 end
