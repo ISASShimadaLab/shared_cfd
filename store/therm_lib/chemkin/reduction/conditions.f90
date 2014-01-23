@@ -350,13 +350,14 @@ subroutine sort_n(flag)!{{{
       close(20)
    end if
 end subroutine sort_n!}}}
-subroutine reduction_species!{{{
+subroutine reduction_species(flag_first)!{{{
    use chem
    implicit none
+   logical flag_first
    integer ns_org,i
    logical flag
 
-   call sort_n(.true.)
+   call sort_n(flag_first)
 
    ns_org=ns
    i=1

@@ -1,5 +1,5 @@
 #Input File for PostProcessing
-File Read Freq.         :   500000
+File Read Freq.         :  1000000
 From Where              : 47000000
 Database Place          : 
 OverWrite? Yes(1)/No(0) : 0

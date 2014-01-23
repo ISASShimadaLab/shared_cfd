@@ -136,7 +136,7 @@ part\_point\_implicitに文字列が存在する場合main.main.point\_implicit.
 \begin{itemize}
 \item Max Step Number...計算を再開してからの最大ステップ数.
 \item convergent RMS...収束とするエネルギー残渣.
-\item CFL Number...Courant–Friedrichs–Lewy数.
+\item CFL Number...CourantFriedrichsLewy数.
 \item File Output Period...ファイル出力周期.
 \end{itemize}
 %}}}
@@ -374,7 +374,7 @@ vhi(1)=kappa_gas/(kappa_gas-1d0)*p/rho
 DHi(1)=0d0
 \end{verbatim}
 %}}}
-\subsubsection{store/therm\_lib/NASA}%{{{
+\subsubsection{store/therm\_lib/NASA}\label{store/therm_lib/NASA}%{{{
 \begin{center}
 \begin{tabular}{cccc}\hline
 特有モジュール               & nY &            nV & with-nV or no-nV\\\hline \hline
@@ -902,6 +902,8 @@ condition.head.f90とcondition.tail.f90というcondition.raw.f90のheadとtail�
 checkout\_model.inpを記入し、checkout.pyを起動すると生成される。
 実処理はcheckout.pyから呼び出された"store/checkout/checkout\_model.py"によって生成される。
 ファイルはchem.inpとcontrol\_chem.raw.inpがcheckout.pyと同じディレクトリに生成される。
+これらのデータベースを用いる計算ではこのcontrol\_chem.raw.inpを編集し、control\_chem.inpとして作業ディレクトリ(checkoutまたはcheckout\_chem)にコピーしなければならない。
+編集方法は\ref{store/therm_lib/NASA}に記してある。
 
 checkout\_model.inpは以下のようになっている。
 \begin{verbatim}
@@ -935,6 +937,15 @@ checkout\_chem.inpを記入し、checkout.pyを起動すると生成される。
 
 化学コードでは化学モデルの選択や、uv一定条件かhp一定条件の選択、単一条件か複数条件の選択、更には化学モデルの簡略化までを行うことができる。
 
+コード生成にはcheckout\_chem.inpを用いる。中身は以下のようになっている。
+\begin{verbatim}
+thermal model:1 # flame sheet of nasa(0) / NASA CEA(1) / chemkin(2)
+calc model   :2 # mono(0) / plot(1) / reduction(2)
+constants    :1 # uv(0) / hp(1)
+\end{verbatim}
+flame sheet of nasa, NASA CEA, chemkinはそれぞれ一段総括反応、完全平衡モデル、化学素反応モデルを表している。該当する数字を入力すれば所望のコードを得られる。例えばこの入力ファイルでは、圧力エンタルピー一定完全平衡モデルの簡略化コードを得られる。
+
+実行ファイルはdriverであり、\verb|./driver|と入力することで、実行される。
 \hspace{1em}
 
 化学コードはディレクトリ構造が複雑である。
@@ -967,20 +978,16 @@ store/therm_lib/chemkin/{mono,plot,reduction}
 これも後述するように全ての組み合わせが存在するわけではない。
 
 また、chem\_driveの中に、ドライバであるdriver.f90をコンパイルするためのMakefileの部品が存在し、0次元化学コード生成時には必ず用いられる。流体コードのstore/coreにあたる。
+
+
+また、化学素反応モデル(chemkin)では"平衡温度"と"着火時刻"を用いているが、定義はそれぞれ
+\begin{itemize}
+\item 着火時間...0次元自己着火計算において初期状態から初期温度から400Kあがるまでの時間
+\item 平衡温度...0次元自己着火計算において初期状態から着火時間の10倍経ったときの時間
+\end{itemize}
+である。
 %}}}
 \subsection{store/therm\_lib/NASA}%{{{
-%intro{{{
-NASAデータベースを用いるものでは共通の計算を行うファイルが
-\begin{verbatim}
-store/therm_lib/NASA/core
-\end{verbatim}
-にまとめてあり、それぞれの計算の種類によって以下のような構造のディレクトリのいずれかを選ぶこととなる。
-\begin{verbatim}
-store/therm_lib/NASA/{flame_sheet,cea}/{mono,plot,reduction}/{uv,hp}
-\end{verbatim}
-ただし\verb|{a,b,c}|と書いてあるところにはaかbかcが入る。
-後述するように全ての組み合わせが存在するわけではない。
-%}}}
 \subsubsection{mono}%{{{
 単条件化学計算を行うものであり、出力としては
 \begin{quotation}
@@ -997,26 +1004,34 @@ control.inpは必要はないが、control\_chem.inpで、そのままのモル�
 \subsubsection{plot}%{{{
 複数条件の0次元化学計算を行うものであり、出力としては各条件での平衡温度となる。
 
+燃料と酸化剤の定義はcontrol\_chem.inpで流体計算と同様に行う。
 control.inpは次のような入力になる。
 \begin{verbatim}
-Pressure (Pa)         range and Ntics : 1.e5 1.e6  7
+Pressure (Pa)         range and Ntics : 1.e5 1.e6  3
 Temperature (K)       range and Ntics : 300. 300.  1
 mass fraction of fuel range and Ntics :   0.   1. 11
-variable for x axis                   : P # P or T or Yf. Yf is mass fraction of fuel
+variable for x axis                   : Yf # P or T or Yf. Yf is mass fraction of fuel
 \end{verbatim}
 入力は初期圧力、初期温度、燃料質量分率及びそのサンプル数、
 加えてプロット時にx軸とする変数である。
 
+実行が完了すると、"done"と表示される。
+
 また、プロット時には、ある変数については色をわけ同じファイルに、ある変数についてはファイル自体をわけることにしており、ファイルを分ける変数はx軸とする変数以外でサンプル数が少ない変数が自動的に選ばれる。
 
-上記入力ファイルの場合、x軸を初期圧力、y軸に平衡温度、異なる初期圧力が色分けされた線として、初期温度300Kを固定した一つのグラフが生成される。
+上記入力ファイルの場合、x軸を燃料質量分率、y軸に平衡温度、異なる初期圧力が色分けされて描かれて、初期温度300Kを固定した一つのグラフが生成される。
 
-ファイルはplot.001.dat, plot.002.dat, plot.003.datが生成され、
-\verb|gnuplot plot.plt|というコマンドを実行するとout.epsというグラフが生成される。
+データファイルとしては、plot.001.002.datのようなファイルが生成される。一つ目の数字(例では'001')はファイルの違い(例では初期温度の違い)、二つ目の数字(例では'002')は色わけの違い(例では初期圧力の違い)を表す。例にあげた入力ファイルだとplot.001.001.dat, plot.001.002.dat, plot.001.003.datが生成される。
+
+\verb|gnuplot plot.plt|というコマンドを実行するとout.*.epsというグラフが生成される。'*'にはplot.*.*.datの一つ目の数字が入る。
+
+また、plot.*.*.datには温度だけではなく各種物性値も記録される。どの列にどのデータがあるかはコメント文をデータファイルに直接記してあるので参照のこと。
 %}}}
 \subsubsection{reduction}%{{{
+複数条件の0次元化学計算による簡略化を行う。モニターする値は温度のみであり、温度があっていれば、どのような簡略化でも許すようになっている。また、簡略化は化学種の削減により行われる。
 \textbf{定圧定エンタルピー条件の完全平衡モデルの簡略化のみを行うことができる。}
 
+燃料と酸化剤の定義はcontrol\_chem.inpで流体計算と同様に行う。
 control.inpは次のような入力になる。
 \begin{verbatim}
 Pressure (Pa)         range and Ntics : 1.e5 1.e6 7
@@ -1027,17 +1042,163 @@ Allowable tolerance of temperature    : 0.05
 入力は初期圧力、初期温度、燃料質量分率及びそのサンプル数、
 許容する温度誤差(割合)である。上記例であれば、許容温度誤差5\%となる。
 
+実行が完了すると、作成されたモデルの実際の温度誤差、及び使用される化学種数が表示される。
+
+新しく作成されたモデルはchem.inp.newとファイルに保存される。これをchem.inpとすれば、流体計算や0次元化学計算に用いることができる。
 
 
-また、プロット時には、ある変数については色をわけ同じファイルに、ある変数についてはファイル自体をわけることにしており、ファイルを分ける変数はx軸とする変数以外でサンプル数が少ない変数が自動的に選ばれる。
-
-上記入力ファイルの場合、x軸を初期圧力、y軸に平衡温度、異なる初期圧力が色分けされた線として、初期温度300Kを固定した一つのグラフが生成される。
-
-ファイルはplot.001.dat, plot.002.dat, plot.003.datが生成され、
-\verb|gnuplot plot.plt|というコマンドを実行するとout.epsというグラフが生成される。
+簡略化は全条件において最も量が少なかった化学種から順に行われる。
+この量は"sort.dat"というファイルに記録されている。以下にファイル冒頭を抜粋する。
+\begin{verbatim}
+  1  9.9999811E-01 # CH4               
+  2  7.7786694E-01 # N2                
+  3  2.2213306E-01 # O2                
+  4  1.9663044E-01 # CO                
+  5  9.0467837E-02 # H2O               
+  6  8.5527640E-02 # CO2               
+  7  3.1036181E-02 # H2                
+  8  1.1552881E-04 # NH3               
+  9  4.3948638E-05 # C2H6              
+ 10  2.1079976E-06 # HCN               
+\end{verbatim}
+一列目は化学種順位、二列目は最大の質量分率、三列目は\#、四列目は化学種名となっている。
+化学種順位は反応物に使われているものが高く、次に量が多いものの順に並んでいる。
+よって最大質量分率が大きい生成物が、最大質量分率が小さい反応物より化学種順位が小さくなる場合もある。
+また、このファイルは化学種名がコメントとなっているので、以下のようにgnuplotでプロットも可能である。
+\begin{verbatim}
+set logscale y
+plot "sort.dat" with lines
+\end{verbatim}
 %}}}
 %}}}
 \subsection{store/therm\_lib/chemkin}%{{{
+\subsubsection{mono}%{{{
+単条件化学計算を行うものであり、
+当量における自己着火計算の温度と指定化学種の質量分率の時間履歴を出力する。
+初期温度、初期圧力、"当量"はcontrol\_chem.inpで指定されたモル分率として定義される。例えばcontrol.inpが
+\begin{verbatim}
+#Control parameters for chemistry
+Oxidizer Pressure(Pa)   : 1.01325e5
+Oxidizer Temperature(K) : 1300.
+Oxygen Composition(mole ratio):
+O2 2
+end
+Fuel Pressure(Pa)       : 1.01325e5
+Fuel Temperature(K)     : 1300.
+Fuel Composition(mole ratio):
+CH4 1
+end
+Relative Torelance VODE : 1.e-8
+Absolute Torelance VODE : 1.e-20
+\end{verbatim}
+の場合は圧力1気圧、温度1300K、CH4:O2$=$1:2の計算が行われる。
+また、VODEで用いる相対許容誤差(Relative Torelance VODE)と絶対許容誤差(Absolute Torelance VODE)も定義しなければならない。(多くの場合上記デフォルト値で十分。落ちた場合はこれらを小さくとること。)
+
+control.inpは以下のようなファイルである。
+\begin{verbatim}
+final time (s)          : -1.e0
+time step (s)           : -1.e0
+species to include:
+CH4
+O2
+OH
+CH
+CO2
+CO
+H2O
+end
+\end{verbatim}
+final time, time stepは自分で決めることもできるが、final timeに負値を指定すると、final timeが着火時間の1.5倍、time stepがfinal timeの千分の一に設定される。
+また、100秒以内に着火しない場合は着火時間計算不能と判断され、プログラムは異常終了する。
+
+"species to include"以下には時間履歴を記録したい化学種を記す。一行一化学種であり、最後に"end"だけの行が必要である。
+
+データは"plt.dat"に出力される。
+\begin{verbatim}
+gnuplot plot.plt
+\end{verbatim}
+を実行すると、まず温度の時間履歴が表示される。グラフのウィンドウを閉じ('q'押下で閉じれる)、ターミナル上でもう一度Enterキーを押すと、指定した化学種の質量分率の時間履歴が表示される。これも'q'押下で閉じれ、ターミナル上でもう一度Enterキーを押すと、実行は終了する。
+
+plt.datにおける各値の列はplot.pltを参照のこと。
+%}}}
+\subsubsection{plot}%{{{
+複数条件の0次元化学計算を行うものであり、出力としては各条件での平衡温度及び着火時間となる。
+
+燃料と酸化剤の組成定義およびVODEのパラメータ定義はcontrol\_chem.inpで流体と同様に行う。
+
+control.inpは次のような入力になる。
+\begin{verbatim}
+Pressure (Pa)         range and Ntics : 1.e6   1.e6  1
+Temperature (K)       range and Ntics : 1300. 1500.  2
+mass fraction of fuel range and Ntics : 0.15   0.25  3
+variable for x axis                   : T  # P or T or Yf. Yf is mass fraction of fuel
+\end{verbatim}
+入力は初期圧力、初期温度、燃料質量分率及びそのサンプル数、
+加えてプロット時にx軸とする変数である。
+
+着火計算の場合、必ずしも全ての条件で着火することはない。よって、まず上記条件の中で"計算可能"なものと"計算不可能"だったものが分類される。この分類は実行時に
+\begin{verbatim}
+           1           1           1 OK
+           2           1           1 OK
+           1           1           2 OK
+           2           1           2 OK
+           1           1           3 OK
+           2           1           3 OK
+ (calculated points)/(all points)=           6 /           6
+\end{verbatim}
+のように表示される(番号は左から順に初期温度、初期圧力、燃料質量分率)他、gnuplotで
+\begin{verbatim}
+splot "calculatable.out","not_calculatable.out"
+\end{verbatim}
+とコマンドをうつと、計算可能な点が赤、不可能な点が緑で表示される。
+
+出力ファイルの、色わけする変数やファイルを分ける変数の選び方や、
+plot.*.*.datの名前規則はNASAデータベースを用いる計算と同じである。
+ただし、\verb|gnuplot plot.plt|を実行した際には、
+out.*.epsの代わりにTeq.*.epsとTign.*.epsが出力される。'*'にはNASAデータベースの際と同じ数字が入る。
+
+また、Tref.outには、全条件での初期圧力、燃料質量分率、初期温度、着火時刻、平衡温度がこの順で入力されている。
+%}}}
+\subsubsection{reduction}%{{{
+複数条件の0次元化学計算による簡略化を行う。
+モニターする値は平衡温度と着火時刻のみであり、この二者があっていれば、どのような簡略化でも許すようになっている。また、簡略化は化学種の削減と素反応の削減のみにより行われる。
+
+燃料と酸化剤の定義はcontrol\_chem.inpで流体計算と同様に行う。
+control.inpは次のような入力になる。
+\begin{verbatim}
+Pressure (Pa)         range and Ntics : 1.e6   1.e6  1
+Temperature (K)       range and Ntics : 1300. 1500.  2
+mass fraction of fuel range and Ntics : 0.15   0.25  3
+Allowable tolerance of temperature    : 0.05
+\end{verbatim}
+入力は初期圧力、初期温度、燃料質量分率及びそのサンプル数、
+許容する温度誤差(割合)である。上記例であれば、許容温度誤差5\%となる。
+
+実行は
+\begin{enumerate}
+\item 計算可能な条件点の判定
+\item 化学種の並び替え及び重要度の少ない化学種からの削減(reduct\_species\_in\_order)
+\item 全ての化学種のチェック(reduct\_every\_species)
+\item 素反応の並び替え及び重要度の少ない素反応からの削減(reduct\_reaction\_in\_order)
+\item 全ての素反応のチェック(reduct\_every\_reaction)
+\item 化学種の並び替え及び重要度の少ない化学種からの削減(reduct\_species\_in\_order)
+\item 全ての化学種のチェック(reduct\_every\_species)
+\end{enumerate}
+のように行われる。
+
+化学種の重要度は全条件全時間におけるその化学種の最大質量分率の大きさで評価される。初回並び替え結果は"sort.dat"に保存されている。
+
+素反応の重要度はCSP法により評価されている。
+全時間のCSPの値は各時間のCSPの値の最大値をとることで評価されている。
+初回並び替え結果は"sort\_r.dat"に保存されている。
+
+"sort.dat"と"sort\_r.dat"はNASAデータベースの際と同様にgnuplotでプロットすることができる。
+
+実行中には現在の化学種数および素反応数が表示される。
+
+新しく作成されたモデルはchem.inp.newとファイルに保存される。
+これをchem.inpとすれば、流体計算や0次元化学計算に用いることができる。
+%}}}
 %}}}
 %}}}
 \newpage
