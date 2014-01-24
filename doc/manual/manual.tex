@@ -2232,8 +2232,10 @@
 \end{verbatim}
 など。)
 
-表にどのサンプルがどの機能を用いているか一覧を記した。
+行うべき操作、つまり打つべきコマンドは各ディレクトリのrun.shにまとめてある。何をすべきか分からない場合は参照すること。
 
+表にどのサンプルがどの機能を用いているか一覧を記した。
+なお、スパコンについては検証問題を作っていない。
 \begin{table}[b]%{{{
 \centering
 \caption{流体コードを用いているサンプル}
@@ -2310,14 +2312,58 @@ no26.chemkin\_mono\_hp            & 化学素反応   & 単条件   & hp一定 \
 \hspace{1em}
 \newpage
 \section{サンプル一覧}
-
-\subsection{no00.shock\_tube}
+\subsection{no00.shock\_tube}%{{{
 衝撃波管問題.理想気体を用いた単純な問題。
 
-\subsection{no01.AdvectionOfN2O2}
-\subsection{no02.boundary\_layer}
-\subsection{no03.n0012}
-\subsection{no04.boundary\_layer\_highviscous}
+圧力が以下の図のようになる。
+\begin{center}
+\includegraphics[width=.6\textwidth,bb=0 0 1556 1054]{sample/no00.png}
+\end{center}
+%}}}
+\subsection{no01.AdvectionOfN2O2}%{{{
+N2とO2の移流を解いている。
+熱力学データはchemkin.inpから取得している。
+phi001もしくはphi002を見ると置き換わっていく様子が分かる。
+図はphi001(N2)を表しており、左側から入ってくるO2によりN2が押し出されていくのがわかる。
+
+なお、このサンプルのcontrol\_chem.inpを見れば、酸化剤がN2に、燃料がO2に定義されていることがわかる。
+このように、本プログラムでは二種類の気体組成を酸化剤と燃料として、(本当は酸化剤と燃料ではなくとも、)保持することができる。
+\begin{center}
+\includegraphics[width=.6\textwidth,bb=0 0 1556 1054]{sample/no01.png}
+\end{center}
+%}}}
+\subsection{no02.boundary\_layer}%{{{
+一様流0.1 m/s、長さ0.3m程度の境界層。
+酸素充填一様場からのImpulse Start.
+流入は二酸化炭素であるため、収束解では二酸化炭素のみとなる。
+実在気体でこの程度の境界層を作るには、通常の時間スキームでは大変な時間がかかる。
+しかし、本例題ではパラメータ調整なしの前処理法を用いているため、
+速やかに収束解を得ることができている。
+\begin{center}
+\includegraphics[width=.7\textwidth,bb=0 0 1556 1054]{sample/no02.png}
+\end{center}
+%}}}
+\subsection{no03.n0012}%{{{
+NACA0012翼の圧力問題。
+この問題で粘性を用いると乱流になるので、非粘性を用いること。
+グリッドは以下のとおりである。
+\begin{center}
+\includegraphics[width=.6\textwidth,bb=0 0 439 205]{sample/no03.2.png}
+\end{center}
+圧力分布は以下のようになる。
+\begin{center}
+\includegraphics[width=.7\textwidth,bb=0 0 1556 1054]{sample/no03.png}
+\end{center}
+実験条件は"Pressure Distributions from High Reynolds Number Transonic Tests of an NACA 0012 Airfoil in the Langley 0.3-Meter Transonic Cryogenic Tunnel;Charles L. Ladson, Acquilla S. Hill and Wiliam G. Johnson, Jr."に合わせており、naca0012.datに検証に使ったデータファイルを置いている。
+この論文にかかれた実験結果と計算結果は以下のように一致するはずである。
+\begin{center}
+\includegraphics[width=.7\textwidth,bb=0 0 640 480]{sample/no03.1.png}
+\end{center}
+postprocess.f90を適宜編集の上、同様の検証を行うこと。
+%}}}
+\subsection{no04.boundary\_layer\_highviscous}%{{{
+
+%}}}
 \subsection{no05.boundary\_layer\_ideal}
 \subsection{no06.step\_flow}
 \subsection{no07.step\_flow2}
