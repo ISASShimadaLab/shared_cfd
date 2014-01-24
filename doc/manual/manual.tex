@@ -7,11 +7,10 @@
 \title{SHIMADA LAB. CODE\\MANUAL}
 \author{山中翔太}%{{{
 \maketitle
-
+\newpage
 \tableofcontents
 %}}}
 \newpage
-
 
 %tutorial
 \part{基本事項}
@@ -28,6 +27,27 @@
 そのあと、condition.f90で用いられる"すべり壁"と"粘着壁"について説明する。
 
 最後に、デバッグに使える多少のコマンドについて説明する。
+
+\begin{itembox}[l]{環境条件}
+本プログラムはUbuntu 12.04 LTS上で正常な実行を確認している。
+
+また、以下のプログラムを用いている。
+\begin{itemize}
+\item intel fortran (non-commercial)
+\item python
+\item wx-python
+\end{itemize}
+使用する際には以上のプログラムをまずインストールすること。
+
+また、外部ライブラリとして
+\begin{itemize}
+\item dvode.f from ODEPACK
+\item thermo.inp from NASA-CEA
+\item trans.inp from NASA-CEA
+\end{itemize}
+を用いており、これらのファイルを再頒布している。
+\end{itembox}
+
 %}}}
 \newpage
 \section{チュートリアル}%{{{
@@ -54,7 +74,7 @@ GUI.pyは以下のコマンドで起動される。
 \begin{center}
 \includegraphics[width=.7\textwidth,bb=0 0 895 649]{tutorial_img/020.png}
 \end{center}
-起動されたら、まずthermal modelで完全平衡モデル"NASA CEA"を選び、"Not Selected"の中から生成物として使いたい化学種をダブルクリックすることで選択する。今回はメタン空気の燃焼なので、CH4,N2,O2の三つを選べばよい。なお、この際"Not Selected"内でCtrl+Lをうつと検索モードとなり、所望の化学種を素早くみつけることができる。
+起動されたら、まずthermal modelで完全平衡モデル"NASA CEA"を選び、"Not Selected"の中から生成物として使いたい化学種をダブルクリックすることで選択する。今回はメタン空気の燃焼なので、CH4,N2,O2の三つを選べばよい。なお、この際"Not Selected"内でCtrl+Fをうつと検索モードとなり、所望の化学種を素早くみつけることができる。
 \begin{center}
 \includegraphics[width=.7\textwidth,bb=0 0 895 649]{tutorial_img/030.png}
 \includegraphics[width=.7\textwidth,bb=0 0 895 649]{tutorial_img/035.png}
@@ -204,11 +224,40 @@ control.inpは以下のように編集する。
 \end{center}
 これも詳しい書式はsection \ref{流体コード}参照のこと。
 
-condition.f90については、左半分を空気、右半分をメタンのそれぞれ静止気体とする。
+\begin{itembox}[l]{重要}
+condition.f90については、一般的に
+\begin{itemize}
+\item 初期条件(set\_IC)
+\begin{itemize}
+\item q全て...保存量全て
+\item $w_4$...圧力
+\item $w_{indxg}$...比熱比
+\item $w_{indxR}$...気体定数
+\end{itemize}
+\item 境界条件(set\_BC)
+\begin{itemize}
+\item w全て...基本量及び、比熱比、気体定数、質量あたり全エンタルピー、粘性係数
+\item vhi全て...それぞれの気体グループの質量あたり内部エンタルピー
+\item Yv全て(NASAデータベース使用の場合)...それぞれの気体グループの質量分率
+\end{itemize}
+\end{itemize}
+を設定する必要がある。
+\end{itembox}
+
+\begin{itembox}[l]{重要}
+特に、理想気体を用いる場合、境界条件において
+\begin{center}
+$w_5=1$
+\end{center}
+を忘れがちなので注意すること。
+\end{itembox}
+
+本チュートリアルでは左半分を空気、右半分をメタンのそれぞれ静止気体とする。
 初期圧力はcontrol\_chem.inpでそれぞれ1気圧、10気圧としているので、これは衝撃波管問題となる。
 
 condition.f90は冒頭を以下に記す。
-\begin{verbatim}%{{{
+%{{{
+\begin{verbatim}
 subroutine set_IC
    use grbl_prmtr
    use prmtr
@@ -322,10 +371,20 @@ contains
 
 (以下省略。condition.raw.f90と変更なし)
 
+
 \hspace{1em}
 
 
 以上のように、NASAデータベースを用いる場合にはモジュールchem\_varを用いることでqo,wo,qf,wfの利用が可能になる。このようなデータベースは熱力学モデル毎に決められており、section \ref{流体コード}で詳細の説明がなされている。
+
+\begin{itembox}[l]{重要}
+ここで、"1"や"49","99"などの数字があるが、これは単純に領域の端の値を示しているのではない。
+C型格子のように、境界値が一部共有されるグリッドの場合は、その"ユーザーが指定する必要のない境界値"はこの数値の範囲外となる。
+例えば、j=0(i=1...100)の境界値のうち、i=1...20とi=81...100が互いに接している場合、
+condition.f90ではj=0の境界値設定のループがi=21...80に自動的に設定される。
+つまりユーザーは、切断面でどこのセルの値がどこに入るのか(これはMPI関数が入ると大変面倒)を考えることなく、
+切断面以外の境界値を与えれば十分である。
+\end{itembox}
 
 以上の変更を行うと、コンパイルが可能になる。
 \begin{verbatim}
@@ -348,6 +407,53 @@ make
 \begin{center}
 \includegraphics[width=.8\textwidth,bb=0 0 962 577]{tutorial_img/210.png}
 \end{center}
+番号はステップ数である。
+
+\hspace{1em}
+
+ここで再度
+\begin{verbatim}
+./main
+\end{verbatim}
+を実行すると、最初から実行はされず、前回計算の結果を初期条件とした計算がはじまる。
+\begin{itembox}[l]{重要}
+これは前回計算結果がrestart.binというファイルに保存されているからである。
+よってrestart.binを削除すれば、再度、set\_ICで定義される初期条件から計算が始まる。
+\end{itembox}
+また、最新の実行結果からではなく、ある時間ステップから実行したい場合は、その時間ステップの結果ファイルをrestart.binとすればよい。
+例えば上の計算で500ステップ目から計算を始める場合、実行ファイルmainがあるディレクトリで
+\begin{verbatim}
+cp result/result000000000500.bin restart.bin
+./main
+\end{verbatim}
+を実行すれば、計算は500ステップ目から再開される。
+
+また、
+\begin{itembox}[l]{重要}
+restart.binファイルは
+\begin{itemize}
+\item 同じ格子をつかい、
+\item 同じ化学データベース(理想気体 or NASAデータベース or chemkinデータベース)
+\end{itemize}
+を用いる計算の場合、互換性がある。
+\end{itembox}
+よって、
+\begin{itemize}
+\item cflを500ステップ目から変えて、うまくいかなかったらresult000000000500.binをrestart.binとして別のcfl数で計算を回す。
+\item 計算を途中で打ち切り、local time stepをglobal time stepに変えて、計算を再開する。
+\item 途中までLU-SGSで計算し、最後の仕上げにRunge=Kutta二次精度を用いて流れ場を整える。
+\item 初期流れ場をcold flow modelでPreconditionerを使って求め、その流れ場を初期条件とした非定常着火計算を行う。
+\item 一段総括反応で求めた収束場を初期条件として完全平衡モデルの収束場を求める。
+\end{itemize}
+などの計算を行うことができる。
+
+\hspace{1em}
+
+また
+\begin{itembox}[l]{重要}
+RMS.datにエネルギー残渣が記録されている
+\end{itembox}
+ので、これをプロットすると流れ場の収束を確かめることができる。
 %}}}
 \subsection{可視化}%{{{
 前節で出力された結果はfortran unformattedファイルのため、そのままでは可視化ソフトに読ませることはできない。よって、可視化用の変換を行わなければならない。
@@ -391,9 +497,25 @@ makeを実行すると、実行ファイルpostprocessが生成される。こ�
 \includegraphics[width=.7\textwidth,bb=0 0 1522 1056]{tutorial_img/280.png}
 \end{center}
 %}}}
+\subsection{作業ディレクトリの削除}%{{{
+削除は2ステップで簡単にできる。
+まずpostprocessディレクトリで
+\begin{verbatim}
+make clean
+\end{verbatim}
+とうつ。すると、postprocessディレクトリの実行ファイル及びvtsファイルが削除される。
+
+次に、checkout.pyと同じ階層に移り、
+\begin{verbatim}
+make clean
+\end{verbatim}
+とうつ。すると、checkout.inpやcheckoutディレクトリが全て削除される。
+
+これら二つのコマンドでpostprocess/control.inpについての変更以外、
+全て元の状態に戻るはずである。
+%}}}
 %}}}
 \newpage
-
 
 %details
 \part{各機能の説明}
@@ -582,6 +704,9 @@ cronを利用する際の注意点として、cronはサーバー毎に設定で
 プログラムが落ちた際や、間違った境界条件を使用していたことに気づいた際に用いる。
 \end{itemize}
 
+これらの中で、check.pl, check\_and\_throw.pl, StepJob.py, qdel.plはファイル中にユーザー名を書き込む必要がある。
+"y535"と書いてある部分を自分のユーザー名に置き換えること。
+
 \paragraph{データファイルの転送コマンド}
 \begin{itemize}
 \item \verb|make remove| on SC...スーパーコンピュータ上で打つと、標準入力および標準出力、result内の全ての結果を削除する。restart.binは残す。
@@ -672,6 +797,12 @@ $\omega$が指数的に増加せず、一回目の内部反復でDqrateにより
 \item \textbf{60 @ Max Number}...理想気体では経験上20で十分。多分子流をDual Time Stepで解いたとき、100必要だった場合もあった。
 \end{itemize}
 %}}}
+
+\hspace{1em}
+
+なお、経験上precon, preconLU-SGSについては、経験上"直交格子"かつ"非燃焼流"の場合は大変うまく働くが、そのどちらかが満たされないとあまりうまく動かない。
+また、dualについてはNR以上の性能を出した経験が一度もない。
+注意すること。
 %}}}
 \subsection{store/viscosity}%{{{
 non-viscousとviscousというディレクトリがあり、viscousにはその中にwith-nVとno-nV、さらにそれぞれに"2d"と"q2d"というディレクトリが収められている。
@@ -1029,6 +1160,16 @@ cfhとは"cea-flame sheet hybrid scheme"の略で、"cea"は完全平衡モデ�
 この入力例では500ステップ毎にどのくらい"ほとんど"燃料または酸素であれば温度の誤差が$10^{-3}$K以下になるかを計算し、
 他のステップではその閾値を用いて完全平衡モデルと一段総括反応の切り替えを行っている。
 
+このモデルを使うと、計算時には以下のような文字列が標準出力に吐かれる。
+\begin{verbatim}
+step=    61633500 fs/all(%)=   84.58 Yf_cfh=  1.3E-08 Yo_cfh=  0.0E+00
+\end{verbatim}
+\begin{itemize}
+\item fs/all(\%)...全てのセルの中で、flame sheetモデルを使用している割合。この場合、全セル中85\%のセルが一段総括反応モデルを用いて計算されている。
+\item Yf\_cfh...燃料質量分率がこの値以下だった場合、セル内はほとんど酸化剤だとして、flame sheetモデルが用いられる。
+\item Yo\_cfh...酸化剤質量分率がこの値以下だった場合、セル内はほとんど燃料だとして、flame sheetモデルが用いられる。
+\end{itemize}
+
 組成は"化学種名 モル分率"の順で一化学種に一行用いて入力し、最後の行には"end"のみの行を入力する。
 このインプットファイルでは、酸化剤にN2:O2=4:1の混合気体(空気)、燃料にH2純粋気体を用いることとなっている。
 
@@ -1306,6 +1447,107 @@ condition.raw.f90生成時には以下のような動作を行っている.
 それぞれno-nV, with-nVに対応する. with-nVではYvのMPI転送が必要となるためファイルが異なる。
 condition.head.f90とcondition.tail.f90というcondition.raw.f90のheadとtailが含まれている。
 %}}}
+\subsection{postprocess}%{{{
+可視化用ライブラリである。
+postprocessディレクトリはその他のstore内のディレクトリとは違い、
+checkout.pyで生成されることはなく、そのまま用いる。
+
+ただし、グリッドの情報のため、checkout/n\_grid.f90は必ず使用する。
+そのため、例えばスーパーコンピュータで回した結果を可視化するために
+checkout内にスーパーコンピュータで用いたソースと違うソースを置いておきながら
+postprocessをコンパイルして用いると、可視化できない。
+
+postprocessに用いる入力ファイルはcontrol.inpのみで、以下のようになっている。
+\begin{verbatim}
+#Input File for PostProcessing
+File Read Freq.         : 100
+From Where              : -1
+Database Place          : ../checkout/
+OverWrite? Yes(1)/No(0) : 0
+1st Plane i start index : 210
+1st Plane i end   index : 400
+1st Plane j start index : 0
+1st Plane j end   index : 80 
+2nd Plane i start index : 0
+2nd Plane i end   index : -1
+2nd Plane j start index : 0
+2nd Plane j end   index : -1
+3rd Plane i start index : 0
+3rd Plane i end   index : -1
+3rd Plane j start index : 0
+3rd Plane j end   index : -1
+\end{verbatim}
+\begin{itemize}
+\item File Read Freq. ... このステップ毎にファイルを読んでいく。
+例えば100をセットすると、100, 200,300,...、
+1000をセットすると、1000, 2000, 3000, ...とファイルを読んでいく。
+\item From Where ... どこから読み出すのかを決める。
+-1をセットするとFile Read Freq.に設定した値がセットされる。
+通常はここに-1をセットし、File Read Freq.に流体計算のFile Output Periodで指定した数字を入力すれば、
+流体計算で出力した全ファイルを可視化できる。
+\item Database Place ... 出力ファイルresult*.binが格納されているresultディレクトリがある場所を入力する。
+PCで計算した場合は例に載せてあるように"../checkout/"、スーパーコンピュータからダウンロードする場合には空白にする。
+(直下のresultディレクトリに展開されるため。)
+OverWrite? ... 出力されている可視化ファイル(vtsファイル)と同名のファイルがある場合、上書きするかどうかを入力する。
+\begin{itemize}
+\item Yes(1)の場合...vtsファイルは上書きされる。デバッグ中で同じステップ数の結果を何種類も見たい場合に用いる。
+\item No(0)の場合...vtsファイルは上書きされない。
+流体コードを動かしている最中にその都度最新結果を見たい場合、未だ可視化していないファイルのみを可視化する必要がある。
+その場合に用いるとよい。
+\end{itemize}
+\item a Plane \{i/j\} \{start/end\} index : aつ目のブロックのi方向またはj方向の初めと終わりのインデックスを指定する。
+本可視化プログラムはセル中心ではなく、格子点を可視化する。よって、セルのi方向のインデックスが1からniまでの場合、
+可視化できる範囲は0からniまでとなる。これをそれぞれ指定する。
+これらはブロックの数だけ指定する必要がある。また、単一ブロックの場合はaは1stのみとなる。
+
+また、end indexに-1を指定すると、指定可能最大インデックス(上記の例ではni)が自動的に指定される。
+よって、領域全てを可視化したい場合にはstart indexに0、end indexに-1を指定すればよい。
+\end{itemize}
+また、control.inpは必要な情報を得たらそのあとの行は読まない。
+よって上記入力ファイルを単一ブロックグリッドに用いても、2nd Plane以下の行は無視される。
+
+可視化にはグリッド情報を得るためにgeometry.binが必要になる。これは流体コード起動時に生成されるファイルである。
+誤って消さないこと。
+
+可視化される量は以下の通りである。
+\begin{itemize}
+\item Density...密度
+\item Velocity\_x...x方向速度
+\item Velocity\_y...y方向速度
+\item Velocity...速度ベクトル
+\item Pressure...圧力
+\item SpecificHeatRatio...比熱比
+\item Temperature...温度
+\item Molecular\_Weight...平均分子量
+\item InternalEnergy...内部エネルギー
+\item phi*...各気体グループの質量分率(*がとりうる値は1,2,3)。数字はqのインデックスに対応する。
+\item phi\_res...気体グループの数が4以上だったとき、気体グループ4以降の質量分率の和。
+\item Indicies...そのグリッドの(i,j)インデックス。
+このインデックスを表示させて、control.inpのstart/end indexを決めたり、デバッグ時にどこで発散が起きているのかを調べたりすることができる。
+\end{itemize}
+
+また、スーパーコンピュータからパソコンにresult*.binを送る際には便利なユーティリティを作成している。スパコンで
+\begin{verbatim}
+make tar
+\end{verbatim}
+とうてば
+\begin{verbatim}
+tar cvf result.tar geometry.bin RMS.dat result/*
+tar -f result.tar
+\end{verbatim}
+が実行され、出力ファイルおよびグリッドファイルがまとめられたresult.tar.gzが作成される。
+
+これを今度はpostprocessディレクトリ内で
+\begin{verbatim}
+make pull
+\end{verbatim}
+と打てば
+\begin{verbatim}
+scp $(remote)/result.tar.gz .
+tar xzvf result.tar.gz
+\end{verbatim}
+が実行されるので、postprocess内のMakefileでremoteに適切な値をセットすれば、result.tar.gzのダウンロードおよび解凍を行うことができる。
+%}}}
 %}}}
 \newpage
 \section{NASA熱力学データベース}%{{{
@@ -1334,7 +1576,10 @@ Species Selectionでは一行に一つの化学種を記録する(スペース�
 選択された化学種のみがchem.inpに記録され、またcontrol\_chem.raw.inpには"Production Composition"の欄が生成される。
 
 \paragraph{完全平衡モデル}
-選択された化学種が含む原子を含む全ての化学種がchem.inpに記録され、またcontrol\_chem.raw.inpには"Production Compsition"の欄は生成されない。
+選択された化学種が含む原子を含む全ての化学種がchem.inpに記録され、またcontrol\_chem.raw.inpには"Products Compsition"の欄は生成されない。
+
+注:このモデルを流体計算で使う場合、一段総括反応モデルを部分的に使うこととなるためProducts Compositionの入力が必要となる。
+詳しくは流体の章参照。
 %}}}
 \newpage
 \section{0次元化学コード}%{{{
@@ -1686,6 +1931,7 @@ conditions.f90ではcontrol.inpの読み込みや各条件に用いるエネル�
 %}}}
 \newpage
 
+%
 
 
 %\section{サンプル集}
