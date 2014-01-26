@@ -100,7 +100,7 @@ subroutine set_BC(step)
             end do
       
             !non-slip wall
-            deltastep=max(0d0,min(dble(step)/5d3,1d0))
+            deltastep=max(0d0,min(dble(step-4e4)/5d3,1d0))
             do i=max(nxs(plane),55),nxe(plane)
                delta=abs(x(i,0,plane)-0.1d0)/0.01d0
                if(delta<1d0) then

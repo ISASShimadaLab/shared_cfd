@@ -14,4 +14,4 @@ rm checkout_chem/control.raw.inp
 cd checkout_chem
 make
 ./driver
-
+gnuplot plot.plt

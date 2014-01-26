@@ -1,8 +1,7 @@
 compiler=ifort -fast -parallel -convert big_endian -assume byterecl
 
-#remote=majao:/large/o/o384/share_code
+#remote=maja:/large/y/y535/2dcfd/debug
 remote=maja:/large/y/y535/2dcfd/share_code
-#remote=nysa:/large/y/y535/share_code
 directory=../checkout/
 
 #program=postprocess change_num_step flow_history

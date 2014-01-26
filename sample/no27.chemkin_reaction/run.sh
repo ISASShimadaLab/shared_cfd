@@ -19,6 +19,8 @@ rm checkout/control.raw.inp
 cp $origin/condition.f90 checkout/
 rm checkout/condition.raw.f90
 
+cp $origin/restart.bin checkout/
+
 # move to 'checkout' and make/run
 cd checkout
 make

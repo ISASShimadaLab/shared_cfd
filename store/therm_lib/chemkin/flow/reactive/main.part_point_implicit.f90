@@ -1,2 +1,3 @@
-      call distribute_reaction
+      !call distribute_reaction
+      call proceed_reaction
 

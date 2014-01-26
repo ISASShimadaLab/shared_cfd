@@ -58,6 +58,7 @@ subroutine set_TG!{{{
    do plane = nps,npe
       ! i-direction{{{
       !$omp parallel do private(i,&
+      !$omp                     wHl,wHr,vn,tg,&
       !$omp                     ul,vl,rhol,gmmal,unl,phil,al,Ml,betal,pl,&
       !$omp                     ur,vr,rhor,gmmar,unr,phir,ar,Mr,betar,pr,&
       !$omp                     N,&
@@ -158,6 +159,7 @@ subroutine set_TG!{{{
       ! j-direction{{{
       !$omp parallel do private(i,&
       !$omp                     ul,vl,rhol,gmmal,unl,phil,al,Ml,betal,pl,&
+      !$omp                     wHl,wHr,vn,tg,&
       !$omp                     ur,vr,rhor,gmmar,unr,phir,ar,Mr,betar,pr,&
       !$omp                     N,&
       !$omp                     Drho,Dp,a_bar,un_bar_abs,p_bar,&

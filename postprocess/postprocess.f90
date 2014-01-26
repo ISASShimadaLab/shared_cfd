@@ -25,6 +25,8 @@ program main
    character*50 title,str_num
    integer*4,external::access
 
+   double precision tmp
+
    !read control parameters
    call read_control
 
@@ -110,6 +112,18 @@ program main
          call center_to_grid(plane,w_res(:,:,plane))
       end do
 
+      !write(filename,"('result/result',i3.3,'.',i12.12,'.plt')") plane,step
+      !!open(28,file=trim(filename))
+      !open(28,file="test.dat")
+      !tmp=0d0
+      !j=0
+      !i=0
+      !write(28,*) tmp,p_mat(i,j,1)/p_mat(i,0,1)
+      !do i=1,ni(1)
+      !   tmp=tmp+sqrt((xh(i,j,1)-xh(i-1,j,1))**2+(rh(i,j,1)-rh(i-1,j,1))**2)
+      !   write(28,*) tmp/2d0/rh(ni(1),0,1),p_mat(i,j,1)/p_mat(0,j,1)
+      !end do
+      !close(28)
 
       do plane = 1,Nplane
          !output file open

@@ -14,6 +14,8 @@ rm checkout/control.raw.inp
 cp $origin/condition.f90 checkout/
 rm checkout/condition.raw.f90
 
+cp $origin/thermal_model.f90 checkout/
+
 # move to 'checkout' and make/run
 cd checkout
 make
