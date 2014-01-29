@@ -999,6 +999,15 @@ cronを利用する際の注意点として、cronはサーバー毎に設定で
 \item \verb|make tar| on SC...スーパーコンピュータ上で打つと、RMS.dat, geometry.bin, result/*.binをresult.tar.gzファイルに圧縮する。
 \item \verb|make pull| on postprocess...postprocessディレクトリにおいて、Makefileの変数remoteにresult.tar.gzが存在するディレクトリを指定すると、このコマンドでそのresult.tar.gzをダウンロードし解凍する。
 \end{itemize}
+
+\paragraph{その他スーパーコンピュータでのコマンド}
+"y535"と書いてある部分は自分のユーザー名に置き換え実行すること。
+\begin{itemize}
+\item qstat | grep y535...qstatで現在の自分のジョブの状態が分かるが、長すぎるので、grepコマンドをかけると、有益な情報のみを取り出すことができる。"RUNNING"が実行中、"QUEUED"が待機中。
+\item qdel -k (number)...qstatで分かるジョブ番号で(number)の部分を置き換え実行すると、そのジョブが強制終了される。
+\item qhold (number)...qstatで分かるジョブ番号で(number)の部分を置き換え実行すると、そのジョブが実行停止になる。"qhold -S ステップ名"でステップジョブを一括停止できる。
+\item qrls (number)...qholdで停止したジョブを再開させる。"qrls -S ステップ名"でステップジョブを一括再開できる。
+\end{itemize}
 %}}}
 \subsection{store/dim}%{{{
 軸対称流か二次元流かを選ぶものである。サブディレクトリは2dとq2dで、それぞれ以下のファイルが含まれている。
@@ -1703,7 +1712,9 @@ Absolute Torelance VODE : 1.e-20
 組成は"化学種名 モル分率"の順で一化学種に一行用いて入力し、最後の行には"end"のみの行を入力する。モル分率の和が1である必要はない。
 このインプットファイルでは、酸化剤にO2純粋気体、燃料にCH4純粋気体を用いることとなっている。
 
-また、VODEに用いる相対許容誤差と絶対許容誤差も定義しなければならない。例に載せてある値はSENKINに使われている値である。これらの値は大きくするとそれだけ計算が早くなるが、大きくしすぎると計算が破綻する(発散する)。
+また、VODEに用いる相対許容誤差と絶対許容誤差も定義しなければならない。例に載せてある値はSENKINに使われている値である。これらの値は大きくするとそれだけ計算が早くなるが、大きくしすぎると計算が破綻する(発散する)。また小さくしすぎてもstiff過ぎる場合おちることがある。
+筆者は経験的に、0次元化学計算(reduction含む)には上記の値、
+流体計算においては$10^{-6}$を相対許容誤差、絶対許容誤差共に用いている。
 
 境界条件には\verb|calc_boundary(p,T,Yf, wt,vhit)|を用いる。仕様はNASAデータベースで用いられている\verb|YPT2w(Yf,p,T,wt,vhit)|と同様である。
 
@@ -2218,7 +2229,7 @@ conditions.f90ではcontrol.inpの読み込みや各条件に用いるエネル�
 \newpage
 
 %sample
-\part{サンプル集}%{{{
+\part{サンプル集}
 \newpage
 \section{使い方と使用機能一覧}%{{{
 本プログラムではプログラムの検証用にサンプルを用意している。
@@ -2309,11 +2320,11 @@ no26.chemkin\_mono\_hp            & 化学素反応   & 単条件   & hp一定 \
 \hline
 \end{tabular}
 \end{table}%}}}
-%}}}
 \newpage
 \hspace{1em}
+%}}}
 \newpage
-\section{サンプル一覧}
+\section{サンプル一覧}%{{{
 \subsection{no00.shock\_tube}%{{{
 衝撃波管問題.理想気体を用いた単純な問題。
 
@@ -2825,14 +2836,47 @@ no23と同様。圧力エンタルピー一定条件以外全て条件を揃え�
 \end{center}
 %}}}
 \subsection{no27.chemkin\_reaction}%{{{
+H2/Airの着火問題を解いている。計算にはPCで三日ほどかかる。
+
+本計算では、空気の主流に水素が横から吹き入れられている境界層燃焼場を解いている。
+初期場は非燃焼場であり、これはcheckout.ini.inpとcontrol.ini.inpを用いて解かれている。
+前処理法を用いているので、40,000step程度で収束場が得られている。
+
+この収束場より、5,000stepかけて1,500K、速度1m/sの当量で混合されたH2/Airガスを一部燃料噴入区間から流入させる。このガスは速やかに自着火し高温ガスとなり、
+\begin{center}
+\includegraphics[width=.65\textwidth,bb=0 0 1440 872]{sample/no27.1.png}
+\end{center}
+境界層を着火する。
+\begin{center}
+\includegraphics[width=.65\textwidth,bb=0 0 1440 872]{sample/no27.2.png}
+\end{center}
+着火された境界層は前方と後方へ予混合火炎が伝播する。
+(また、400,000step=0.044sで高温ガス噴入を非連続的に止めている。)
+\begin{center}
+\includegraphics[width=.65\textwidth,bb=0 0 1440 872]{sample/no27.3.png}
+\end{center}
+火炎はまず乱れる。
+\begin{center}
+\includegraphics[width=.65\textwidth,bb=0 0 1440 872]{sample/no27.4.png}
+\end{center}
+しかし乱れは通りすぎ、定常的な乱流状態に遷移する。
+\begin{center}
+\includegraphics[width=.65\textwidth,bb=0 0 1440 872]{sample/no27.5.png}
+\end{center}
+この計算は見ての通りメッシュが荒く、予混合火炎の火炎核が解像できていないため、火炎伝播速度は定量的に現実に一致していないことが予想される。
+
+物理現象を論じる場合にはさらにメッシュを細かくすることが必要である。
+
+また、以上の図では白線で当量に混合された反応物や、そこから生成されたと推測される生成物の位置を白線で示している。
 %}}}
 \subsection{no28.cold\_flow\_NASA}%{{{
 NASAデータベースを用いた凍結流計算を行っている。
-H2/O2の計算であり、共にN2で10倍に希釈してある。
+H2/O2の計算であり、N2で希釈し、
+H2:N2=2:10の混合物を燃料、O2:N2=1:10の混合物を酸化剤としている(ともにモル分率)。
 前処理法を用いて収束場を素早く得ている。
 
 NASA D.B.の凍結流計算は一段総括反応や完全平衡を用いる計算の初期速度場を得たいときなどに利用できる。
-酸素質量分率は図の通り。
+燃料質量分率は図の通り。
 \begin{center}
 \includegraphics[width=.8\textwidth,bb=0 0 1663 1056]{sample/no28.png}
 \end{center}
