@@ -193,7 +193,7 @@ contains
       open(55,file=trim(filename))
       write(55,'(a)') '<?xml version="1.0"?>'
       write(55,'(a)') '<VTKFile type="StructuredGrid" version="0.1" byte_order="BigEndian">'
-      write(55,'(a,6i4,a)') '<StructuredGrid WholeExtent="',&
+      write(55,'(a,6i6,a)') '<StructuredGrid WholeExtent="',&
                              nxs_vis(plane),&
                              nxe_vis(plane),&
                              nys_vis(plane),&
@@ -211,7 +211,7 @@ contains
                            '</DataArray>'
       write(55,'(a)') '</FieldData>'
 
-      write(55,'(a,6i4,a)') '<Piece Extent="',&
+      write(55,'(a,6i6,a)') '<Piece Extent="',&
                              nxs_vis(plane),&
                              nxe_vis(plane),&
                              nys_vis(plane),&
